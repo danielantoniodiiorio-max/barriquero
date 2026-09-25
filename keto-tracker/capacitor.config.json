@@ -1,0 +1,21 @@
+{
+  "appId": "com.ketotrack.garmin",
+  "appName": "KetoTrack",
+  "webDir": "public",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true
+  },
+  "plugins": {
+    "Health": {
+      "permissions": [
+        "steps",
+        "calories",
+        "heartRate"
+      ]
+    }
+  }
+}
