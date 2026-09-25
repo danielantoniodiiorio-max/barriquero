@@ -5,24 +5,27 @@ jobs:
     name: Compilar APK Android 15 con Health Connect
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Descargar Código del Repositorio
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - uses: actions/setup-java@v4
+      - name: Configurar Java 21 (JDK)
+        uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '21'
 
-      - name: Preparar y Compilar APK con Health Connect
+      - name: Configurar Dependencias y Assets
         run: |
           if [ -d "keto-tracker" ]; then
             cd keto-tracker
           fi
 
-          # 1. Configurar dependencias compatibles de Capacitor 7 y Health Connect
+          # 1. Configurar dependencias de Capacitor 7 y Health Connect
           node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
@@ -37,7 +40,7 @@ jobs:
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
           "
 
-          # 2. Generar Política de Privacidad obligatoria para Health Connect
+          # 2. Generar Política de Privacidad para Health Connect
           cat << 'EOF' > public/privacypolicy.html
           <!DOCTYPE html>
           <html lang="es">
@@ -48,13 +51,13 @@ jobs:
           </head>
           <body style="font-family:sans-serif; padding:20px; color:#1e293b; line-height:1.6;">
             <h1 style="color:#10b981;">Política de Privacidad de KetoTrack</h1>
-            <p>KetoTrack lee pasos, calorías activas y frecuencia cardíaca de Google Health Connect exclusivamente para calcular la velocidad de vaciado de glucógeno y entrada en cetosis.</p>
+            <p>KetoTrack lee pasos, calorías activas y frecuencia cardíaca de Google Health Connect exclusivamente para calcular el vaciado de glucógeno y entrada en cetosis.</p>
             <p>Tus datos se procesan 100% de manera local en tu teléfono y nunca son compartidos con terceros.</p>
           </body>
           </html>
           EOF
 
-          # 3. Inyectar health-connect.js con soporte oficial readSamples
+          # 3. Inyectar health-connect.js actualizado
           cat << 'EOF' > public/health-connect.js
           class HealthConnectManager {
             constructor() {
@@ -298,7 +301,7 @@ jobs:
           window.healthConnectManager = new HealthConnectManager();
           EOF
 
-          # 4. Inyectar botón de Health Connect en index.html si no está presente
+          # 4. Inyectar botón de Health Connect en index.html
           node -e "
             const fs = require('fs');
             let html = fs.readFileSync('public/index.html', 'utf8');
@@ -310,14 +313,44 @@ jobs:
             }
           "
 
-          # 5. Instalar dependencias con npm
+      - name: Instalar Dependencias npm
+        run: |
+          if [ -d "keto-tracker" ]; then
+            cd keto-tracker
+          fi
           npm install
 
-          # 6. Recrear proyecto Android nativo con Capacitor 7
+      - name: Configurar Proyecto Android y Permisos
+        run: |
+          if [ -d "keto-tracker" ]; then
+            cd keto-tracker
+          fi
           rm -rf android
           npx cap add android
 
-          # 7. Inyectar AndroidManifest.xml completo con permisos y Rationale de Health Connect
+          # Configurar variables.gradle (SDK 35 y Kotlin 1.9.24)
+          node -e "
+            const fs = require('fs');
+            let vg = fs.readFileSync('android/variables.gradle', 'utf8');
+            vg = vg.replace(/compileSdkVersion\s*=\s*\d+/, 'compileSdkVersion = 35');
+            vg = vg.replace(/targetSdkVersion\s*=\s*\d+/, 'targetSdkVersion = 35');
+            if (!vg.includes('kotlinVersion')) {
+              vg = vg.replace(/ext\s*\{/, \"ext {\n    kotlinVersion = '1.9.24'\");
+            }
+            fs.writeFileSync('android/variables.gradle', vg, 'utf8');
+          "
+
+          # Configurar android/build.gradle (Kotlin Gradle plugin)
+          node -e "
+            const fs = require('fs');
+            let bg = fs.readFileSync('android/build.gradle', 'utf8');
+            if (!bg.includes('kotlin-gradle-plugin')) {
+              bg = bg.replace(/dependencies\s*\{/, \"dependencies {\n        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24'\");
+              fs.writeFileSync('android/build.gradle', bg, 'utf8');
+            }
+          "
+
+          # Inyectar AndroidManifest.xml con permisos de Health Connect y Rationale oficial
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -377,15 +410,32 @@ jobs:
           </manifest>
           EOF
 
-          # 8. Sincronizar plugins de Capacitor en el proyecto Android
+          # Sincronizar plugins de Capacitor en el proyecto Android
           npx cap sync android
 
-          # 9. Compilar el archivo APK Debug con Gradle y Java 21
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          # Habilitar coreLibraryDesugaring en app/build.gradle
+          node -e "
+            const fs = require('fs');
+            let abg = fs.readFileSync('android/app/build.gradle', 'utf8');
+            if (!abg.includes('coreLibraryDesugaring')) {
+              abg = abg.replace(/compileOptions\s*\{/, \"compileOptions {\n        coreLibraryDesugaringEnabled true\");
+              abg = abg.replace(/dependencies\s*\{/, \"dependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'\");
+              fs.writeFileSync('android/app/build.gradle', abg, 'utf8');
+            }
+          "
 
-      - uses: actions/upload-artifact@v4
+      - name: Compilar APK con Gradle
+        run: |
+          if [ -d "keto-tracker" ]; then
+            cd keto-tracker/android
+          else
+            cd android
+          fi
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Guardar APK como Artefacto Descargable
+        uses: actions/upload-artifact@v4
         with:
           name: KetoTrack-Android-APK
           path: |
