@@ -12,15 +12,26 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
-      - name: Instalar y Compilar
+      - uses: android-actions/setup-android@v3
+      - name: Preparar y Compilar APK
         run: |
           cd keto-tracker
           npm install
-          npx cap add android || true
+          
+          # Respaldar manifiesto con permisos de Health Connect
+          cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml || true
+          rm -rf android
+          
+          # Generar proyecto nativo completo de Android
+          npx cap add android
+          
+          # Restaurar manifiesto con permisos de Health Connect
+          cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml || true
+          
           npx cap sync android
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: KetoTrack-Android-APK
