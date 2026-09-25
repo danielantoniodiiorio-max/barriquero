@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>KetoTrack + Garmin</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="logo-icon">🥑</span>
+        <div>
+          <h1>KetoTrack</h1>
+          <span class="subtext">Control Cetogénico & Garmin</span>
+        </div>
+      </div>
+      <button id="btnSettingsModal" class="btn-icon" title="Configuración">⚙️</button>
+    </header>
+
+    <!-- Main Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="tab-dashboard">
+        <span class="tab-icon">⚡</span> Estado
+      </button>
+      <button class="nav-tab" data-tab="tab-meals">
+        <span class="tab-icon">🍽️</span> Comidas
+      </button>
+      <button class="nav-tab" data-tab="tab-garmin">
+        <span class="tab-icon">⌚</span> Garmin
+      </button>
+      <button class="nav-tab" data-tab="tab-biomarkers">
+        <span class="tab-icon">🩸</span> Cetonas
+      </button>
+    </nav>
+
+    <!-- TAB 1: DASHBOARD (ESTADO DE CETOSIS & MACROS) -->
+    <main id="tab-dashboard" class="tab-pane active">
+      <!-- Ketosis Status Card -->
+      <section class="card ketosis-card">
+        <div class="card-header">
+          <span class="badge" id="badgePhase">Fase ...</span>
+          <span class="timer-tag" id="timerFasting">⏱️ 0h en ayuno/keto</span>
+        </div>
+
+        <div class="ketosis-gauge-wrap">
+          <div class="gauge-circle" id="gaugeCircle">
+            <div class="gauge-inner">
+              <span class="ketone-val" id="valEstimatedKetones">0.0</span>
+              <span class="ketone-unit">mmol/L est.</span>
+            </div>
+          </div>
+          <div class="gauge-details">
+            <h3 id="txtPhaseTitle">Calculando estado...</h3>
+            <p id="txtPhaseDesc" class="text-muted">Cargando datos metabólicos...</p>
+            <div class="time-next" id="wrapTimeToNext">
+              <span>Tiempo est. a siguiente fase:</span>
+              <strong id="valTimeToNext">--</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Garmin Impact Pill -->
+        <div class="garmin-impact-banner" id="bannerGarminImpact">
+          <span class="garmin-logo">⌚ Garmin Boost:</span>
+          <span id="txtGarminImpactDesc">+0 kcal activas</span>
+        </div>
+      </section>
+
+      <!-- Daily Macros Overview -->
+      <section class="card macros-card">
+        <div class="section-title">
+          <h2>Macronutrientes de Hoy</h2>
+          <span class="carb-status" id="badgeCarbStatus">Bajo Límite</span>
+        </div>
+
+        <div class="macro-bars">
+          <!-- Carbs -->
+          <div class="macro-item">
+            <div class="macro-label">
+              <span class="macro-name">Carbos Netos</span>
+              <span class="macro-amount"><strong id="valNetCarbs">0</strong> / <span id="targetNetCarbs">25</span>g</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill carb-fill" id="barNetCarbs" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Grasas -->
+          <div class="macro-item">
+            <div class="macro-label">
+              <span class="macro-name">Grasas (Keto Fuel)</span>
+              <span class="macro-amount"><strong id="valFat">0</strong> / <span id="targetFat">140</span>g</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill fat-fill" id="barFat" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Proteínas -->
+          <div class="macro-item">
+            <div class="macro-label">
+              <span class="macro-name">Proteínas</span>
+              <span class="macro-amount"><strong id="valProtein">0</strong> / <span id="targetProtein">90</span>g</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill protein-fill" id="barProtein" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Keto Caloric Distribution -->
+        <div class="calorie-ratio-row">
+          <div class="ratio-box fat-box">
+            <span class="ratio-num" id="ratioFat">0%</span>
+            <span class="ratio-title">Grasas</span>
+            <small class="ratio-ideal">Meta: 70-75%</small>
+          </div>
+          <div class="ratio-box protein-box">
+            <span class="ratio-num" id="ratioProtein">0%</span>
+            <span class="ratio-title">Proteínas</span>
+            <small class="ratio-ideal">Meta: 20-25%</small>
+          </div>
+          <div class="ratio-box carb-box">
+            <span class="ratio-num" id="ratioCarbs">0%</span>
+            <span class="ratio-title">Carbos</span>
+            <small class="ratio-ideal">Meta: 5-10%</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- Quick Meal Add Shortcut -->
+      <section class="quick-action-strip">
+        <button class="btn btn-primary btn-full" id="btnOpenAddMeal">
+          <span>➕</span> Registrar Comida Rápida
+        </button>
+      </section>
+    </main>
+
+    <!-- TAB 2: COMIDAS (REGISTRO & LISTA) -->
+    <main id="tab-meals" class="tab-pane">
+      <div class="card">
+        <div class="section-title">
+          <h2>Nueva Ingesta</h2>
+        </div>
+
+        <!-- AI Vision Camera Scanner -->
+        <div class="camera-scanner-box">
+          <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
+          <button type="button" class="btn btn-ai-camera full-width" id="btnTriggerCamera">
+            <span class="camera-icon">📸</span> Tomar Foto al Plato (IA Vision)
+          </button>
+          
+          <div id="photoAnalysisLoading" class="analysis-loading" style="display: none;">
+            <div class="spinner"></div>
+            <div class="loading-text">
+              <strong>Analizando nutrientes con Gemini Vision...</strong>
+              <span class="text-muted small">Estimando porciones y carbohidratos netos</span>
+            </div>
+          </div>
+
+          <div id="photoPreviewWrap" class="photo-preview-wrap" style="display: none;">
+            <div class="preview-img-container">
+              <img id="imgMealPreview" src="" alt="Foto del plato">
+            </div>
+            <div id="aiAdviceBanner" class="ai-advice-banner"></div>
+          </div>
+        </div>
+
+        <!-- Presets Populares Keto -->
+        <div class="presets-row">
+          <span class="preset-label">O elige un Keto Rápido:</span>
+          <button class="chip" data-name="3 Huevos revueltos c/ manteca" data-c="1.5" data-f="0" data-p="19" data-fat="22" data-cal="280">🍳 3 Huevos c/ manteca</button>
+          <button class="chip" data-name="Bife de chorizo c/ ensalada verde" data-c="3" data-f="2" data-p="45" data-fat="35" data-cal="510">🥩 Bife c/ ensalada</button>
+          <button class="chip" data-name="Medio aguacate con aceite de oliva" data-c="6" data-f="5" data-p="1.5" data-fat="22" data-cal="230">🥑 Medio aguacate</button>
+          <button class="chip" data-name="Café con aceite MCT y manteca" data-c="0" data-f="0" data-p="0.5" data-fat="25" data-cal="230">☕ Café Bulletproof</button>
+        </div>
+
+        <form id="formMeal" class="form-grid">
+          <div class="form-group full-width">
+            <label for="inputMealName">Nombre del alimento o plato</label>
+            <input type="text" id="inputMealName" placeholder="Ej. Omelette con queso y panceta" required>
+          </div>
+
+          <div class="form-group">
+            <label for="inputCarbs">Carbos Totales (g)</label>
+            <input type="number" step="0.1" id="inputCarbs" value="0">
+          </div>
+
+          <div class="form-group">
+            <label for="inputFiber">Fibra (g)</label>
+            <input type="number" step="0.1" id="inputFiber" value="0">
+          </div>
+
+          <div class="form-group">
+            <label for="inputProtein">Proteínas (g)</label>
+            <input type="number" step="0.1" id="inputProtein" value="0">
+          </div>
+
+          <div class="form-group">
+            <label for="inputFat">Grasas (g)</label>
+            <input type="number" step="0.1" id="inputFat" value="0">
+          </div>
+
+          <div class="form-group full-width">
+            <label for="inputCalories">Calorías Totales (kcal - opcional, autocalculado)</label>
+            <input type="number" id="inputCalories" placeholder="Autocalcular si queda vacío">
+          </div>
+
+          <button type="submit" class="btn btn-primary full-width">Guardar Comida</button>
+        </form>
+      </div>
+
+      <!-- Meal History for Today -->
+      <section class="card meals-list-card">
+        <div class="section-title">
+          <h2>Comidas Registradas Hoy</h2>
+        </div>
+        <div id="mealsList" class="meals-list">
+          <!-- Populated via JS -->
+          <p class="text-muted text-center">No hay comidas registradas hoy.</p>
+        </div>
+      </section>
+    </main>
+
+    <!-- TAB 3: GARMIN (CONEXIÓN & MÉTRICAS) -->
+    <main id="tab-garmin" class="tab-pane">
+      <div class="card">
+        <div class="section-title">
+          <h2>Sincronización Garmin</h2>
+          <span class="badge badge-garmin" id="garminSourceBadge">Modo Demo</span>
+        </div>
+
+        <div class="free-sync-banner">
+          <span class="free-tag">100% GRATIS</span>
+          <span>Sincroniza directamente con tu cuenta gratuita de <strong>Garmin Connect</strong> (la misma que usas en la app de tu celular). Sin pagar licencias ni suscripciones.</span>
+        </div>
+
+        <p class="text-muted">
+          Los pasos y calorías activas de tu reloj Garmin se utilizan para calcular la velocidad de vaciado del glucógeno y acelerar el tiempo de entrada en cetosis.
+        </p>
+
+        <!-- Garmin Live Stats Grid -->
+        <div class="garmin-stats-grid">
+          <div class="stat-card">
+            <span class="stat-icon">🔥</span>
+            <div class="stat-info">
+              <span class="stat-value" id="garminActiveCal">0</span>
+              <span class="stat-label">Calorías Activas</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <span class="stat-icon">👣</span>
+            <div class="stat-info">
+              <span class="stat-value" id="garminSteps">0</span>
+              <span class="stat-label">Pasos de Hoy</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <span class="stat-icon">❤️</span>
+            <div class="stat-info">
+              <span class="stat-value" id="garminRestingHr">--</span>
+              <span class="stat-label">Pulsaciones Reposo</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <span class="stat-icon">⚡</span>
+            <div class="stat-info">
+              <span class="stat-value" id="garminTotalCal">0</span>
+              <span class="stat-label">Gasto Total (kcal)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Formulario de Entrada Directa de Métricas Reales -->
+        <div class="manual-garmin-box">
+          <div class="manual-header">
+            <h3>⌚ Cargar Métricas de tu Reloj de Hoy</h3>
+            <span class="badge badge-green">100% Directo y Seguro</span>
+          </div>
+          <p class="small text-muted">
+            Mira tu reloj Garmin o la app Garmin Connect de tu celular e introduce tus valores de hoy para alimentar el motor de cetosis:
+          </p>
+          
+          <form id="formManualGarmin" class="form-grid">
+            <div class="form-group">
+              <label for="inputManualActiveCal">🔥 Calorías Activas (kcal)</label>
+              <input type="number" id="inputManualActiveCal" placeholder="Ej. 520" required>
+            </div>
+            <div class="form-group">
+              <label for="inputManualSteps">👣 Pasos de Hoy</label>
+              <input type="number" id="inputManualSteps" placeholder="Ej. 9200" required>
+            </div>
+            <div class="form-group full-width">
+              <label for="inputManualRestingHr">❤️ Pulsaciones en Reposo (bpm - opcional)</label>
+              <input type="number" id="inputManualRestingHr" placeholder="Ej. 58">
+            </div>
+            <button type="submit" class="btn btn-primary full-width">
+              Guardar Métricas de Hoy y Recalcular
+            </button>
+          </form>
+        </div>
+
+        <!-- Sync Actions Automática -->
+        <div class="sync-actions">
+          <button id="btnSyncGarminReal" class="btn btn-outline full-width">
+            🔄 Intentar Conexión Directa con Garmin Cloud
+          </button>
+          <small class="text-muted text-center" style="display:block; margin-top:4px;">
+            Nota: Garmin protege su inicio de sesión con Cloudflare Anti-Bot, lo que puede rechazar inicios de sesión programáticos.
+          </small>
+        </div>
+
+        <!-- Simulator / Custom adjustment for prototype -->
+        <div class="simulator-box">
+          <h3>Simulador Interactivo de Actividad</h3>
+          <p class="small text-muted">Desliza para simular entrenamientos y ver cómo se acelera la cetosis:</p>
+          <div class="sim-row">
+            <label>Calorías Activas:</label>
+            <input type="range" id="simActiveCal" min="0" max="1500" step="50" value="450">
+            <span id="lblSimActiveCal">450 kcal</span>
+          </div>
+          <div class="sim-row">
+            <label>Pasos:</label>
+            <input type="range" id="simSteps" min="0" max="25000" step="500" value="8500">
+            <span id="lblSimSteps">8500 pasos</span>
+          </div>
+          <button id="btnApplySimGarmin" class="btn btn-secondary full-width">
+            Simular y Recalcular
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- TAB 4: BIOMARCADORES (CETONAS SANGRE / ORINA) -->
+    <main id="tab-biomarkers" class="tab-pane">
+      <div class="card">
+        <div class="section-title">
+          <h2>Registro de Cetonas Reales</h2>
+        </div>
+        <p class="text-muted">Si mides tus cetonas con tiras reactivas o medidor en sangre (ej. Keto-Mojo), regístralo aquí para contrastar con la estimación algorítmica.</p>
+
+        <form id="formKetoneLog" class="form-grid">
+          <div class="form-group">
+            <label for="selKetoneType">Tipo de Prueba</label>
+            <select id="selKetoneType">
+              <option value="blood">Sangre (mmol/L)</option>
+              <option value="urine">Tira de Orina</option>
+              <option value="breath">Aliento (ppm)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="inputKetoneValue">Valor Medido</label>
+            <input type="number" step="0.1" id="inputKetoneValue" placeholder="Ej. 1.2" required>
+          </div>
+
+          <div class="form-group full-width">
+            <label for="inputKetoneNotes">Notas (opcional)</label>
+            <input type="text" id="inputKetoneNotes" placeholder="Ej. En ayuno matutino">
+          </div>
+
+          <button type="submit" class="btn btn-primary full-width">Guardar Medición</button>
+        </form>
+      </div>
+
+      <section class="card">
+        <div class="section-title">
+          <h2>Historial de Mediciones</h2>
+        </div>
+        <div id="ketoneLogsList" class="ketone-logs-list">
+          <p class="text-muted text-center">Aún no hay mediciones registradas.</p>
+        </div>
+      </section>
+    </main>
+
+    <!-- MODAL DE CONFIGURACIÓN -->
+    <div id="settingsModal" class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>Configuración de Objetivos</h2>
+          <button id="btnCloseSettingsModal" class="btn-close">&times;</button>
+        </div>
+        <form id="formSettings">
+          <div class="form-group">
+            <label for="setNetCarbs">Límite Diario de Carbos Netos (g)</label>
+            <input type="number" id="setNetCarbs" required>
+          </div>
+          <div class="form-group">
+            <label for="setProtein">Objetivo de Proteína (g)</label>
+            <input type="number" id="setProtein" required>
+          </div>
+          <div class="form-group">
+            <label for="setFat">Objetivo de Grasas (g)</label>
+            <input type="number" id="setFat" required>
+          </div>
+          <div class="form-group">
+            <label for="setCalories">Objetivo Calórico (kcal)</label>
+            <input type="number" id="setCalories" required>
+          </div>
+
+          <hr class="divider">
+          <h3>Credenciales Garmin Connect (Opcional)</h3>
+          <p class="small text-muted">Se almacenan solo localmente en tu base de datos SQLite.</p>
+          <div class="form-group">
+            <label for="setGarminUser">Usuario / Email de Garmin Connect</label>
+            <input type="email" id="setGarminUser" placeholder="tu-email@ejemplo.com">
+          </div>
+          <div class="form-group">
+            <label for="setGarminPass">Contraseña de Garmin Connect</label>
+            <input type="password" id="setGarminPass" placeholder="••••••••">
+          </div>
+
+          <hr class="divider">
+          <h3>IA Gemini Vision (Opcional)</h3>
+          <p class="small text-muted">Clave gratuita de Google AI Studio para análisis fotográfico de platos.</p>
+          <div class="form-group">
+            <label for="setGeminiKey">Gemini API Key</label>
+            <input type="password" id="setGeminiKey" placeholder="AIzaSy••••••••">
+          </div>
+
+          <button type="submit" class="btn btn-primary full-width">Guardar Ajustes</button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="health-connect.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

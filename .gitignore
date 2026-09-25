@@ -1,0 +1,22 @@
+# Environment variables & secrets
+.env
+data/garmin_session.json
+
+# Local database (keeps user's local meals private)
+data/*.db
+data/*.db-journal
+
+# Node & dependencies
+node_modules/
+npm-debug.log*
+
+# Android build outputs & local caches
+android/app/build/
+android/.gradle/
+android/build/
+android/local.properties
+.gradle/
+
+# OS files
+Thumbs.db
+.DS_Store
