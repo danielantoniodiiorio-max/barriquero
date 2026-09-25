@@ -18,18 +18,52 @@ jobs:
       - name: Preparar y Compilar APK
         run: |
           cd keto-tracker
-          npm install
+          # Instalar versiones compatibles de Capacitor y Health Connect
+          npm install @capacitor/core@latest @capacitor/android@latest @capacitor/cli@latest @capgo/capacitor-health@latest
           
-          # Respaldar manifiesto con permisos de Health Connect
-          cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml || true
+          # Generar proyecto Android
           rm -rf android
-          
-          # Generar proyecto nativo de Android
           npx cap add android
           
-          # Restaurar manifiesto con permisos de Health Connect
-          cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml || true
-          
+          # Inyectar permisos de Health Connect
+          cat << 'EOF' > android/app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.CAMERA" />
+              <uses-permission android:name="android.permission.health.READ_STEPS" />
+              <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
+              <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
+              <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+              <queries>
+                  <package android:name="com.google.android.apps.healthdata" />
+              </queries>
+              <application
+                  android:allowBackup="true"
+                  android:icon="@mipmap/ic_launcher"
+                  android:label="KetoTrack"
+                  android:roundIcon="@mipmap/ic_launcher_round"
+                  android:supportsRtl="true"
+                  android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+                  <activity
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+                      android:name=".MainActivity"
+                      android:label="KetoTrack"
+                      android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+                      android:launchMode="singleTask"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                      <intent-filter>
+                          <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOF
+
           npx cap sync android
           cd android
           chmod +x gradlew
