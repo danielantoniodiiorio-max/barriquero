@@ -5,14 +5,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+
       - name: Preparar y Compilar APK
         run: |
           cd keto-tracker
@@ -22,7 +24,7 @@ jobs:
           cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml || true
           rm -rf android
           
-          # Generar proyecto nativo completo de Android
+          # Generar proyecto nativo de Android
           npx cap add android
           
           # Restaurar manifiesto con permisos de Health Connect
@@ -31,7 +33,8 @@ jobs:
           npx cap sync android
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug --no-daemon
+
       - uses: actions/upload-artifact@v4
         with:
           name: KetoTrack-Android-APK
