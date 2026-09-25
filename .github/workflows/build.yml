@@ -2,6 +2,7 @@ name: Compilar APK Android
 on: [push, workflow_dispatch]
 jobs:
   build:
+    name: Compilar APK Android 15 con Health Connect
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -13,28 +14,373 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: '17'
+          java-version: '21'
 
-      - name: Preparar y Compilar APK
+      - name: Preparar y Compilar APK con Health Connect
         run: |
-          cd keto-tracker
-          # 1. Corregir dependencia en package.json
-          node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json')); delete p.dependencies['@capgo/capacitor-health']; fs.writeFileSync('package.json', JSON.stringify(p,null,2));"
+          if [ -d "keto-tracker" ]; then
+            cd keto-tracker
+          fi
 
-          # 2. Respaldar manifiesto con permisos de Health Connect
-          cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml
-          rm -rf android
+          # 1. Configurar dependencias compatibles de Capacitor 7 y Health Connect
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.dependencies = {
+              '@capacitor/core': '^7.0.0',
+              '@capacitor/android': '^7.0.0',
+              '@capgo/capacitor-health': '^7.2.1'
+            };
+            pkg.devDependencies = {
+              '@capacitor/cli': '^7.0.0'
+            };
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
 
-          # 3. Instalar dependencias y generar proyecto Android
+          # 2. Generar Política de Privacidad obligatoria para Health Connect
+          cat << 'EOF' > public/privacypolicy.html
+          <!DOCTYPE html>
+          <html lang="es">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Privacidad - KetoTrack</title>
+          </head>
+          <body style="font-family:sans-serif; padding:20px; color:#1e293b; line-height:1.6;">
+            <h1 style="color:#10b981;">Política de Privacidad de KetoTrack</h1>
+            <p>KetoTrack lee pasos, calorías activas y frecuencia cardíaca de Google Health Connect exclusivamente para calcular la velocidad de vaciado de glucógeno y entrada en cetosis.</p>
+            <p>Tus datos se procesan 100% de manera local en tu teléfono y nunca son compartidos con terceros.</p>
+          </body>
+          </html>
+          EOF
+
+          # 3. Inyectar health-connect.js con soporte oficial readSamples
+          cat << 'EOF' > public/health-connect.js
+          class HealthConnectManager {
+            constructor() {
+              this.isNative = false;
+              this.plugin = null;
+              this.init();
+            }
+
+            getPlugin() {
+              if (window.Capacitor) {
+                if (window.Capacitor.Plugins && window.Capacitor.Plugins.Health) {
+                  return window.Capacitor.Plugins.Health;
+                }
+                if (typeof window.Capacitor.registerPlugin === 'function') {
+                  try {
+                    return window.Capacitor.registerPlugin('Health');
+                  } catch (e) {
+                    console.warn('registerPlugin error:', e);
+                  }
+                }
+              }
+              return null;
+            }
+
+            async init() {
+              if (window.Capacitor) {
+                this.isNative = typeof window.Capacitor.isNativePlatform === 'function' 
+                  ? window.Capacitor.isNativePlatform() 
+                  : true;
+                this.plugin = this.getPlugin();
+              }
+
+              this.bindUI();
+
+              if (this.isNative) {
+                console.log('📱 Modo Nativo Android detectado.');
+                if (this.plugin) {
+                  await this.setupAutoSync();
+                } else {
+                  setTimeout(async () => {
+                    this.plugin = this.getPlugin();
+                    if (this.plugin) {
+                      await this.setupAutoSync();
+                    } else {
+                      this.updateUIStatus('Toca el botón verde para conectar con Google Health Connect.');
+                    }
+                  }, 800);
+                }
+              } else {
+                this.updateUINonNative();
+              }
+            }
+
+            bindUI() {
+              const btn = document.getElementById('btnConnectHealthConnect');
+              if (btn) {
+                btn.addEventListener('click', async () => {
+                  btn.disabled = true;
+                  btn.textContent = '⏳ Conectando con Android 15...';
+                  await this.requestPermissionAndSync(false);
+                  btn.disabled = false;
+                  btn.innerHTML = '<span>🔄</span> Conectar / Sincronizar Google Health Connect';
+                });
+              }
+            }
+
+            async setupAutoSync() {
+              await this.requestPermissionAndSync(true);
+
+              document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) {
+                  this.syncFromHealthConnect();
+                }
+              });
+
+              setInterval(() => {
+                if (!document.hidden) {
+                  this.syncFromHealthConnect();
+                }
+              }, 3 * 60 * 1000);
+            }
+
+            async requestPermissionAndSync(isSilent = false) {
+              this.plugin = this.getPlugin();
+              if (!this.plugin) {
+                if (!isSilent) {
+                  alert('El plugin nativo de Health Connect se está inicializando. Reintenta en unos instantes.');
+                }
+                return false;
+              }
+
+              try {
+                this.updateUIStatus('Verificando Google Health Connect en Android...');
+                const availability = await this.plugin.isAvailable().catch(e => ({ available: false, reason: e.message }));
+                if (availability && availability.available === false) {
+                  this.updateUIStatus(`Health Connect: ${availability.reason || 'No disponible'}`);
+                  return false;
+                }
+
+                this.updateUIStatus('Solicitando permisos a Android 15...');
+                await this.plugin.requestAuthorization({
+                  read: ['steps', 'calories', 'heartRate', 'restingHeartRate'],
+                  write: [],
+                  requestHistoryAccess: true
+                });
+
+                this.updateUIStatus('Permisos concedidos. Sincronizando datos de Garmin...');
+                await this.syncFromHealthConnect();
+                return true;
+              } catch (err) {
+                console.error('Error en Health Connect:', err);
+                this.updateUIStatus(`Error al conectar: ${err.message || err}`);
+                return false;
+              }
+            }
+
+            async syncFromHealthConnect() {
+              this.plugin = this.getPlugin();
+              if (!this.plugin) return;
+
+              try {
+                const now = new Date();
+                const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+
+                let steps = 0;
+                try {
+                  const stepsRes = await this.plugin.readSamples({
+                    dataType: 'steps',
+                    startDate: startOfDay.toISOString(),
+                    endDate: now.toISOString(),
+                    limit: 1000
+                  });
+                  if (stepsRes && Array.isArray(stepsRes.samples)) {
+                    steps = Math.round(stepsRes.samples.reduce((acc, s) => acc + (Number(s.value) || 0), 0));
+                  }
+                } catch (e) {
+                  console.warn('Error leyendo pasos:', e);
+                }
+
+                let activeCalories = 0;
+                try {
+                  const calRes = await this.plugin.readSamples({
+                    dataType: 'calories',
+                    startDate: startOfDay.toISOString(),
+                    endDate: now.toISOString(),
+                    limit: 1000
+                  });
+                  if (calRes && Array.isArray(calRes.samples)) {
+                    activeCalories = Math.round(calRes.samples.reduce((acc, s) => acc + (Number(s.value) || 0), 0));
+                  }
+                } catch (e) {
+                  console.warn('Error leyendo calorías:', e);
+                }
+
+                let restingHr = 60;
+                try {
+                  const rhrRes = await this.plugin.readSamples({
+                    dataType: 'restingHeartRate',
+                    startDate: startOfDay.toISOString(),
+                    endDate: now.toISOString(),
+                    limit: 1,
+                    ascending: false
+                  });
+                  if (rhrRes && rhrRes.samples && rhrRes.samples.length > 0) {
+                    restingHr = Math.round(rhrRes.samples[0].value || 60);
+                  } else {
+                    const hrRes = await this.plugin.readSamples({
+                      dataType: 'heartRate',
+                      startDate: startOfDay.toISOString(),
+                      endDate: now.toISOString(),
+                      limit: 1,
+                      ascending: false
+                    });
+                    if (hrRes && hrRes.samples && hrRes.samples.length > 0) {
+                      restingHr = Math.round(hrRes.samples[0].value || 60);
+                    }
+                  }
+                } catch (e) {
+                  console.warn('Error leyendo ritmo cardíaco:', e);
+                }
+
+                if (window.applyGarminMetrics) {
+                  window.applyGarminMetrics(steps, activeCalories, restingHr, 'Google Health Connect (Garmin)');
+                }
+
+                try {
+                  await fetch('/api/garmin/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      mode: 'manual',
+                      custom: { steps, active_calories: activeCalories, resting_hr: restingHr, source: 'health_connect' }
+                    })
+                  });
+                } catch (err) {}
+
+                this.updateUINativeSuccess(steps, activeCalories, restingHr);
+              } catch (err) {
+                console.error('Error al sincronizar Health Connect:', err);
+                this.updateUIStatus(`Error al sincronizar: ${err.message || err}`);
+              }
+            }
+
+            updateUINativeSuccess(steps, calories, hr) {
+              const badge = document.getElementById('garminSourceBadge');
+              if (badge) {
+                badge.textContent = 'Health Connect (Garmin) ✓';
+                badge.style.backgroundColor = 'var(--accent-green)';
+              }
+
+              const banner = document.querySelector('.free-sync-banner');
+              if (banner) {
+                banner.innerHTML = `
+                  <span class="free-tag">AUTO-SYNC CONECTADO</span>
+                  <span>Sincronizado con tu <strong>reloj Garmin</strong> vía Google Health Connect (${steps.toLocaleString()} pasos, ${calories} kcal activas).</span>
+                `;
+              }
+
+              this.updateUIStatus(`Última sincronización: ${new Date().toLocaleTimeString()} • ${steps.toLocaleString()} pasos leídos de Garmin`);
+            }
+
+            updateUIStatus(msg) {
+              const el = document.getElementById('healthConnectStatusText');
+              if (el) {
+                el.textContent = msg;
+              }
+            }
+
+            updateUINonNative() {
+              const banner = document.querySelector('.free-sync-banner');
+              if (banner) {
+                banner.innerHTML = `
+                  <span class="free-tag">ANDROID 15 LISTO</span>
+                  <span>En tu teléfono Android 15, la app se conecta automáticamente a <strong>Google Health Connect</strong> para leer tu reloj Garmin sin contraseñas ni demoras.</span>
+                `;
+              }
+              this.updateUIStatus('Modo navegador web.');
+            }
+          }
+
+          window.healthConnectManager = new HealthConnectManager();
+          EOF
+
+          # 4. Inyectar botón de Health Connect en index.html si no está presente
+          node -e "
+            const fs = require('fs');
+            let html = fs.readFileSync('public/index.html', 'utf8');
+            if (!html.includes('btnConnectHealthConnect')) {
+              const needle = '<div class=\"free-sync-banner\">';
+              const buttonHtml = '<div class=\"health-connect-action-box\" style=\"margin:14px 0 18px 0;\"><button id=\"btnConnectHealthConnect\" class=\"btn btn-primary full-width\" style=\"background:linear-gradient(135deg,#10b981,#059669);font-weight:700;padding:13px;font-size:15px;border-radius:10px;display:flex;align-items:center;justify-content:center;gap:8px;\"><span>🔄</span> Conectar / Sincronizar Google Health Connect</button><div id=\"healthConnectStatusText\" class=\"small text-muted\" style=\"margin-top:6px;text-align:center;\">Listo para conectar con tu reloj Garmin</div></div>';
+              html = html.replace(needle, needle + '\n' + buttonHtml);
+              fs.writeFileSync('public/index.html', html, 'utf8');
+            }
+          "
+
+          # 5. Instalar dependencias con npm
           npm install
+
+          # 6. Recrear proyecto Android nativo con Capacitor 7
+          rm -rf android
           npx cap add android
 
-          # 4. Restaurar manifiesto con permisos de Health Connect
-          cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          # 7. Inyectar AndroidManifest.xml completo con permisos y Rationale de Health Connect
+          cat << 'EOF' > android/app/src/main/AndroidManifest.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.CAMERA" />
+              <uses-permission android:name="android.permission.health.READ_STEPS" />
+              <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
+              <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
+              <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+              <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
+              <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />
 
+              <queries>
+                  <package android:name="com.google.android.apps.healthdata" />
+                  <intent>
+                      <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+                  </intent>
+              </queries>
+
+              <application
+                  android:allowBackup="true"
+                  android:icon="@mipmap/ic_launcher"
+                  android:label="KetoTrack"
+                  android:roundIcon="@mipmap/ic_launcher_round"
+                  android:supportsRtl="true"
+                  android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+
+                  <activity
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+                      android:name=".MainActivity"
+                      android:label="KetoTrack"
+                      android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+                      android:launchMode="singleTask"
+                      android:exported="true">
+
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+
+                      <intent-filter>
+                          <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+                      </intent-filter>
+                  </activity>
+
+                  <activity-alias
+                      android:name="ViewPermissionUsageActivity"
+                      android:exported="true"
+                      android:targetActivity=".MainActivity"
+                      android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+                      <intent-filter>
+                          <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                          <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+                      </intent-filter>
+                  </activity-alias>
+              </application>
+          </manifest>
+          EOF
+
+          # 8. Sincronizar plugins de Capacitor en el proyecto Android
           npx cap sync android
 
-          # 5. Compilar APK
+          # 9. Compilar el archivo APK Debug con Gradle y Java 21
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
@@ -42,4 +388,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: KetoTrack-Android-APK
-          path: keto-tracker/android/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            keto-tracker/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
