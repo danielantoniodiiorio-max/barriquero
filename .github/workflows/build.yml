@@ -256,7 +256,7 @@ jobs:
                   console.warn('Error leyendo calorías:', e);
                 }
 
-                // Si Garmin aún no registró un entrenamiento formal, estimar calorías activas según ritmo de Garmin (0.0342 kcal/paso)
+                // Si Garmin aún no registró un entrenamiento formal, estimar calorías activas por pasos (0.0342 kcal/paso)
                 if (activeCalories === 0 && steps > 0) {
                   activeCalories = Math.round(steps * 0.0342);
                 }
@@ -486,26 +486,65 @@ jobs:
           if [ -d "keto-tracker" ]; then
             cd keto-tracker
           fi
+          rm -rf android
           npx cap add android
 
-          # 1. Inyectar AndroidManifest.xml con soporte Health Connect para Android 15
+          # 1. Configurar variables.gradle con minSdk 26 y compileSdk 35
+          node -e "
+            const fs = require('fs');
+            let vg = fs.readFileSync('android/variables.gradle', 'utf8');
+            vg = vg.replace(/minSdkVersion\s*=\s*\d+/, 'minSdkVersion = 26');
+            vg = vg.replace(/compileSdkVersion\s*=\s*\d+/, 'compileSdkVersion = 35');
+            vg = vg.replace(/targetSdkVersion\s*=\s*\d+/, 'targetSdkVersion = 35');
+            if (!vg.includes('kotlinVersion')) {
+              vg = vg.replace(/ext\s*\{/, \"ext {\n    kotlinVersion = '1.9.24'\");
+            }
+            fs.writeFileSync('android/variables.gradle', vg, 'utf8');
+          "
+
+          # 2. Configurar android/build.gradle con Kotlin Gradle plugin
+          node -e "
+            const fs = require('fs');
+            let bg = fs.readFileSync('android/build.gradle', 'utf8');
+            if (!bg.includes('kotlin-gradle-plugin')) {
+              bg = bg.replace(/dependencies\s*\{/, \"dependencies {\n        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24'\");
+              fs.writeFileSync('android/build.gradle', bg, 'utf8');
+            }
+          "
+
+          # 3. Inyectar AndroidManifest.xml con permisos de Health Connect y Rationale oficial
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.CAMERA" />
+              <uses-permission android:name="android.permission.health.READ_STEPS" />
+              <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
+              <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
+              <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+              <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
+              <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />
+
+              <queries>
+                  <package android:name="com.google.android.apps.healthdata" />
+                  <intent>
+                      <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+                  </intent>
+              </queries>
 
               <application
                   android:allowBackup="true"
                   android:icon="@mipmap/ic_launcher"
-                  android:label="@string/app_name"
+                  android:label="KetoTrack"
                   android:roundIcon="@mipmap/ic_launcher_round"
                   android:supportsRtl="true"
-                  android:theme="@style/AppTheme">
+                  android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
 
                   <activity
-                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
                       android:name=".MainActivity"
-                      android:label="@string/title_activity_main"
-                      android:theme="@style/AppTheme.NoActionBarLaunch"
+                      android:label="KetoTrack"
+                      android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
                       android:launchMode="singleTask"
                       android:exported="true">
 
@@ -514,14 +553,11 @@ jobs:
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
 
-                      <!-- Health Connect Permissions Rationale -->
                       <intent-filter>
                           <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
                       </intent-filter>
-
                   </activity>
 
-                  <!-- Health Connect Activity Alias -->
                   <activity-alias
                       android:name="ViewPermissionUsageActivity"
                       android:exported="true"
@@ -532,38 +568,14 @@ jobs:
                           <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
                       </intent-filter>
                   </activity-alias>
-
-                  <provider
-                      android:name="androidx.core.content.FileProvider"
-                      android:authorities="${applicationId}.fileprovider"
-                      android:exported="false"
-                      android:grantUriPermissions="true">
-                      <meta-data
-                          android:name="android.support.FILE_PROVIDER_PATHS"
-                          android:resource="@xml/file_paths"></meta-data>
-                  </provider>
               </application>
-
-              <uses-permission android:name="android.permission.INTERNET" />
-              <uses-permission android:name="android.permission.health.READ_STEPS"/>
-              <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED"/>
-              <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED"/>
-              <uses-permission android:name="android.permission.health.READ_HEART_RATE"/>
-
-              <queries>
-                  <package android:name="com.google.android.apps.healthdata" />
-                  <intent>
-                      <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
-                  </intent>
-              </queries>
-
           </manifest>
           EOF
 
-          # 2. Sincronizar proyecto Android con Capacitor
+          # 4. Sincronizar plugins de Capacitor en el proyecto Android
           npx cap sync android
 
-          # 3. Habilitar Java 21 y Desugaring en build.gradle
+          # 5. Configurar android/app/build.gradle con Java 21 y Desugaring
           node -e "
             const fs = require('fs');
             let abg = fs.readFileSync('android/app/build.gradle', 'utf8');
