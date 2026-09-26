@@ -6553,9 +6553,9 @@ jobs:
             const fs = require('fs');
             let abg = fs.readFileSync('android/app/build.gradle', 'utf8');
             if (abg.includes('compileOptions {')) {
-              abg = abg.replace(/compileOptions\s*\{[\s\S]*?\}/, \"compileOptions {\n        sourceCompatibility JavaVersion.VERSION_21\n        targetCompatibility JavaVersion.VERSION_21\n        coreLibraryDesugaringEnabled true\n    \");
+              abg = abg.replace(/compileOptions\s*\{[\s\S]*?\}/, \"compileOptions {\n        sourceCompatibility JavaVersion.VERSION_21\n        targetCompatibility JavaVersion.VERSION_21\n        coreLibraryDesugaringEnabled true\n    }\");
             } else {
-              abg = abg.replace(/android\s*\{/, \"android {\n    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_21\n        targetCompatibility JavaVersion.VERSION_21\n        coreLibraryDesugaringEnabled true\n    \");
+              abg = abg.replace(/android\s*\{/, \"android {\n    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_21\n        targetCompatibility JavaVersion.VERSION_21\n        coreLibraryDesugaringEnabled true\n    }\");
             }
             if (!abg.includes('desugar_jdk_libs')) {
               abg = abg.replace(/dependencies\s*\{/, \"dependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'\");
