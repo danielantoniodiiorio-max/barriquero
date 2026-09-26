@@ -3867,7 +3867,9 @@ jobs:
 
               if (tab.dataset.tab === 'tab-weight') {
                 loadWeights();
-                if (typeof renderWeightComparison === 'function') renderWeightComparison();
+                setTimeout(() => {
+                  if (typeof renderWeightComparison === 'function') renderWeightComparison();
+                }, 50);
               }
               if (tab.dataset.tab === 'tab-charts') {
                 if (typeof renderChartsView === 'function') renderChartsView();
@@ -5021,30 +5023,52 @@ jobs:
           function renderWeightView() {
             const weights = state.weights || [];
             const settings = state.settings || {};
+            const currentWeight = Number(settings.weight || (weights[0] && weights[0].weight) || 80.0);
             const goalWeight = Number(settings.goal_weight || 75.0);
             const heightCm = Number(settings.height || 175);
 
-            document.getElementById('valGoalWeight').textContent = goalWeight.toFixed(1) + ' kg';
+            const goalEl = document.getElementById('valGoalWeight');
+            if (goalEl) goalEl.textContent = goalWeight.toFixed(1) + ' kg';
 
-            if (weights.length > 0) {
-              const latest = weights[0];
-              document.getElementById('valCurrentWeight').textContent = Number(latest.weight).toFixed(1);
+            const currentEl = document.getElementById('valCurrentWeight');
+            if (currentEl) currentEl.textContent = currentWeight.toFixed(1);
 
-              const diff = Number(latest.weight) - goalWeight;
-              const diffEl = document.getElementById('valWeightDiff');
-              if (diffEl) {
-                diffEl.textContent = (diff > 0 ? '+' : '') + diff.toFixed(1) + ' kg a la meta';
-                diffEl.className = diff <= 0 ? 'text-success' : 'text-warning';
+            const diff = Math.round((currentWeight - goalWeight) * 10) / 10;
+            const diffEl = document.getElementById('valWeightDiff');
+            if (diffEl) {
+              if (diff > 0) {
+                diffEl.textContent = '+' + diff.toFixed(1) + ' kg a la meta';
+                diffEl.className = 'text-warning';
+              } else if (diff < 0) {
+                diffEl.textContent = diff.toFixed(1) + ' kg de la meta';
+                diffEl.className = 'text-success';
+              } else {
+                diffEl.textContent = '¡En peso meta!';
+                diffEl.className = 'text-success';
               }
+            }
 
-              // IMC
-              if (heightCm > 0) {
-                const heightM = heightCm / 100;
-                const bmi = latest.weight / (heightM * heightM);
-                document.getElementById('valWeightBmi').textContent = bmi.toFixed(1);
+            // IMC
+            if (heightCm > 0) {
+              const heightM = heightCm / 100;
+              const bmi = currentWeight / (heightM * heightM);
+              const bmiEl = document.getElementById('valWeightBmi');
+              if (bmiEl) bmiEl.textContent = bmi.toFixed(1);
+            }
+
+            // Badge de Tendencia
+            const trendBadge = document.getElementById('weightTrendBadge');
+            if (trendBadge) {
+              if (diff > 0) {
+                trendBadge.textContent = 'Déficit a Meta: ' + goalWeight.toFixed(1) + ' kg';
+                trendBadge.className = 'badge badge-cyan';
+              } else if (diff === 0) {
+                trendBadge.textContent = '¡Meta Lograda!';
+                trendBadge.className = 'badge badge-success';
+              } else {
+                trendBadge.textContent = 'Mantenimiento';
+                trendBadge.className = 'badge badge-purple';
               }
-            } else {
-              document.getElementById('valCurrentWeight').textContent = Number(settings.weight || 80).toFixed(1);
             }
 
             // Lista de pesajes
@@ -5087,19 +5111,23 @@ jobs:
             const numWeight = Math.round(Number(weightKg) * 10) / 10;
             const localWeights = JSON.parse(localStorage.getItem('ketotrack_weights') || '[]');
 
-            // Si no está registrado hoy, agregarlo
+            // Sincronizar pesaje de hoy
             const now = new Date();
-            const existingToday = localWeights.find(w => new Date(w.date || w.timestamp).toDateString() === now.toDateString());
-            if (!existingToday) {
+            const todayKey = now.toISOString().slice(0, 10);
+            const existingToday = localWeights.find(w => (w.date || w.timestamp || '').slice(0, 10) === todayKey);
+            if (existingToday) {
+              existingToday.weight = numWeight;
+              existingToday.source = source || 'Health Connect (Balanza)';
+            } else {
               localWeights.unshift({
                 id: Date.now(),
                 weight: numWeight,
                 date: now.toISOString(),
-                source: source || 'Health Connect'
+                source: source || 'Health Connect (Balanza)'
               });
-              localStorage.setItem('ketotrack_weights', JSON.stringify(localWeights));
-              state.weights = localWeights;
             }
+            localStorage.setItem('ketotrack_weights', JSON.stringify(localWeights));
+            state.weights = localWeights;
 
             // Actualizar configuración y recalcular macros
             state.settings.weight = numWeight;
@@ -5168,10 +5196,11 @@ jobs:
             const now = new Date();
             let generated = [...(weights || [])];
 
-            // Si no hay pesaje de hoy, agregar hoy
             const todayStr = now.toISOString().slice(0, 10);
-            const hasToday = generated.some(w => (w.date || w.timestamp || '').slice(0, 10) === todayStr);
-            if (!hasToday) {
+            const existingToday = generated.find(w => (w.date || w.timestamp || '').slice(0, 10) === todayStr);
+            if (existingToday) {
+              existingToday.weight = currentWeight;
+            } else {
               generated.unshift({
                 id: Date.now(),
                 weight: currentWeight,
@@ -5180,32 +5209,43 @@ jobs:
               });
             }
 
-            // Cero datos ficticios. Solo registrar pesajes reales del usuario.
-
             generated.sort((a, b) => new Date(b.date || b.timestamp) - new Date(a.date || a.timestamp));
             return generated;
+          }
+
+          // Función auxiliar para interpolación lineal de pesos entre fechas conocidas
+          function getInterpolatedWeight(targetDateKey, weightMap, fallbackStart, fallbackEnd) {
+            const dates = Object.keys(weightMap).sort();
+            if (dates.length === 0) return fallbackEnd;
+            if (targetDateKey <= dates[0]) return weightMap[dates[0]];
+            if (targetDateKey >= dates[dates.length - 1]) return weightMap[dates[dates.length - 1]];
+
+            for (let k = 0; k < dates.length - 1; k++) {
+              if (targetDateKey >= dates[k] && targetDateKey <= dates[k + 1]) {
+                const d1 = new Date(dates[k]).getTime();
+                const d2 = new Date(dates[k + 1]).getTime();
+                const dt = new Date(targetDateKey).getTime();
+                const frac = d2 > d1 ? (dt - d1) / (d2 - d1) : 0;
+                return weightMap[dates[k]] + frac * (weightMap[dates[k + 1]] - weightMap[dates[k]]);
+              }
+            }
+            return fallbackEnd;
           }
 
           // Calcula las trayectorias día a día (Real vs Ideal)
           function calculateWeightTrajectories(range) {
             const dailyHistory = syncTodayToDailyHistory();
             const settings = state.settings || {};
-            let weights = ensureWeightHistory(state.weights || [], settings, dailyHistory);
-            state.weights = weights;
-
-            // Filtrar según el rango seleccionado: 14, 30 o all
-            let dayCount = range === '14' ? 14 : (range === '30' ? 30 : dailyHistory.length);
-            dayCount = Math.min(dayCount, dailyHistory.length);
-            const slicedHistory = dailyHistory.slice(-dayCount);
-
-            const goalWeight = Number(settings.goal_weight || 75.0);
+            
             const profileWeight = Number(settings.weight || 80.0);
+            const goalWeight = Number(settings.goal_weight || 75.0);
             const heightCm = Number(settings.height || 175);
             const age = Number(settings.age || 35);
             const gender = settings.gender || 'male';
 
-            // BMR Mifflin-St Jeor
-            const bmrBase = (10 * profileWeight) + (6.25 * heightCm) - (5 * age) + (gender === 'female' ? -161 : 5);
+            // Sincronizar pesajes con settings
+            let weights = ensureWeightHistory(state.weights || [], settings, dailyHistory);
+            state.weights = weights;
 
             // Mapear pesajes reales por día YYYY-MM-DD
             const weightMap = {};
@@ -5216,92 +5256,134 @@ jobs:
               }
             });
 
-            // Peso inicial para el período
-            const firstDayKey = slicedHistory[0].date;
-            let startWeight = weightMap[firstDayKey];
-            if (!startWeight) {
-              const sortedWeightsAsc = [...weights].sort((a, b) => new Date(a.date || a.timestamp) - new Date(b.date || b.timestamp));
-              startWeight = sortedWeightsAsc[0] ? Number(sortedWeightsAsc[0].weight) : (profileWeight + 1.5);
+            const now = new Date();
+            const todayKey = now.toISOString().slice(0, 10);
+            if (!weightMap[todayKey]) {
+              weightMap[todayKey] = profileWeight;
             }
 
-            // Interpolar pesajes reales entre fechas conocidas
-            const knownIndices = [];
-            for (let i = 0; i < slicedHistory.length; i++) {
-              if (weightMap[slicedHistory[i].date] !== undefined) {
-                knownIndices.push({ index: i, weight: weightMap[slicedHistory[i].date] });
-              }
-            }
-            if (knownIndices.length === 0) {
-              knownIndices.push({ index: 0, weight: startWeight });
-              knownIndices.push({ index: slicedHistory.length - 1, weight: profileWeight });
-            } else if (knownIndices.length === 1) {
-              if (knownIndices[0].index > 0) {
-                knownIndices.unshift({ index: 0, weight: startWeight });
-              } else {
-                knownIndices.push({ index: slicedHistory.length - 1, weight: profileWeight });
-              }
+            // BMR Mifflin-St Jeor
+            const bmrBase = (10 * profileWeight) + (6.25 * heightCm) - (5 * age) + (gender === 'female' ? -161 : 5);
+
+            // Gasto activo promedio según Garmin
+            const garmin = state.status?.garmin || JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
+            const garminActiveCal = Number(garmin.active_calories || 450);
+            const tdee = Math.round(bmrBase + garminActiveCal);
+
+            // Déficit calórico diario saludable (ACSM / OMS: ~400-600 kcal/día = ~0.4 - 0.6 kg/semana)
+            const targetCal = Number(settings.calories_target || (tdee - 500));
+            const dailyDeficit = Math.max(300, Math.min(1000, tdee - targetCal));
+            const dailyLossKg = dailyDeficit / 7700; // ~0.065 kg/día = 0.455 kg/sem
+
+            // Determinar horizonte en días según el rango
+            let horizonDays = 14;
+            if (range === '30') {
+              horizonDays = 30;
+            } else if (range === 'all') {
+              const kgToGoal = Math.abs(profileWeight - goalWeight);
+              const estDays = Math.ceil(kgToGoal / Math.max(0.02, dailyLossKg));
+              horizonDays = Math.max(30, Math.min(90, estDays + 3));
+            } else {
+              horizonDays = 14;
             }
 
-            function getInterpolatedReal(idx) {
-              if (idx <= knownIndices[0].index) return knownIndices[0].weight;
-              if (idx >= knownIndices[knownIndices.length - 1].index) return knownIndices[knownIndices.length - 1].weight;
-              for (let k = 0; k < knownIndices.length - 1; k++) {
-                if (idx >= knownIndices[k].index && idx <= knownIndices[k + 1].index) {
-                  const span = knownIndices[k + 1].index - knownIndices[k].index;
-                  const frac = span > 0 ? (idx - knownIndices[k].index) / span : 0;
-                  return knownIndices[k].weight + frac * (knownIndices[k + 1].weight - knownIndices[k].weight);
-                }
-              }
-              return profileWeight;
+            // Fecha de inicio: la fecha del protocolo o primer día de historial, pero no posterior a hoy
+            let startDate = now;
+            const sDate = settings.keto_start_date ? new Date(settings.keto_start_date) : null;
+            if (sDate && !isNaN(sDate.getTime()) && sDate <= now) {
+              startDate = sDate;
             }
+            const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0);
 
-            let curIdeal = startWeight;
+            // Determinar peso inicial
+            const startDayKey = startDay.toISOString().slice(0, 10);
+            let startWeight = weightMap[startDayKey] || profileWeight;
+
+            // Construir la lista de fechas, puntos ideales y puntos reales
+            const dates = [];
             const idealPoints = [];
             const realPoints = [];
-            const dates = [];
 
-            for (let i = 0; i < slicedHistory.length; i++) {
-              const h = slicedHistory[i];
-              dates.push(h.date);
+            // Mapear historial diario por fecha para pasos y calorías
+            const dailyHistoryMap = {};
+            (dailyHistory || []).forEach(h => {
+              if (h.date) dailyHistoryMap[h.date] = h;
+            });
 
-              // 1. Pérdida teórica ideal por déficit (Wishnofsky / ACSM)
-              const tdeeToday = Math.round(bmrBase + (h.calories_out || 400));
-              const intakeToday = h.calories_in > 0 ? h.calories_in : (tdeeToday - 500);
-              const dailyDeficit = Math.max(150, tdeeToday - intakeToday);
-              const dailyLossKg = dailyDeficit / 7700;
+            // Generar día por día desde startDay hasta startDay + horizonDays - 1
+            for (let i = 0; i < horizonDays; i++) {
+              const curDate = new Date(startDay.getTime() + (i * 86400000));
+              const curDateKey = curDate.toISOString().slice(0, 10);
+              dates.push(curDateKey);
 
-              if (i > 0) {
-                curIdeal = Math.max(goalWeight, curIdeal - dailyLossKg);
+              // 1. Curva Ideal (Proyección Wishnofsky / ACSM hacia la meta)
+              let idealW;
+              if (goalWeight < startWeight) {
+                idealW = Math.max(goalWeight, startWeight - (i * dailyLossKg));
+              } else if (goalWeight > startWeight) {
+                idealW = Math.min(goalWeight, startWeight + (i * dailyLossKg));
+              } else {
+                idealW = goalWeight;
               }
-              idealPoints.push(Math.round(curIdeal * 100) / 100);
+              idealPoints.push(Math.round(idealW * 100) / 100);
 
-              // 2. Peso real interpolado o explícito
-              const interpReal = Math.round(getInterpolatedReal(i) * 10) / 10;
-              const isExplicit = weightMap[h.date] !== undefined;
-              realPoints.push({
-                weight: interpReal,
-                isExplicit: isExplicit
-              });
+              // 2. Curva Real (Pesos registrados hasta la fecha actual)
+              if (curDateKey <= todayKey) {
+                let realW = weightMap[curDateKey];
+                const isExplicit = (realW !== undefined);
+                if (realW === undefined) {
+                  if (curDateKey === todayKey) {
+                    realW = profileWeight;
+                  } else {
+                    realW = getInterpolatedWeight(curDateKey, weightMap, startWeight, profileWeight);
+                  }
+                }
+                realPoints.push({
+                  weight: Math.round(realW * 10) / 10,
+                  isExplicit: isExplicit,
+                  hasData: true,
+                  date: curDateKey
+                });
+              } else {
+                // Día futuro: todavía no ocurrió
+                realPoints.push({
+                  weight: null,
+                  isExplicit: false,
+                  hasData: false,
+                  date: curDateKey
+                });
+              }
             }
+
+            // Traer el último peso real conocido
+            const recordedReals = realPoints.filter(p => p.hasData && p.weight !== null);
+            const currentReal = recordedReals.length > 0 ? recordedReals[recordedReals.length - 1].weight : profileWeight;
+            const currentIdeal = idealPoints[recordedReals.length > 0 ? (recordedReals.length - 1) : 0];
 
             return {
               dates,
-              slicedHistory,
+              dailyHistoryMap,
               idealPoints,
               realPoints,
               goalWeight,
               startWeight,
-              currentReal: realPoints[realPoints.length - 1].weight,
-              currentIdeal: idealPoints[idealPoints.length - 1]
+              currentReal,
+              currentIdeal,
+              profileWeight,
+              horizonDays,
+              dailyLossKg,
+              range
             };
           }
 
           // Agrupa en bloques de 7 días y contrarresta el avance semanal
           function calculateWeeklyComparison(trajectories) {
-            const { dates, slicedHistory, idealPoints, realPoints } = trajectories;
+            const { dates, idealPoints, realPoints, dailyHistoryMap, startWeight, currentReal, goalWeight } = trajectories;
             const weeks = [];
             const totalDays = dates.length;
             const numWeeks = Math.ceil(totalDays / 7);
+            const now = new Date();
+            const todayKey = now.toISOString().slice(0, 10);
 
             for (let w = 0; w < numWeeks; w++) {
               const startIdx = w * 7;
@@ -5311,27 +5393,55 @@ jobs:
               const startDate = dates[startIdx];
               const endDate = dates[endIdx];
 
-              const weekRealStart = realPoints[startIdx].weight;
-              const weekRealEnd = realPoints[endIdx].weight;
-              const deltaReal = Math.round((weekRealEnd - weekRealStart) * 10) / 10;
-
+              // Puntos ideales de la semana
               const weekIdealStart = idealPoints[startIdx];
               const weekIdealEnd = idealPoints[endIdx];
               const deltaIdeal = Math.round((weekIdealEnd - weekIdealStart) * 10) / 10;
 
+              // Puntos reales de la semana
+              const weekRealPoints = realPoints.slice(startIdx, endIdx + 1).filter(p => p.hasData && p.weight !== null);
+              
+              let isCurrentWeek = false;
+              let isFutureWeek = false;
+              if (startDate > todayKey) {
+                isFutureWeek = true;
+              } else if (endDate >= todayKey && startDate <= todayKey) {
+                isCurrentWeek = true;
+              }
+
+              let weekRealStart = weekRealPoints.length > 0 ? weekRealPoints[0].weight : (w === 0 ? startWeight : weeks[w - 1]?.endReal || currentReal);
+              let weekRealEnd = weekRealPoints.length > 0 ? weekRealPoints[weekRealPoints.length - 1].weight : weekRealStart;
+              let deltaReal = Math.round((weekRealEnd - weekRealStart) * 10) / 10;
+
+              // Pasos y calorías de la semana
               let weekSteps = 0;
               let weekActiveCal = 0;
               for (let d = startIdx; d <= endIdx; d++) {
-                weekSteps += slicedHistory[d].steps || 0;
-                weekActiveCal += slicedHistory[d].calories_out || 0;
+                const dKey = dates[d];
+                const h = dailyHistoryMap[dKey];
+                if (h) {
+                  weekSteps += Number(h.steps || 0);
+                  weekActiveCal += Number(h.calories_out || 0);
+                } else {
+                  const garmin = state.status?.garmin || {};
+                  weekSteps += Number(garmin.steps || 8000);
+                  weekActiveCal += Number(garmin.active_calories || 400);
+                }
               }
 
               let statusText = 'En Meta Óptima';
               let statusBadgeClass = 'badge-success';
               let statusIcon = '🎯';
 
-              // deltaReal y deltaIdeal son negativos (pérdida)
-              if (deltaReal <= deltaIdeal - 0.2) {
+              if (isFutureWeek) {
+                statusText = 'Proyección a Meta';
+                statusBadgeClass = 'badge-cyan';
+                statusIcon = '🏁';
+              } else if (isCurrentWeek) {
+                statusText = 'Semana en Curso';
+                statusBadgeClass = 'badge-success';
+                statusIcon = '⚡';
+              } else if (deltaReal <= deltaIdeal - 0.2) {
                 statusText = 'Adelantado al Ideal';
                 statusBadgeClass = 'badge-cyan';
                 statusIcon = '⚡';
@@ -5341,18 +5451,17 @@ jobs:
                 statusIcon = '⚠️';
               }
 
-              const isCurrentWeek = (w === numWeeks - 1);
-
               weeks.push({
                 weekNum: w + 1,
                 startDate,
                 endDate,
                 daysInWeek,
                 isCurrentWeek,
+                isFutureWeek,
                 startReal: weekRealStart,
-                endReal: weekRealEnd,
+                endReal: isFutureWeek ? weekIdealEnd : weekRealEnd,
                 endIdeal: weekIdealEnd,
-                deltaReal,
+                deltaReal: isFutureWeek ? deltaIdeal : deltaReal,
                 deltaIdeal,
                 weekSteps,
                 weekActiveCal,
@@ -5374,26 +5483,28 @@ jobs:
             const dpr = window.devicePixelRatio || 1;
             const rect = canvas.getBoundingClientRect();
 
-            canvas.width = rect.width * dpr;
-            canvas.height = rect.height * dpr;
+            const w = rect.width > 0 ? rect.width : (canvas.parentElement?.clientWidth || 340);
+            const h = rect.height > 0 ? rect.height : 220;
+
+            canvas.width = w * dpr;
+            canvas.height = h * dpr;
             ctx.scale(dpr, dpr);
 
-            const w = rect.width;
-            const h = rect.height;
             const padLeft = 48;
-            const padRight = 18;
-            const padTop = 20;
-            const padBottom = 30;
+            const padRight = 24;
+            const padTop = 24;
+            const padBottom = 32;
             const plotW = w - padLeft - padRight;
             const plotH = h - padTop - padBottom;
 
             ctx.clearRect(0, 0, w, h);
 
-            const { dates, idealPoints, realPoints, goalWeight } = trajectories;
-            const realVals = realPoints.map(r => r.weight);
+            const { dates, idealPoints, realPoints, goalWeight, startWeight } = trajectories;
+            const recordedReals = realPoints.filter(p => p.hasData && p.weight !== null);
+            const realVals = recordedReals.map(r => r.weight);
 
-            // Escala Y dinámica
-            const allVals = [...realVals, ...idealPoints, goalWeight];
+            // Escala Y dinámica abarcando meta, ideal y real
+            const allVals = [...realVals, ...idealPoints, goalWeight, startWeight];
             let minVal = Math.min(...allVals) - 0.4;
             let maxVal = Math.max(...allVals) + 0.4;
             minVal = Math.floor(minVal * 2) / 2;
@@ -5424,7 +5535,7 @@ jobs:
             const yGoal = padTop + plotH - ((goalWeight - minVal) / valRange) * plotH;
             if (yGoal >= padTop && yGoal <= padTop + plotH) {
               ctx.save();
-              ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
+              ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
               ctx.setLineDash([4, 4]);
               ctx.lineWidth = 1.5;
               ctx.beginPath();
@@ -5435,19 +5546,19 @@ jobs:
               ctx.fillStyle = '#38bdf8';
               ctx.font = 'bold 9px -apple-system, sans-serif';
               ctx.textAlign = 'right';
-              ctx.fillText('Meta ' + goalWeight.toFixed(1) + ' kg', w - padRight - 4, yGoal - 4);
+              ctx.fillText('Meta ' + goalWeight.toFixed(1) + ' kg', w - padRight - 4, yGoal - 5);
               ctx.restore();
             }
 
             const numPoints = dates.length;
             const stepX = numPoints > 1 ? plotW / (numPoints - 1) : plotW;
 
-            // 1. Dibujar Curva Ideal (Violeta luminoso punteado suave)
+            // 1. Dibujar Curva Ideal (Violeta luminoso punteado suave a lo largo de los días)
             const idealCoords = [];
             for (let i = 0; i < idealPoints.length; i++) {
               const px = padLeft + i * stepX;
               const py = padTop + plotH - ((idealPoints[i] - minVal) / valRange) * plotH;
-              idealCoords.push({ x: px, y: py });
+              idealCoords.push({ x: px, y: py, val: idealPoints[i] });
             }
 
             if (idealCoords.length >= 2) {
@@ -5470,15 +5581,31 @@ jobs:
               ctx.lineWidth = 2.5;
               ctx.setLineDash([5, 4]);
               ctx.stroke();
+
+              // Marcador final en la meta proyectada
+              const lastIdeal = idealCoords[idealCoords.length - 1];
+              ctx.setLineDash([]);
+              ctx.beginPath();
+              ctx.arc(lastIdeal.x, lastIdeal.y, 4, 0, Math.PI * 2);
+              ctx.fillStyle = '#c084fc';
+              ctx.fill();
               ctx.restore();
             }
 
-            // 2. Dibujar Curva Real (Esmeralda #10b981 con degradado y nodos)
+            // 2. Dibujar Curva Real (Esmeralda #10b981)
             const realCoords = [];
-            for (let i = 0; i < realVals.length; i++) {
-              const px = padLeft + i * stepX;
-              const py = padTop + plotH - ((realVals[i] - minVal) / valRange) * plotH;
-              realCoords.push({ x: px, y: py, isExplicit: realPoints[i].isExplicit, val: realVals[i] });
+            for (let i = 0; i < realPoints.length; i++) {
+              if (realPoints[i].hasData && realPoints[i].weight !== null) {
+                const px = padLeft + i * stepX;
+                const py = padTop + plotH - ((realPoints[i].weight - minVal) / valRange) * plotH;
+                realCoords.push({
+                  x: px,
+                  y: py,
+                  val: realPoints[i].weight,
+                  isExplicit: realPoints[i].isExplicit,
+                  idx: i
+                });
+              }
             }
 
             if (realCoords.length >= 2) {
@@ -5537,13 +5664,39 @@ jobs:
                 ctx.strokeStyle = '#0f172a';
                 ctx.stroke();
               }
+            } else if (realCoords.length === 1) {
+              // Un solo pesaje (inicio / hoy): Dibujar nodo destacado con anillo luminoso y badge
+              const p = realCoords[0];
+              
+              // Anillo de brillo exterior
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, 9, 0, Math.PI * 2);
+              ctx.fillStyle = 'rgba(16, 185, 129, 0.25)';
+              ctx.fill();
+
+              // Círculo exterior
+              ctx.beginPath();
+              ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+              ctx.fillStyle = '#10b981';
+              ctx.fill();
+              ctx.lineWidth = 2;
+              ctx.strokeStyle = '#0f172a';
+              ctx.stroke();
+
+              // Etiqueta flotante con el peso actual
+              ctx.save();
+              ctx.fillStyle = '#10b981';
+              ctx.font = 'bold 10px -apple-system, sans-serif';
+              ctx.textAlign = 'left';
+              ctx.fillText(p.val.toFixed(1) + ' kg (Hoy)', p.x + 12, p.y + 4);
+              ctx.restore();
             }
 
             // Eje X fechas
             ctx.fillStyle = '#94a3b8';
             ctx.font = '10px -apple-system, sans-serif';
             ctx.textAlign = 'center';
-            const labelSkip = numPoints > 10 ? Math.ceil(numPoints / 6) : 1;
+            const labelSkip = numPoints > 10 ? Math.ceil(numPoints / 6) : (numPoints > 5 ? 2 : 1);
 
             for (let i = 0; i < numPoints; i++) {
               if (i % labelSkip === 0 || i === numPoints - 1) {
@@ -5558,26 +5711,42 @@ jobs:
           // Renderiza las tarjetas de resumen y desglose semanal
           function renderWeightWeeklyView(trajectories, weeks) {
             const container = document.getElementById('weightWeeklyBreakdown');
-            const { startWeight, currentReal, currentIdeal, goalWeight } = trajectories;
+            const { startWeight, currentReal, goalWeight, idealPoints, range, dailyLossKg } = trajectories;
 
             // 1. Métricas Hero
             const totalRealLoss = Math.round((currentReal - startWeight) * 10) / 10;
-            const totalIdealLoss = Math.round((currentIdeal - startWeight) * 10) / 10;
+            
+            // Pérdida ideal acumulada/proyectada para el horizonte seleccionado
+            const idealEndWeight = idealPoints[idealPoints.length - 1];
+            const targetIdealLoss = Math.round((idealEndWeight - startWeight) * 10) / 10;
 
             const elRealLoss = document.getElementById('valWeightRealLoss');
+            const subRealLoss = document.getElementById('subWeightRealLoss');
             if (elRealLoss) {
               elRealLoss.textContent = (totalRealLoss <= 0 ? '' : '+') + totalRealLoss.toFixed(1) + ' kg';
               elRealLoss.className = totalRealLoss <= 0 ? 'w-val text-success' : 'w-val text-warning';
             }
+            if (subRealLoss) {
+              subRealLoss.textContent = weeks[0]?.isCurrentWeek && weeks.length === 1 ? 'En inicio de plan' : 'Desde el inicio';
+            }
 
             const elIdealLoss = document.getElementById('valWeightIdealLoss');
+            const subIdealLoss = document.getElementById('subWeightIdealLoss');
             if (elIdealLoss) {
-              elIdealLoss.textContent = (totalIdealLoss <= 0 ? '' : '+') + totalIdealLoss.toFixed(1) + ' kg';
+              elIdealLoss.textContent = (targetIdealLoss <= 0 ? '' : '+') + targetIdealLoss.toFixed(1) + ' kg';
+            }
+            if (subIdealLoss) {
+              const rangeLabel = range === '14' ? '14 Días' : (range === '30' ? '30 Días' : 'Meta');
+              subIdealLoss.textContent = 'Meta proyectada (' + rangeLabel + ')';
             }
 
             // Ritmo semanal promedio
-            const lastWeek = weeks[weeks.length - 1];
-            const avgWeeklyRate = lastWeek ? lastWeek.deltaReal : (totalRealLoss / Math.max(1, weeks.length));
+            const weeklyRateTarget = -Math.round(dailyLossKg * 7 * 10) / 10; // ~ -0.5 kg/sem
+            const pastWeeks = weeks.filter(w => !w.isFutureWeek);
+            const avgWeeklyRate = pastWeeks.length > 0 && pastWeeks[0].deltaReal !== 0
+              ? pastWeeks[pastWeeks.length - 1].deltaReal
+              : weeklyRateTarget;
+
             const elWeeklyRate = document.getElementById('valWeightWeeklyRate');
             if (elWeeklyRate) {
               elWeeklyRate.textContent = (avgWeeklyRate <= 0 ? '' : '+') + avgWeeklyRate.toFixed(1) + ' kg/sem';
@@ -5586,27 +5755,38 @@ jobs:
             // Estado Metabólico y Diferencia
             const elStatus = document.getElementById('valWeightPaceStatus');
             const elDiff = document.getElementById('subWeightPaceDiff');
-            const paceDiff = Math.round((currentReal - currentIdeal) * 10) / 10;
+            const diffToGoal = Math.round((currentReal - goalWeight) * 10) / 10;
 
             if (elStatus && elDiff) {
-              if (paceDiff <= -0.2) {
-                elStatus.textContent = '⚡ Adelantado';
-                elStatus.style.color = '#38bdf8';
-                elDiff.textContent = Math.abs(paceDiff).toFixed(1) + ' kg bajo lo ideal';
-              } else if (paceDiff <= 0.2) {
+              if (diffToGoal <= 0) {
+                elStatus.textContent = '🏆 ¡Meta Lograda!';
+                elStatus.style.color = '#10b981';
+                elDiff.textContent = 'En peso objetivo (' + goalWeight.toFixed(1) + ' kg)';
+              } else {
                 elStatus.textContent = '🎯 En Ritmo';
                 elStatus.style.color = '#10b981';
-                elDiff.textContent = 'Sincronizado con meta';
+                elDiff.textContent = 'A ' + diffToGoal.toFixed(1) + ' kg de la meta';
+              }
+            }
+
+            // Actualizar Badge de Tendencia Superior
+            const trendBadge = document.getElementById('weightTrendBadge');
+            if (trendBadge) {
+              if (diffToGoal > 0) {
+                trendBadge.textContent = 'Déficit a Meta: ' + goalWeight.toFixed(1) + ' kg';
+                trendBadge.className = 'badge badge-cyan';
+              } else if (diffToGoal === 0) {
+                trendBadge.textContent = '¡Meta Lograda!';
+                trendBadge.className = 'badge badge-success';
               } else {
-                elStatus.textContent = '⚠️ Ajuste Sugerido';
-                elStatus.style.color = '#f59e0b';
-                elDiff.textContent = '+' + paceDiff.toFixed(1) + ' kg sobre lo ideal';
+                trendBadge.textContent = 'Mantenimiento';
+                trendBadge.className = 'badge badge-purple';
               }
             }
 
             const badgeWeeks = document.getElementById('badgeTotalWeeks');
             if (badgeWeeks) {
-              badgeWeeks.textContent = weeks.length === 1 ? '1 Semana Registrada' : (weeks.length + ' Semanas Registradas');
+              badgeWeeks.textContent = weeks.length === 1 ? '1 Semana de Plan' : (weeks.length + ' Semanas de Plan');
             }
 
             const legendGoal = document.getElementById('txtLegendGoalWeight');
@@ -5615,11 +5795,11 @@ jobs:
             // 2. Renderizar Tarjetas Semanales
             if (!container) return;
             if (weeks.length === 0) {
-              container.innerHTML = '<div class="loading-placeholder">Sin datos suficientes para desglosar semanas.</div>';
+              container.innerHTML = '<div class="loading-placeholder">Calculando desglose semanal...</div>';
               return;
             }
 
-            container.innerHTML = [...weeks].reverse().map(w => {
+            container.innerHTML = weeks.map(w => {
               const sParts = w.startDate.split('-');
               const eParts = w.endDate.split('-');
               const rangeText = sParts[2] + '/' + sParts[1] + ' al ' + eParts[2] + '/' + eParts[1];
@@ -5627,11 +5807,15 @@ jobs:
               const deltaSign = w.deltaReal <= 0 ? '' : '+';
               const idealDeltaSign = w.deltaIdeal <= 0 ? '' : '+';
 
+              let weekSubtitle = '';
+              if (w.isCurrentWeek) weekSubtitle = '<small style="color:#38bdf8">(En curso)</small>';
+              else if (w.isFutureWeek) weekSubtitle = '<small style="color:#c084fc">(Proyección)</small>';
+
               return `
                 <div class="weekly-card">
                   <div class="weekly-card-header">
                     <div class="weekly-card-title">
-                      <strong>Semana ${w.weekNum} ${w.isCurrentWeek ? '<small style="color:#38bdf8">(En curso)</small>' : ''}</strong>
+                      <strong>Semana ${w.weekNum} ${weekSubtitle}</strong>
                       <span>📅 ${rangeText}</span>
                     </div>
                     <span class="badge ${w.statusBadgeClass}">${w.statusIcon} ${w.statusText}</span>
@@ -5639,11 +5823,11 @@ jobs:
 
                   <div class="weekly-card-body">
                     <div class="weekly-col">
-                      <span class="weekly-col-lbl">Peso Cierre</span>
+                      <span class="weekly-col-lbl">${w.isFutureWeek ? 'Meta Cierre' : 'Peso Cierre'}</span>
                       <strong class="weekly-col-val">${w.endReal.toFixed(1)} kg</strong>
                     </div>
                     <div class="weekly-col">
-                      <span class="weekly-col-lbl">Δ Peso Real</span>
+                      <span class="weekly-col-lbl">${w.isFutureWeek ? 'Δ Proyectado' : 'Δ Peso Real'}</span>
                       <strong class="weekly-col-val" style="color: ${w.deltaReal <= 0 ? '#10b981' : '#f59e0b'};">
                         ${deltaSign}${w.deltaReal.toFixed(1)} kg
                       </strong>
@@ -5657,7 +5841,7 @@ jobs:
                   </div>
 
                   <div class="weekly-garmin-strip">
-                    <span>⌚ <strong>Garmin:</strong> ${w.weekSteps.toLocaleString()} pasos totales</span>
+                    <span>⌚ <strong>Garmin:</strong> ${w.weekSteps.toLocaleString()} pasos</span>
                     <span>🔥 <strong>${w.weekActiveCal.toLocaleString()} kcal</strong> activas quemadas</span>
                   </div>
                 </div>
@@ -5834,9 +6018,32 @@ jobs:
             state.settings = { ...state.settings, ...newSettings };
             localStorage.setItem('ketotrack_settings', JSON.stringify(state.settings));
 
+            // Sincronizar pesaje de hoy en ketotrack_weights
+            const now = new Date();
+            const todayStr = now.toISOString().slice(0, 10);
+            let localWeights = JSON.parse(localStorage.getItem('ketotrack_weights') || '[]');
+            const existingToday = localWeights.find(w => (w.date || w.timestamp || '').slice(0, 10) === todayStr);
+            if (existingToday) {
+              existingToday.weight = newSettings.weight;
+              existingToday.source = 'Ajustes Perfil';
+            } else {
+              localWeights.unshift({
+                id: Date.now(),
+                weight: newSettings.weight,
+                date: now.toISOString(),
+                source: 'Ajustes Perfil'
+              });
+            }
+            state.weights = localWeights;
+            localStorage.setItem('ketotrack_weights', JSON.stringify(localWeights));
+
             settingsModal.classList.remove('show');
+            document.body.classList.remove('modal-open');
             recalculateClientState();
             renderWeightView();
+            if (typeof renderWeightComparison === 'function') {
+              renderWeightComparison();
+            }
 
             alert('¡Ajustes y metas guardados con éxito!');
           });
