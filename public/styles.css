@@ -2780,3 +2780,58 @@ body.modal-open .app-bottom-nav,
   box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4) !important;
 }
 
+/* Asistente IA de Reconocimiento Natural de Comidas */
+.input-with-action {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.input-with-action input {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  font-size: 0.9rem !important;
+  padding: 11px 14px !important;
+}
+
+.btn-ai-calc {
+  background: linear-gradient(135deg, #8b5cf6, #6366f1) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 11px 16px !important;
+  font-size: 0.88rem !important;
+  font-weight: 700 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35) !important;
+  transition: all 0.2s ease !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.btn-ai-calc:hover, .btn-ai-calc:active {
+  background: linear-gradient(135deg, #7c3aed, #4f46e5) !important;
+  transform: translateY(-1px) !important;
+}
+
+.ai-feedback-banner {
+  margin-top: 10px !important;
+  padding: 12px 14px !important;
+  border-radius: var(--radius-md) !important;
+  background: rgba(19, 29, 51, 0.95) !important;
+  border: 1px solid var(--card-border) !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35) !important;
+  font-size: 0.82rem !important;
+  line-height: 1.45 !important;
+  transition: all 0.25s ease !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+}
+
+

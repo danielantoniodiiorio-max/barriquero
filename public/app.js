@@ -157,186 +157,1231 @@ function calculatePersonalizedTargets(profile) {
 // ==========================================================================
 // 2. MOTOR DE INTELIGENCIA ARTIFICIAL NUTRICIONAL (AI MEAL ESTIMATOR)
 // ==========================================================================
+// Base de Conocimiento Nutricional Ampliada con +80 Categorías de Platos, Postres, Bebidas y Alimentos
+const FOOD_AI_DATABASE = [
+  // --- POSTRES Y DULCES ---
+  {
+    id: 'flan_mixto',
+    match: ['flan mixto', 'flan con dulce de leche y crema', 'flan con crema y dulce de leche', 'flan con dulce y crema'],
+    name: 'Flan mixto (con DDL y crema)',
+    unit: 'porción', baseGrams: 0,
+    carbs: 44, fiber: 0, protein: 7.5, fat: 16, calories: 350,
+    category: 'postre'
+  },
+  {
+    id: 'flan_ddl',
+    match: ['flan con dulce de leche', 'flan con ddl', 'flan con dulce'],
+    name: 'Flan con dulce de leche',
+    unit: 'porción', baseGrams: 0,
+    carbs: 42, fiber: 0, protein: 7, fat: 7, calories: 260,
+    category: 'postre'
+  },
+  {
+    id: 'flan_crema',
+    match: ['flan con crema'],
+    name: 'Flan con crema',
+    unit: 'porción', baseGrams: 0,
+    carbs: 26, fiber: 0, protein: 6.5, fat: 14, calories: 255,
+    category: 'postre'
+  },
+  {
+    id: 'flan',
+    match: ['flan casero', 'flan'],
+    name: 'Flan casero',
+    unit: 'porción', baseGrams: 0,
+    carbs: 24, fiber: 0, protein: 6, fat: 5, calories: 165,
+    category: 'postre'
+  },
+  {
+    id: 'chocotorta',
+    match: ['chocotorta'],
+    name: 'Chocotorta',
+    unit: 'porción', baseGrams: 0,
+    carbs: 46, fiber: 1.5, protein: 6, fat: 24, calories: 425,
+    category: 'postre'
+  },
+  {
+    id: 'tiramisu',
+    match: ['tiramisu'],
+    name: 'Tiramisú',
+    unit: 'porción', baseGrams: 0,
+    carbs: 38, fiber: 1, protein: 6, fat: 18, calories: 340,
+    category: 'postre'
+  },
+  {
+    id: 'cheesecake',
+    match: ['cheesecake', 'tarta de queso dulce'],
+    name: 'Cheesecake',
+    unit: 'porción', baseGrams: 0,
+    carbs: 34, fiber: 1, protein: 7, fat: 22, calories: 365,
+    category: 'postre'
+  },
+  {
+    id: 'lemon_pie',
+    match: ['lemon pie', 'tarta de limon'],
+    name: 'Lemon pie',
+    unit: 'porción', baseGrams: 0,
+    carbs: 45, fiber: 1, protein: 5, fat: 14, calories: 330,
+    category: 'postre'
+  },
+  {
+    id: 'torta_chocolate',
+    match: ['torta de chocolate', 'pastel de chocolate', 'brownie', 'marquise de chocolate', 'marquise'],
+    name: 'Torta de chocolate / Brownie',
+    unit: 'porción', baseGrams: 0,
+    carbs: 52, fiber: 2.5, protein: 5, fat: 19, calories: 400,
+    category: 'postre'
+  },
+  {
+    id: 'torta_generica',
+    match: ['porcion de torta dulce', 'porcion de torta', 'torta dulce', 'torta'],
+    name: 'Porción de torta dulce',
+    unit: 'porción', baseGrams: 0,
+    carbs: 48, fiber: 1, protein: 4.5, fat: 16, calories: 360,
+    category: 'postre'
+  },
+  {
+    id: 'helado_cuarto',
+    match: ['1/4 de helado', '1/4 helado', 'cuarto de helado', 'cuarto kilo de helado', '250g helado', '250g de helado', 'cuarto helado'],
+    name: '1/4 kg de helado',
+    unit: '1/4 kg', baseGrams: 250,
+    carbs: 68, fiber: 1.5, protein: 9, fat: 26, calories: 545,
+    category: 'postre'
+  },
+  {
+    id: 'helado',
+    match: ['bocha de helado', 'bochas de helado', 'cucurucho de helado', 'cucurucho', 'helado'],
+    name: 'Helado',
+    unit: 'bocha', baseGrams: 0,
+    carbs: 22, fiber: 0.5, protein: 3, fat: 8.5, calories: 175,
+    category: 'postre'
+  },
+  {
+    id: 'panqueque_ddl',
+    match: ['panqueque con dulce de leche', 'panqueque de dulce de leche', 'panqueque con ddl', 'panqueques con dulce de leche', 'waffle con dulce de leche'],
+    name: 'Panqueque con dulce de leche',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 36, fiber: 1, protein: 5, fat: 6.5, calories: 225,
+    category: 'postre'
+  },
+  {
+    id: 'medialuna_ddl',
+    match: ['medialuna con dulce de leche', 'medialunas con dulce de leche', 'medialuna rellena', 'medialunas rellenas'],
+    name: 'Medialuna con dulce de leche',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 38, fiber: 1, protein: 5, fat: 9.5, calories: 260,
+    category: 'panaderia'
+  },
+  {
+    id: 'medialuna_manteca',
+    match: ['medialuna de manteca', 'medialunas de manteca', 'medialuna dulce', 'medialunas dulces'],
+    name: 'Medialuna de manteca',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 26, fiber: 1, protein: 4, fat: 8.5, calories: 195,
+    category: 'panaderia'
+  },
+  {
+    id: 'medialuna_grasa',
+    match: ['medialuna de grasa', 'medialunas de grasa', 'medialuna salada', 'medialunas saladas'],
+    name: 'Medialuna de grasa',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 22, fiber: 0.8, protein: 3.5, fat: 7, calories: 165,
+    category: 'panaderia'
+  },
+  {
+    id: 'medialuna',
+    match: ['medialunas', 'medialuna'],
+    name: 'Medialuna',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 25, fiber: 1, protein: 4, fat: 8, calories: 188,
+    category: 'panaderia'
+  },
+  {
+    id: 'factura',
+    match: ['facturas', 'factura', 'vigilante', 'cañoncito'],
+    name: 'Factura de panadería',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 30, fiber: 1, protein: 4, fat: 9, calories: 220,
+    category: 'panaderia'
+  },
+  {
+    id: 'alfajor_maicena',
+    match: ['alfajor de maicena', 'alfajores de maicena'],
+    name: 'Alfajor de maicena',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 40, fiber: 1.5, protein: 4, fat: 11, calories: 280,
+    category: 'dulce'
+  },
+  {
+    id: 'alfajor',
+    match: ['alfajor de chocolate', 'alfajores', 'alfajor'],
+    name: 'Alfajor de chocolate',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 42, fiber: 2, protein: 5, fat: 12, calories: 300,
+    category: 'dulce'
+  },
+  {
+    id: 'conito_ddl',
+    match: ['conito de dulce de leche', 'conito havanna', 'conito de chocolate'],
+    name: 'Conito de dulce de leche',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 26, fiber: 1, protein: 3, fat: 7, calories: 180,
+    category: 'dulce'
+  },
+  {
+    id: 'chocolate_amargo',
+    match: ['chocolate amargo', 'chocolate negro', 'chocolate 70%', 'chocolate 80%', 'chocolate 85%', 'chocolate puro'],
+    name: 'Chocolate amargo 70%+',
+    unit: 'porción 30g', baseGrams: 30,
+    carbs: 10, fiber: 3.5, protein: 2.5, fat: 14, calories: 175,
+    category: 'dulce_keto'
+  },
+  {
+    id: 'chocolate',
+    match: ['chocolate con leche', 'chocolate blanco', 'barra de chocolate', 'chocolate'],
+    name: 'Chocolate con leche',
+    unit: 'porción 40g', baseGrams: 40,
+    carbs: 24, fiber: 1, protein: 3.2, fat: 13, calories: 225,
+    category: 'dulce'
+  },
+  {
+    id: 'galletitas',
+    match: ['galletitas dulces', 'galletitas', 'galletas dulces', 'galletas', 'oreo', 'chocolinas', 'pepas'],
+    name: 'Galletitas dulces (porción)',
+    unit: 'porción', baseGrams: 0,
+    carbs: 26, fiber: 1, protein: 2.5, fat: 7, calories: 180,
+    category: 'dulce'
+  },
+  {
+    id: 'dulce_de_leche',
+    match: ['dulce de leche', 'ddl'],
+    name: 'Dulce de leche (1 cda)',
+    unit: 'cucharada (25g)', baseGrams: 25,
+    carbs: 14, fiber: 0, protein: 1.5, fat: 2, calories: 80,
+    category: 'dulce'
+  },
+
+  // --- BEBIDAS (ALCOHÓLICAS Y ANALCOHÓLICAS) ---
+  {
+    id: 'fernet_coca_zero',
+    match: ['fernet con coca zero', 'fernet con coca light', 'fernet zero'],
+    name: 'Fernet con Coca Zero',
+    unit: 'vaso', baseGrams: 0,
+    carbs: 0.5, fiber: 0, protein: 0, fat: 0, calories: 140,
+    category: 'alcohol_keto'
+  },
+  {
+    id: 'fernet_coca',
+    match: ['fernet con coca cola', 'fernet con coca', 'fernet'],
+    name: 'Fernet con Coca Cola común',
+    unit: 'vaso', baseGrams: 0,
+    carbs: 36, fiber: 0, protein: 0, fat: 0, calories: 290,
+    category: 'alcohol_azucar'
+  },
+  {
+    id: 'gin_tonic_zero',
+    match: ['gin tonic zero', 'gin tonic light', 'gin con tonica zero'],
+    name: 'Gin Tonic con tónica Zero',
+    unit: 'trago', baseGrams: 0,
+    carbs: 0.2, fiber: 0, protein: 0, fat: 0, calories: 110,
+    category: 'alcohol_keto'
+  },
+  {
+    id: 'gin_tonic',
+    match: ['gin tonic', 'gin con tonica'],
+    name: 'Gin Tonic tradicional',
+    unit: 'trago', baseGrams: 0,
+    carbs: 18, fiber: 0, protein: 0, fat: 0, calories: 195,
+    category: 'alcohol'
+  },
+  {
+    id: 'campari',
+    match: ['campari con naranja', 'campari'],
+    name: 'Campari con jugo de naranja',
+    unit: 'trago', baseGrams: 0,
+    carbs: 26, fiber: 0.2, protein: 0.5, fat: 0, calories: 210,
+    category: 'alcohol_azucar'
+  },
+  {
+    id: 'aperol',
+    match: ['aperol spritz', 'aperol'],
+    name: 'Aperol Spritz',
+    unit: 'copa', baseGrams: 0,
+    carbs: 16, fiber: 0, protein: 0.1, fat: 0, calories: 155,
+    category: 'alcohol'
+  },
+  {
+    id: 'cerveza_pinta',
+    match: ['pinta de cerveza artesanal', 'pinta de cerveza', 'pinta de birra', 'pinta'],
+    name: 'Pinta de cerveza (500ml)',
+    unit: 'pinta', baseGrams: 0,
+    carbs: 19, fiber: 0, protein: 2, fat: 0, calories: 215,
+    category: 'alcohol'
+  },
+  {
+    id: 'cerveza',
+    match: ['lata de cerveza', 'porron de cerveza', 'vaso de cerveza', 'cerveza artesanal', 'cerveza', 'birra', 'lata cerveza', 'porron'],
+    name: 'Cerveza (lata / porrón 354ml)',
+    unit: 'lata/vaso', baseGrams: 0,
+    carbs: 13, fiber: 0, protein: 1.5, fat: 0, calories: 150,
+    category: 'alcohol'
+  },
+  {
+    id: 'vino',
+    match: ['copa de vino tinto', 'copa de vino blanco', 'copa de vino', 'vino tinto', 'vino blanco', 'copa vino', 'malbec', 'cabernet', 'vino'],
+    name: 'Copa de vino (150ml)',
+    unit: 'copa', baseGrams: 0,
+    carbs: 2.5, fiber: 0, protein: 0.1, fat: 0, calories: 125,
+    category: 'alcohol_keto'
+  },
+  {
+    id: 'champagne',
+    match: ['copa de champagne', 'champagne', 'espumante', 'prosecco'],
+    name: 'Copa de champagne / espumante',
+    unit: 'copa', baseGrams: 0,
+    carbs: 2.8, fiber: 0, protein: 0.1, fat: 0, calories: 115,
+    category: 'alcohol_keto'
+  },
+  {
+    id: 'whisky',
+    match: ['whisky', 'vodka', 'ron', 'tequila', 'gin puro'],
+    name: 'Destilado puro (50ml)',
+    unit: 'medida', baseGrams: 0,
+    carbs: 0, fiber: 0, protein: 0, fat: 0, calories: 110,
+    category: 'alcohol_keto'
+  },
+  {
+    id: 'coca_zero',
+    match: ['coca cola zero', 'coca zero', 'coca light', 'pepsi black', 'sprite zero', '7up free', 'gaseosa zero', 'gaseosa light'],
+    name: 'Gaseosa Zero / Light (354ml)',
+    unit: 'lata/vaso', baseGrams: 0,
+    carbs: 0, fiber: 0, protein: 0, fat: 0, calories: 1,
+    category: 'bebida_keto'
+  },
+  {
+    id: 'coca_cola',
+    match: ['coca cola', 'pepsi', 'sprite', 'fanta', '7up', 'gaseosa regular', 'gaseosa comun', 'gaseosa', 'coca'],
+    name: 'Gaseosa regular con azúcar (354ml)',
+    unit: 'lata/vaso', baseGrams: 0,
+    carbs: 37, fiber: 0, protein: 0, fat: 0, calories: 145,
+    category: 'bebida_azucar'
+  },
+  {
+    id: 'jugo_naranja',
+    match: ['jugo de naranja exprimido', 'naranja exprimida', 'jugo de naranja natural', 'jugo de naranja', 'vaso de naranja exprimida'],
+    name: 'Jugo de naranja natural (250ml)',
+    unit: 'vaso', baseGrams: 0,
+    carbs: 26, fiber: 0.5, protein: 1.8, fat: 0.2, calories: 115,
+    category: 'bebida_azucar'
+  },
+  {
+    id: 'jugo_fruta',
+    match: ['jugo de manzana', 'jugo de frutas', 'jugo cepita', 'jugo'],
+    name: 'Jugo de frutas (250ml)',
+    unit: 'vaso', baseGrams: 0,
+    carbs: 28, fiber: 0, protein: 0.5, fat: 0, calories: 120,
+    category: 'bebida_azucar'
+  },
+  {
+    id: 'limonada_casera',
+    match: ['limonada con menta y jengibre', 'limonada sin azucar', 'limonada keto'],
+    name: 'Limonada natural sin azúcar',
+    unit: 'vaso', baseGrams: 0,
+    carbs: 1.5, fiber: 0, protein: 0, fat: 0, calories: 10,
+    category: 'bebida_keto'
+  },
+  {
+    id: 'limonada',
+    match: ['limonada'],
+    name: 'Limonada tradicional (con azúcar)',
+    unit: 'vaso', baseGrams: 0,
+    carbs: 22, fiber: 0, protein: 0, fat: 0, calories: 90,
+    category: 'bebida'
+  },
+  {
+    id: 'licuado_banana',
+    match: ['licuado de banana con leche', 'licuado de banana', 'batido de banana'],
+    name: 'Licuado de banana con leche',
+    unit: 'vaso', baseGrams: 0,
+    carbs: 36, fiber: 2.5, protein: 6.5, fat: 5, calories: 220,
+    category: 'bebida'
+  },
+  {
+    id: 'cafe_bulletproof',
+    match: ['cafe bulletproof', 'bulletproof', 'cafe con manteca', 'cafe keto'],
+    name: 'Café Bulletproof (con manteca/MCT)',
+    unit: 'taza', baseGrams: 0,
+    carbs: 0.2, fiber: 0, protein: 0.5, fat: 24, calories: 220,
+    category: 'keto_puro'
+  },
+  {
+    id: 'cafe_leche',
+    match: ['cafe con leche', 'latte', 'cafe con leche y espuma'],
+    name: 'Café con leche (200ml)',
+    unit: 'taza', baseGrams: 0,
+    carbs: 6, fiber: 0, protein: 4, fat: 4, calories: 80,
+    category: 'infusion'
+  },
+  {
+    id: 'cortado',
+    match: ['cafe cortado', 'cortado', 'macchiato'],
+    name: 'Café cortado',
+    unit: 'pocillo', baseGrams: 0,
+    carbs: 2, fiber: 0, protein: 1.5, fat: 1.5, calories: 28,
+    category: 'infusion'
+  },
+  {
+    id: 'capuchino',
+    match: ['capuchino', 'cappuccino'],
+    name: 'Capuchino',
+    unit: 'taza', baseGrams: 0,
+    carbs: 8, fiber: 0, protein: 5, fat: 5, calories: 100,
+    category: 'infusion'
+  },
+  {
+    id: 'cafe',
+    match: ['cafe solo', 'cafe negro', 'espresso', 'cafe'],
+    name: 'Café negro / espresso',
+    unit: 'pocillo', baseGrams: 0,
+    carbs: 0.2, fiber: 0, protein: 0.2, fat: 0, calories: 3,
+    category: 'infusion_keto'
+  },
+  {
+    id: 'mate_dulce',
+    match: ['mate dulce', 'mate con azucar'],
+    name: 'Mate con azúcar (ronda)',
+    unit: 'termo', baseGrams: 0,
+    carbs: 24, fiber: 0, protein: 0, fat: 0, calories: 96,
+    category: 'infusion'
+  },
+  {
+    id: 'mate',
+    match: ['mate amargo', 'mate'],
+    name: 'Mate amargo',
+    unit: 'ronda', baseGrams: 0,
+    carbs: 0.5, fiber: 0, protein: 0.5, fat: 0, calories: 5,
+    category: 'infusion_keto'
+  },
+  {
+    id: 'te',
+    match: ['te verde', 'te negro', 'te rojo', 'te'],
+    name: 'Té',
+    unit: 'taza', baseGrams: 0,
+    carbs: 0.2, fiber: 0, protein: 0, fat: 0, calories: 2,
+    category: 'infusion_keto'
+  },
+  {
+    id: 'agua',
+    match: ['agua con gas', 'soda', 'agua mineral', 'agua'],
+    name: 'Agua / Soda',
+    unit: 'vaso', baseGrams: 0,
+    carbs: 0, fiber: 0, protein: 0, fat: 0, calories: 0,
+    category: 'bebida_keto'
+  },
+
+  // --- PLATOS Y COMIDAS ELABORADAS ---
+  {
+    id: 'pastel_papas',
+    match: ['porcion de pastel de papas', 'porcion de pastel de papa', 'pastel de papas', 'pastel de papa', 'pastel de carne'],
+    name: 'Pastel de papas con carne',
+    unit: 'porción', baseGrams: 0,
+    carbs: 32, fiber: 2.5, protein: 22, fat: 16, calories: 360,
+    category: 'plato'
+  },
+  {
+    id: 'milanesa_napolitana',
+    match: ['milanesa napolitana', 'suprema napolitana', 'milanesa a la napolitana'],
+    name: 'Milanesa napolitana (jamón, queso, salsa)',
+    unit: 'unidad grande', baseGrams: 0,
+    carbs: 22, fiber: 1.5, protein: 36, fat: 22, calories: 430,
+    category: 'plato'
+  },
+  {
+    id: 'milanesa',
+    match: ['milanesa de carne', 'milanesa de ternera', 'milanesa de pollo', 'suprema de pollo', 'suprema', 'milanesa'],
+    name: 'Milanesa (carne/pollo rebozada)',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 18, fiber: 1, protein: 26, fat: 14, calories: 300,
+    category: 'plato'
+  },
+  {
+    id: 'empanada_carne',
+    match: ['empanadas de carne', 'empanada de carne'],
+    name: 'Empanada de carne',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 22, fiber: 1.5, protein: 8.5, fat: 9.5, calories: 210,
+    category: 'plato'
+  },
+  {
+    id: 'empanada_jyq',
+    match: ['empanadas de jamon y queso', 'empanada de jamon y queso'],
+    name: 'Empanada de jamón y queso',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 20, fiber: 1, protein: 8, fat: 10, calories: 205,
+    category: 'plato'
+  },
+  {
+    id: 'empanada_pollo',
+    match: ['empanadas de pollo', 'empanada de pollo'],
+    name: 'Empanada de pollo',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 21, fiber: 1, protein: 8.5, fat: 7.5, calories: 185,
+    category: 'plato'
+  },
+  {
+    id: 'empanada_verdura',
+    match: ['empanadas de verdura', 'empanada de verdura', 'empanada de acelga'],
+    name: 'Empanada de verdura',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 22, fiber: 2.5, protein: 5.5, fat: 7, calories: 175,
+    category: 'plato'
+  },
+  {
+    id: 'empanada',
+    match: ['empanadas', 'empanada'],
+    name: 'Empanada',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 22, fiber: 1.5, protein: 8, fat: 9, calories: 200,
+    category: 'plato'
+  },
+  {
+    id: 'pizza_fugazzeta',
+    match: ['pizza fugazzeta', 'fugazzeta con queso', 'fugazzeta rellena', 'fugazzeta'],
+    name: 'Pizza fugazzeta (cebolla y queso)',
+    unit: 'porción', baseGrams: 0,
+    carbs: 30, fiber: 2, protein: 13, fat: 13, calories: 290,
+    category: 'plato'
+  },
+  {
+    id: 'pizza',
+    match: ['pizza de muzzarella', 'pizza muzzarella', 'pizza napolitana', 'pizza especial', 'porciones de pizza', 'porcion de pizza', 'pizza'],
+    name: 'Pizza (porción)',
+    unit: 'porción', baseGrams: 0,
+    carbs: 28, fiber: 1.8, protein: 12, fat: 11, calories: 260,
+    category: 'plato'
+  },
+  {
+    id: 'faina',
+    match: ['faina'],
+    name: 'Fainá',
+    unit: 'porción', baseGrams: 0,
+    carbs: 24, fiber: 3, protein: 6, fat: 8, calories: 195,
+    category: 'plato'
+  },
+  {
+    id: 'pancho',
+    match: ['superpancho', 'pancho con papas pay', 'pancho', 'hot dog'],
+    name: 'Pancho / Hot Dog',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 28, fiber: 1, protein: 9, fat: 14, calories: 275,
+    category: 'comida_rapida'
+  },
+  {
+    id: 'bife_chorizo',
+    match: ['bife de chorizo', 'ojo de bife', 'bife de lomo', 'bife', 'lomo', 'churrasco', 'entrecot', 'colita de cuadril'],
+    name: 'Bife de carne vacuna (250g)',
+    unit: 'porción 250g', baseGrams: 250,
+    carbs: 0, fiber: 0, protein: 65, fat: 35, calories: 580,
+    category: 'carne_keto'
+  },
+  {
+    id: 'asado_carne',
+    match: ['asado de tira', 'tira de asado', 'asado', 'vacio', 'entrana', 'entraña', 'costillas de asado', 'matambre de carne', 'matambre'],
+    name: 'Asado / Vacío a la parrilla (250g)',
+    unit: 'porción 250g', baseGrams: 250,
+    carbs: 0, fiber: 0, protein: 62, fat: 48, calories: 680,
+    category: 'carne_keto'
+  },
+  {
+    id: 'choripan',
+    match: ['choripan con chimichurri', 'choripan', 'chori'],
+    name: 'Choripán con chimichurri',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 36, fiber: 2, protein: 16, fat: 26, calories: 440,
+    category: 'comida_rapida'
+  },
+  {
+    id: 'chorizo',
+    match: ['chorizo de cerdo', 'chorizo', 'morcilla'],
+    name: 'Chorizo / Morcilla',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 1.5, fiber: 0, protein: 14, fat: 24, calories: 280,
+    category: 'carne_keto'
+  },
+  {
+    id: 'lomito_completo',
+    match: ['lomito completo', 'sandwich de lomo completo', 'sandwich de lomo'],
+    name: 'Lomito completo con pan',
+    unit: 'sándwich', baseGrams: 0,
+    carbs: 46, fiber: 2.5, protein: 36, fat: 24, calories: 550,
+    category: 'comida_rapida'
+  },
+  {
+    id: 'tostado',
+    match: ['tostado de jamon y queso', 'tostado', 'carlitos', 'sandwich tostado'],
+    name: 'Tostado de jamón y queso',
+    unit: 'sándwich', baseGrams: 0,
+    carbs: 32, fiber: 1.5, protein: 16, fat: 14, calories: 320,
+    category: 'comida_rapida'
+  },
+  {
+    id: 'hamburguesa_completa',
+    match: ['hamburguesa completa', 'hamburguesa con queso y bacon', 'doble cuarto de libra', 'big mac', 'hamburguesa con papas', 'hamburguesa con queso', 'hamburguesa'],
+    name: 'Hamburguesa con pan',
+    unit: 'sándwich', baseGrams: 0,
+    carbs: 38, fiber: 2, protein: 34, fat: 36, calories: 615,
+    category: 'comida_rapida'
+  },
+  {
+    id: 'hamburguesa_plato',
+    match: ['hamburguesa al plato', 'hamburguesa casera', 'medallon de carne'],
+    name: 'Hamburguesa casera al plato',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 1, fiber: 0, protein: 24, fat: 18, calories: 265,
+    category: 'carne_keto'
+  },
+  {
+    id: 'pollo_pechuga',
+    match: ['pechuga de pollo', 'pechuga'],
+    name: 'Pechuga de pollo (200g)',
+    unit: 'porción 200g', baseGrams: 200,
+    carbs: 0, fiber: 0, protein: 62, fat: 7.2, calories: 330,
+    category: 'ave_keto'
+  },
+  {
+    id: 'pollo_pata_muslo',
+    match: ['pata y muslo', 'pata muslo', 'muslo de pollo', 'alitas de pollo', 'pollo al horno', 'pollo a la parrilla', 'pollo'],
+    name: 'Pollo (al horno / parrilla 200g)',
+    unit: 'porción 200g', baseGrams: 200,
+    carbs: 0, fiber: 0, protein: 48, fat: 22, calories: 400,
+    category: 'ave_keto'
+  },
+  {
+    id: 'cerdo_bondiola',
+    match: ['bondiola', 'costillita de cerdo', 'costillitas de cerdo', 'pechito de cerdo', 'carre de cerdo', 'cerdo'],
+    name: 'Carne de cerdo / Bondiola (200g)',
+    unit: 'porción 200g', baseGrams: 200,
+    carbs: 0, fiber: 0, protein: 48, fat: 36, calories: 520,
+    category: 'carne_keto'
+  },
+  {
+    id: 'salmon',
+    match: ['salmon rosado', 'salmon'],
+    name: 'Salmón rosado (200g)',
+    unit: 'porción 200g', baseGrams: 200,
+    carbs: 0, fiber: 0, protein: 44, fat: 26, calories: 420,
+    category: 'pescado_keto'
+  },
+  {
+    id: 'pescado_blanco',
+    match: ['merluza', 'lenguado', 'corvina', 'pejerrey', 'pescado'],
+    name: 'Filet de pescado (200g)',
+    unit: 'porción 200g', baseGrams: 200,
+    carbs: 0, fiber: 0, protein: 40, fat: 4, calories: 200,
+    category: 'pescado_keto'
+  },
+  {
+    id: 'atun',
+    match: ['atun al natural', 'lata de atun', 'atun en aceite', 'atun'],
+    name: 'Lata de atún',
+    unit: 'lata', baseGrams: 170,
+    carbs: 0, fiber: 0, protein: 28, fat: 4, calories: 150,
+    category: 'pescado_keto'
+  },
+  {
+    id: 'mariscos',
+    match: ['camarones', 'langostinos', 'mejillones', 'mariscos', 'rabas'],
+    name: 'Mariscos / Rabas (porción)',
+    unit: 'porción', baseGrams: 0,
+    carbs: 6, fiber: 0.5, protein: 26, fat: 6, calories: 185,
+    category: 'pescado_keto'
+  },
+  {
+    id: 'carne_picada',
+    match: ['carne picada', 'albondigas', 'carne vacuna', 'carne molida', 'carne'],
+    name: 'Carne vacuna (200g)',
+    unit: 'porción 200g', baseGrams: 200,
+    carbs: 0, fiber: 0, protein: 52, fat: 30, calories: 480,
+    category: 'carne_keto'
+  },
+  {
+    id: 'panceta',
+    match: ['panceta', 'bacon', 'tocino'],
+    name: 'Panceta / Bacon (3 fetas)',
+    unit: 'porción 40g', baseGrams: 40,
+    carbs: 0.5, fiber: 0, protein: 12, fat: 16, calories: 195,
+    category: 'carne_keto'
+  },
+  {
+    id: 'jamon',
+    match: ['jamon crudo', 'jamon cocido', 'jamon'],
+    name: 'Jamón (fetas)',
+    unit: 'porción 50g', baseGrams: 50,
+    carbs: 0.5, fiber: 0, protein: 11, fat: 5, calories: 95,
+    category: 'carne_keto'
+  },
+  {
+    id: 'huevos_fritos',
+    match: ['huevos fritos', 'huevo frito'],
+    name: 'Huevos fritos',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 0.5, fiber: 0, protein: 6.5, fat: 8.5, calories: 105,
+    category: 'huevo_keto'
+  },
+  {
+    id: 'huevos',
+    match: ['huevos revueltos', 'huevo revuelto', 'huevo duro', 'huevos duros', 'huevos', 'huevo', 'omelette'],
+    name: 'Huevos (revueltos/duros/omelette)',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 0.5, fiber: 0, protein: 6.5, fat: 5.2, calories: 75,
+    category: 'huevo_keto'
+  },
+
+  // --- PASTAS, ARROCES Y GUISOS ---
+  {
+    id: 'noquis',
+    match: ['plato de noquis', 'plato de ñoquis', 'noquis', 'ñoquis'],
+    name: 'Ñoquis de papa',
+    unit: 'plato', baseGrams: 0,
+    carbs: 68, fiber: 3, protein: 9, fat: 4, calories: 350,
+    category: 'pasta'
+  },
+  {
+    id: 'fideos',
+    match: ['fideos', 'spaghetti', 'tallarines', 'pasta'],
+    name: 'Fideos / Pasta',
+    unit: 'plato', baseGrams: 0,
+    carbs: 65, fiber: 3.5, protein: 12, fat: 3, calories: 340,
+    category: 'pasta'
+  },
+  {
+    id: 'ravioles',
+    match: ['ravioles', 'sorrentinos', 'capeletis', 'canelones', 'pasta rellena'],
+    name: 'Pastas rellenas (ravioles/sorrentinos)',
+    unit: 'plato', baseGrams: 0,
+    carbs: 62, fiber: 3, protein: 16, fat: 8, calories: 385,
+    category: 'pasta'
+  },
+  {
+    id: 'lasagna',
+    match: ['lasagna', 'lasana'],
+    name: 'Lasaña de carne y queso',
+    unit: 'porción', baseGrams: 0,
+    carbs: 48, fiber: 3.5, protein: 26, fat: 22, calories: 495,
+    category: 'pasta'
+  },
+  {
+    id: 'salsa_bolognesa',
+    match: ['salsa bolognesa', 'bolognesa', 'tuco con carne'],
+    name: 'Salsa bolognesa con carne',
+    unit: 'porción', baseGrams: 0,
+    carbs: 8, fiber: 1.5, protein: 14, fat: 10, calories: 180,
+    category: 'salsa'
+  },
+  {
+    id: 'salsa_tuco',
+    match: ['salsa de tomate', 'filetto', 'tuco'],
+    name: 'Salsa de tomate / tuco',
+    unit: 'porción', baseGrams: 0,
+    carbs: 6, fiber: 1.5, protein: 1.5, fat: 3, calories: 60,
+    category: 'salsa'
+  },
+  {
+    id: 'arroz_pollo',
+    match: ['arroz con pollo', 'guiso de arroz con pollo'],
+    name: 'Arroz con pollo',
+    unit: 'plato', baseGrams: 0,
+    carbs: 48, fiber: 2, protein: 28, fat: 11, calories: 405,
+    category: 'plato'
+  },
+  {
+    id: 'risotto',
+    match: ['risotto', 'paella'],
+    name: 'Risotto / Paella',
+    unit: 'plato', baseGrams: 0,
+    carbs: 52, fiber: 2, protein: 18, fat: 13, calories: 395,
+    category: 'plato'
+  },
+  {
+    id: 'arroz',
+    match: ['arroz blanco', 'arroz'],
+    name: 'Arroz blanco',
+    unit: 'plato (180g)', baseGrams: 180,
+    carbs: 50, fiber: 1, protein: 4.5, fat: 1, calories: 230,
+    category: 'guarnicion'
+  },
+  {
+    id: 'guiso_lentejas',
+    match: ['guiso de lentejas', 'lentejas', 'guiso'],
+    name: 'Guiso de lentejas con carne',
+    unit: 'plato hondo', baseGrams: 0,
+    carbs: 44, fiber: 9, protein: 22, fat: 10, calories: 360,
+    category: 'plato'
+  },
+  {
+    id: 'estofado',
+    match: ['estofado de carne', 'estofado'],
+    name: 'Estofado de carne con papas',
+    unit: 'plato', baseGrams: 0,
+    carbs: 26, fiber: 3, protein: 28, fat: 14, calories: 345,
+    category: 'plato'
+  },
+  {
+    id: 'locro',
+    match: ['locro'],
+    name: 'Locro tradicional',
+    unit: 'plato hondo', baseGrams: 0,
+    carbs: 48, fiber: 6, protein: 24, fat: 18, calories: 455,
+    category: 'plato'
+  },
+  {
+    id: 'tarta_jyq',
+    match: ['tarta de jamon y queso', 'tarta de jamon'],
+    name: 'Tarta de jamón y queso',
+    unit: 'porción', baseGrams: 0,
+    carbs: 28, fiber: 1.5, protein: 15, fat: 18, calories: 335,
+    category: 'plato'
+  },
+  {
+    id: 'tarta_verdura',
+    match: ['tarta de verdura', 'tarta de acelga', 'tarta de espinaca', 'pascualina', 'tarta pascualina'],
+    name: 'Tarta pascualina / verdura',
+    unit: 'porción', baseGrams: 0,
+    carbs: 26, fiber: 3.5, protein: 9, fat: 13, calories: 260,
+    category: 'plato'
+  },
+  {
+    id: 'tortilla_papas',
+    match: ['tortilla de papas', 'tortilla de papa', 'tortilla espanola'],
+    name: 'Tortilla de papas',
+    unit: 'porción', baseGrams: 0,
+    carbs: 26, fiber: 2, protein: 8, fat: 14, calories: 265,
+    category: 'plato'
+  },
+  {
+    id: 'tortilla_verdura',
+    match: ['tortilla de acelga', 'tortilla de espinaca', 'tortilla de verduras'],
+    name: 'Tortilla de acelga / espinaca',
+    unit: 'porción', baseGrams: 0,
+    carbs: 7, fiber: 3, protein: 9, fat: 8, calories: 140,
+    category: 'plato_keto'
+  },
+  {
+    id: 'revuelto_gramajo',
+    match: ['revuelto gramajo', 'gramajo'],
+    name: 'Revuelto gramajo',
+    unit: 'porción', baseGrams: 0,
+    carbs: 28, fiber: 2.5, protein: 18, fat: 22, calories: 385,
+    category: 'plato'
+  },
+  {
+    id: 'sushi',
+    match: ['piezas de sushi', 'rolls de sushi', 'roll de sushi', 'piezas sushi', 'sushi'],
+    name: 'Sushi (roll tradicional)',
+    unit: 'pieza', baseGrams: 0,
+    carbs: 5.5, fiber: 0.4, protein: 2, fat: 1.5, calories: 44,
+    category: 'plato'
+  },
+  {
+    id: 'sopa_verduras',
+    match: ['sopa de verduras', 'sopa de vegetales', 'sopa crema', 'sopa'],
+    name: 'Sopa de verduras',
+    unit: 'plato', baseGrams: 0,
+    carbs: 12, fiber: 3, protein: 3, fat: 1, calories: 70,
+    category: 'sopa'
+  },
+  {
+    id: 'caldo',
+    match: ['caldo de huesos', 'caldo de pollo', 'caldo de carne', 'caldo'],
+    name: 'Caldo nutritivo',
+    unit: 'taza', baseGrams: 0,
+    carbs: 0.5, fiber: 0, protein: 4, fat: 1, calories: 28,
+    category: 'sopa_keto'
+  },
+
+  // --- GUARNICIONES, ENSALADAS Y PAPAS ---
+  {
+    id: 'papas_fritas',
+    match: ['papas fritas', 'papa frita', 'fritas'],
+    name: 'Papas fritas (porción)',
+    unit: 'porción', baseGrams: 0,
+    carbs: 44, fiber: 4, protein: 4, fat: 19, calories: 365,
+    category: 'guarnicion'
+  },
+  {
+    id: 'pure_papas',
+    match: ['pure de papas', 'pure de papa', 'pure'],
+    name: 'Puré de papas',
+    unit: 'porción', baseGrams: 0,
+    carbs: 26, fiber: 2, protein: 3, fat: 6, calories: 170,
+    category: 'guarnicion'
+  },
+  {
+    id: 'papa_horno',
+    match: ['papas al horno', 'papa al horno', 'papa rustica'],
+    name: 'Papa al horno',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 30, fiber: 2.5, protein: 3, fat: 1, calories: 145,
+    category: 'guarnicion'
+  },
+  {
+    id: 'pure_calabaza',
+    match: ['pure de calabaza', 'calabaza al horno', 'zapallo'],
+    name: 'Puré de calabaza',
+    unit: 'porción', baseGrams: 0,
+    carbs: 15, fiber: 2.5, protein: 2, fat: 3, calories: 95,
+    category: 'guarnicion'
+  },
+  {
+    id: 'ensalada_cesar',
+    match: ['ensalada cesar', 'cesar salad', 'caesar'],
+    name: 'Ensalada César con pollo',
+    unit: 'porción', baseGrams: 0,
+    carbs: 10, fiber: 2, protein: 24, fat: 18, calories: 300,
+    category: 'ensalada'
+  },
+  {
+    id: 'ensalada_rusa',
+    match: ['ensalada rusa'],
+    name: 'Ensalada rusa con mayonesa',
+    unit: 'porción', baseGrams: 0,
+    carbs: 25, fiber: 3, protein: 3.5, fat: 14, calories: 245,
+    category: 'ensalada'
+  },
+  {
+    id: 'ensalada_mixta',
+    match: ['ensalada mixta', 'ensalada verde', 'lechuga y tomate', 'rucula y tomate', 'lechuga', 'ensalada'],
+    name: 'Ensalada verde mixta',
+    unit: 'porción', baseGrams: 0,
+    carbs: 5, fiber: 2.5, protein: 1.5, fat: 0.5, calories: 32,
+    category: 'ensalada_keto'
+  },
+  {
+    id: 'palta',
+    match: ['palta', 'aguacate', 'guacamole'],
+    name: 'Palta / Aguacate',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 12, fiber: 9.2, protein: 2.8, fat: 22, calories: 240,
+    category: 'grasa_keto'
+  },
+  {
+    id: 'aceitunas',
+    match: ['aceitunas verdes', 'aceitunas negras', 'aceitunas'],
+    name: 'Aceitunas (porción 50g)',
+    unit: 'porción 50g', baseGrams: 50,
+    carbs: 1.5, fiber: 1.2, protein: 0.5, fat: 8, calories: 75,
+    category: 'grasa_keto'
+  },
+  {
+    id: 'verduras_keto',
+    match: ['brocoli', 'coliflor', 'esparragos', 'espinaca', 'acelga', 'champinon', 'champinones', 'zucchini'],
+    name: 'Verduras verdes keto (brócoli/espinaca)',
+    unit: 'porción 150g', baseGrams: 150,
+    carbs: 6, fiber: 4, protein: 3.5, fat: 0.5, calories: 42,
+    category: 'verdura_keto'
+  },
+
+  // --- LÁCTEOS, GRASAS, CONDIMENTOS Y FRUTOS SECOS ---
+  {
+    id: 'queso_rallado',
+    match: ['queso rallado', 'parmesano', 'queso sardo', 'queso duro'],
+    name: 'Queso rallado (parmesano 30g)',
+    unit: 'porción 30g', baseGrams: 30,
+    carbs: 0.8, fiber: 0, protein: 10, fat: 9, calories: 125,
+    category: 'lacteo_keto'
+  },
+  {
+    id: 'queso_muzzarella',
+    match: ['queso muzzarella', 'muzzarella', 'queso cremoso', 'queso cheddar', 'queso dambo', 'queso cuartirolo', 'queso'],
+    name: 'Queso (muzzarella/cremoso 60g)',
+    unit: 'porción 60g', baseGrams: 60,
+    carbs: 1.5, fiber: 0, protein: 14, fat: 16, calories: 210,
+    category: 'lacteo_keto'
+  },
+  {
+    id: 'queso_crema',
+    match: ['queso untable', 'queso crema', 'casancrem', 'philadelphia'],
+    name: 'Queso crema / untable (30g)',
+    unit: 'cucharada (30g)', baseGrams: 30,
+    carbs: 1.2, fiber: 0, protein: 2.5, fat: 8, calories: 88,
+    category: 'lacteo_keto'
+  },
+  {
+    id: 'crema_leche',
+    match: ['crema de leche', 'crema doble'],
+    name: 'Crema de leche (50ml)',
+    unit: 'porción (50ml)', baseGrams: 50,
+    carbs: 1.4, fiber: 0, protein: 1.2, fat: 18, calories: 175,
+    category: 'lacteo_keto'
+  },
+  {
+    id: 'manteca',
+    match: ['manteca', 'mantequilla', 'ghee'],
+    name: 'Manteca / Mantequilla (15g)',
+    unit: 'porción', baseGrams: 15,
+    carbs: 0.1, fiber: 0, protein: 0.1, fat: 12.5, calories: 110,
+    category: 'grasa_keto'
+  },
+  {
+    id: 'aceite_oliva',
+    match: ['aceite de oliva', 'aceite de coco', 'aceite mct', 'aceite'],
+    name: 'Aceite de oliva / coco (1 cda)',
+    unit: 'cda', baseGrams: 15,
+    carbs: 0, fiber: 0, protein: 0, fat: 14, calories: 120,
+    category: 'grasa_keto'
+  },
+  {
+    id: 'mayonesa',
+    match: ['mayonesa'],
+    name: 'Mayonesa (1 cda)',
+    unit: 'cda (20g)', baseGrams: 20,
+    carbs: 0.5, fiber: 0, protein: 0.3, fat: 15, calories: 135,
+    category: 'grasa_keto'
+  },
+  {
+    id: 'frutos_secos',
+    match: ['frutos secos', 'nueces', 'almendras', 'mani', 'avellanas', 'castanas', 'pistachos'],
+    name: 'Frutos secos (puñado 35g)',
+    unit: 'puñado', baseGrams: 35,
+    carbs: 5, fiber: 3, protein: 6.5, fat: 19, calories: 215,
+    category: 'fruto_keto'
+  },
+  {
+    id: 'banana',
+    match: ['banana', 'platano'],
+    name: 'Banana mediana',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 27, fiber: 3, protein: 1.2, fat: 0.3, calories: 105,
+    category: 'fruta'
+  },
+  {
+    id: 'manzana',
+    match: ['manzana', 'pera'],
+    name: 'Manzana / Pera',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 22, fiber: 4, protein: 0.5, fat: 0.3, calories: 95,
+    category: 'fruta'
+  },
+  {
+    id: 'frutillas',
+    match: ['frutos rojos', 'frutillas', 'arandanos', 'frambuesas'],
+    name: 'Frutillas / Frutos rojos (150g)',
+    unit: 'taza', baseGrams: 150,
+    carbs: 11, fiber: 3.5, protein: 1, fat: 0.5, calories: 52,
+    category: 'fruta_keto'
+  },
+  {
+    id: 'leche',
+    match: ['vaso de leche', 'taza de leche', 'leche'],
+    name: 'Vaso de leche (200ml)',
+    unit: 'vaso', baseGrams: 200,
+    carbs: 10, fiber: 0, protein: 6.5, fat: 6, calories: 120,
+    category: 'lacteo'
+  },
+  {
+    id: 'yogur_griego',
+    match: ['yogur griego sin azucar', 'yogur griego natural', 'yogur griego'],
+    name: 'Yogur griego natural (150g)',
+    unit: 'pote (150g)', baseGrams: 150,
+    carbs: 4.5, fiber: 0, protein: 12, fat: 6, calories: 120,
+    category: 'lacteo_keto'
+  },
+  {
+    id: 'yogur',
+    match: ['yogur con cereales', 'yogur', 'yogurt'],
+    name: 'Pote de yogur regular',
+    unit: 'pote', baseGrams: 0,
+    carbs: 18, fiber: 0.5, protein: 6, fat: 4, calories: 135,
+    category: 'lacteo'
+  },
+  {
+    id: 'pan_tostada',
+    match: ['tostadas', 'tostada', 'rodajas de pan', 'pan blanco', 'pan'],
+    name: 'Pan / Tostada',
+    unit: 'unidad', baseGrams: 0,
+    carbs: 16, fiber: 1, protein: 2.5, fat: 0.8, calories: 85,
+    category: 'panaderia'
+  }
+];
+
+// Aplanamiento de reglas ordenadas estrictamente por longitud descendente de frase clave
+const FLATTENED_FOOD_RULES = [];
+for (const item of FOOD_AI_DATABASE) {
+  for (const kw of item.match) {
+    const kwNorm = kw.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    FLATTENED_FOOD_RULES.push({
+      item,
+      kwNorm,
+      len: kwNorm.length
+    });
+  }
+}
+FLATTENED_FOOD_RULES.sort((a, b) => b.len - a.len);
+
+// Extractor bidireccional de cantidades numéricas, porciones y gramos (hacia adelante y hacia atrás)
+function extractFoodQuantityBidirectional(fullText, matchStart, matchEnd) {
+  // 1. Revisar sufijo (justo después del alimento, ej: "bife de chorizo 400g" o "vino 2 copas")
+  const suffix = fullText.slice(matchEnd, Math.min(fullText.length, matchEnd + 25));
+  const gramSuffix = suffix.match(/^\s*(?:de\s+)?(\d+(?:\.\d+)?)\s*(?:g|gr|gramos)\b/i);
+  if (gramSuffix) {
+    const grams = parseFloat(gramSuffix[1]);
+    const endPad = matchEnd + gramSuffix[0].length;
+    return { multiplier: grams / 100, isGrams: true, grams, startPad: matchStart, endPad };
+  }
+
+  const unitSuffix = suffix.match(/^\s*(?:x\s*)?(\d+(?:\.\d+)?)\s*(?:unidades?|porciones?|fetas?|rodajas?|vasos?|copas?|latas?|platos?|bochas?|piezas?)?\b/i);
+  if (unitSuffix) {
+    const val = parseFloat(unitSuffix[1]);
+    if (!isNaN(val) && val > 0 && val < 50) {
+      const endPad = matchEnd + unitSuffix[0].length;
+      return { multiplier: val, isGrams: false, startPad: matchStart, endPad };
+    }
+  }
+
+  // 2. Revisar prefijo (justo antes del alimento, ej: "400g de bife" o "2 empanadas")
+  const prefixStart = Math.max(0, matchStart - 25);
+  const prefix = fullText.slice(prefixStart, matchStart);
+
+  const gramPrefix = prefix.match(/(\d+(?:\.\d+)?)\s*(?:g|gr|gramos)(?:\s+de)?\s*$/i);
+  if (gramPrefix) {
+    const grams = parseFloat(gramPrefix[1]);
+    const startPad = matchStart - gramPrefix[0].length;
+    return { multiplier: grams / 100, isGrams: true, grams, startPad, endPad: matchEnd };
+  }
+
+  if (prefix.match(/(?:1\/2|media|medio)\s*(?:de\s+)?$/i)) {
+    const startPad = matchStart - (prefix.match(/(?:1\/2|media|medio)\s*(?:de\s+)?$/i)[0].length);
+    return { multiplier: 0.5, isGrams: false, startPad, endPad: matchEnd };
+  }
+  if (prefix.match(/(?:1\/4|cuarto)\s*(?:de\s+)?$/i)) {
+    const startPad = matchStart - (prefix.match(/(?:1\/4|cuarto)\s*(?:de\s+)?$/i)[0].length);
+    return { multiplier: 0.25, isGrams: false, startPad, endPad: matchEnd };
+  }
+
+  const numPrefix = prefix.match(/\b(\d+(?:\.\d+)?)\s*(?:unidades?|porciones?|fetas?|rodajas?|vasos?|copas?|latas?|platos?|bochas?|botellas?|tazas?|piezas?)?(?:\s+de)?\s*$/i);
+  if (numPrefix) {
+    const val = parseFloat(numPrefix[1]);
+    if (!isNaN(val) && val > 0 && val < 50) {
+      const startPad = matchStart - numPrefix[0].length;
+      return { multiplier: val, isGrams: false, startPad, endPad: matchEnd };
+    }
+  }
+
+  const wordMap = [
+    { regex: /\b(?:una|un|uno)\s*(?:de\s+)?$/i, val: 1 },
+    { regex: /\b(?:dos)\s*(?:de\s+)?$/i, val: 2 },
+    { regex: /\b(?:tres)\s*(?:de\s+)?$/i, val: 3 },
+    { regex: /\b(?:cuatro)\s*(?:de\s+)?$/i, val: 4 },
+    { regex: /\b(?:cinco)\s*(?:de\s+)?$/i, val: 5 },
+    { regex: /\b(?:seis)\s*(?:de\s+)?$/i, val: 6 },
+    { regex: /\b(?:diez)\s*(?:de\s+)?$/i, val: 10 },
+    { regex: /\b(?:doce)\s*(?:de\s+)?$/i, val: 12 }
+  ];
+
+  for (const w of wordMap) {
+    const matchW = prefix.match(w.regex);
+    if (matchW) {
+      const startPad = matchStart - matchW[0].length;
+      return { multiplier: w.val, isGrams: false, startPad, endPad: matchEnd };
+    }
+  }
+
+  return { multiplier: 1, isGrams: false, startPad: matchStart, endPad: matchEnd };
+}
+
+// Función Principal de Estimación Inteligente con Procesamiento de Lenguaje Natural
 function estimateMealMacrosAI(input) {
   if (!input || !input.trim()) return null;
-  const text = input.toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // normalizar tildes
+  
+  let raw = input.toLowerCase().trim();
+  let text = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
+  // Normalizar separadores y conjunciones
+  text = text.replace(/,/g, ' y ')
+             .replace(/\+/g, ' y ')
+             .replace(/;/g, ' y ')
+             .replace(/\s+/g, ' ');
+
+  let workingText = text;
   let totalCarbs = 0;
   let totalFiber = 0;
   let totalProtein = 0;
   let totalFat = 0;
   let totalCalories = 0;
-  let detectedItems = [];
+  let detectedList = [];
+  const matchedItemIds = new Set();
 
-  function extractQty(regex, defaultVal = 1) {
-    const match = text.match(regex);
-    if (!match) return 0;
-    const num = parseFloat(match[1]);
-    return isNaN(num) ? defaultVal : num;
+  for (const rule of FLATTENED_FOOD_RULES) {
+    if (matchedItemIds.has(rule.item.id)) continue;
+
+    const regex = new RegExp('(?:^|\\s)(' + rule.kwNorm.replace(/\s+/g, '\\s+') + ')(?:$|\\s)', 'i');
+    const match = workingText.match(regex);
+    if (match) {
+      const matchStart = match.index + (match[0].startsWith(' ') ? 1 : 0);
+      const matchEnd = matchStart + match[1].length;
+
+      const q = extractFoodQuantityBidirectional(workingText, matchStart, matchEnd);
+      let mult = q.multiplier;
+
+      let itemCarbs = rule.item.carbs;
+      let itemFiber = rule.item.fiber;
+      let itemProtein = rule.item.protein;
+      let itemFat = rule.item.fat;
+      let itemCal = rule.item.calories;
+
+      if (q.isGrams && rule.item.baseGrams > 0) {
+        const factor = q.grams / rule.item.baseGrams;
+        itemCarbs *= factor;
+        itemFiber *= factor;
+        itemProtein *= factor;
+        itemFat *= factor;
+        itemCal *= factor;
+      } else {
+        itemCarbs *= mult;
+        itemFiber *= mult;
+        itemProtein *= mult;
+        itemFat *= mult;
+        itemCal *= mult;
+      }
+
+      totalCarbs += itemCarbs;
+      totalFiber += itemFiber;
+      totalProtein += itemProtein;
+      totalFat += itemFat;
+      totalCalories += itemCal;
+
+      matchedItemIds.add(rule.item.id);
+
+      const qtyLabel = q.isGrams ? (q.grams + 'g ') : (mult === 1 ? '' : (mult + 'x '));
+      detectedList.push(qtyLabel + rule.item.name + ' (' + Math.round(itemCarbs - itemFiber) + 'g carbos)');
+
+      // Consumir el texto emparejado y la cantidad para evitar subcoincidencias duplicadas
+      const padLen = q.endPad - q.startPad;
+      workingText = workingText.substring(0, q.startPad) + ' '.repeat(padLen) + workingText.substring(q.endPad);
+    }
   }
 
-  // Huevos
-  if (text.includes("huevo") || text.includes("omelette") || text.includes("revuelto")) {
-    let count = extractQty(/(\d+)\s*(?:huevos?|claras?)/, 2);
-    if (count === 0) count = 2;
-    totalProtein += count * 6.5;
-    totalFat += count * 5.2;
-    totalCarbs += count * 0.6;
-    totalCalories += count * 78;
-    detectedItems.push(count + " huevos");
-  }
-
-  // Milanesas (evaluadas antes de pollo/carne cruda)
-  const isMilanesa = text.includes("milanesa") || text.includes("suprema");
-  if (isMilanesa) {
-    let count = extractQty(/(\d+)\s*milanesas?/, 1);
-    if (count === 0) count = 1;
-    totalCarbs += count * 18;
-    totalFiber += count * 1;
-    totalProtein += count * 24;
-    totalFat += count * 14;
-    totalCalories += count * 310;
-    detectedItems.push(count + " milanesa(s)");
-  }
-
-  // Carnes Rojas (si no es milanesa de carne)
-  if (!isMilanesa && (text.includes("bife") || text.includes("asado") || text.includes("lomo") || text.includes("vacio") || 
-      text.includes("carne") || text.includes("entrecot") || text.includes("costilla") || text.includes("hamburguesa"))) {
-    let grams = extractQty(/(\d+)\s*(?:g|gr|gramos)\s*(?:de\s*)?(?:bife|carne|lomo|asado)?/, 250);
-    if (grams < 30) grams = grams * 100;
-    if (grams === 0 || grams > 1500) grams = 250;
-    totalProtein += (grams / 100) * 26;
-    totalFat += (grams / 100) * 18;
-    totalCalories += (grams / 100) * 270;
-    detectedItems.push(grams + "g carne vacuna");
-  }
-
-  // Pollo / Aves (si no es milanesa de pollo)
-  if (!isMilanesa && (text.includes("pollo") || text.includes("pechuga") || text.includes("pata muslo"))) {
-    let grams = extractQty(/(\d+)\s*(?:g|gr|gramos)\s*(?:de\s*)?(?:pollo|pechuga)?/, 200);
-    if (grams < 20) grams = grams * 100;
-    if (grams === 0 || grams > 1500) grams = 200;
-    totalProtein += (grams / 100) * 29;
-    totalFat += (grams / 100) * 7.5;
-    totalCalories += (grams / 100) * 185;
-    detectedItems.push(grams + "g pollo");
-  }
-
-  // Pescado / Atun / Salmon
-  if (text.includes("salmon") || text.includes("atun") || text.includes("pescado") || text.includes("merluza")) {
-    let grams = extractQty(/(\d+)\s*(?:g|gr|gramos)/, 180);
-    if (grams < 20) grams = grams * 100;
-    if (grams === 0 || grams > 1000) grams = 180;
-    const isFatty = text.includes("salmon");
-    totalProtein += (grams / 100) * 23;
-    totalFat += (grams / 100) * (isFatty ? 13 : 2);
-    totalCalories += (grams / 100) * (isFatty ? 210 : 110);
-    detectedItems.push(grams + "g pescado");
-  }
-
-  // Palta / Aguacate
-  if (text.includes("palta") || text.includes("aguacate")) {
-    let units = 1;
-    if (text.includes("media") || text.includes("1/2") || text.includes("medio")) units = 0.5;
-    else units = extractQty(/(\d+)\s*(?:paltas?|aguacates?)/, 1);
-    totalCarbs += units * 12;
-    totalFiber += units * 9.2;
-    totalProtein += units * 2.8;
-    totalFat += units * 22;
-    totalCalories += units * 240;
-    detectedItems.push(units + " palta");
-  }
-
-  // Queso
-  if (text.includes("queso") || text.includes("muzzarella") || text.includes("mozzarella") || text.includes("cheddar") || text.includes("parmesano")) {
-    let grams = extractQty(/(\d+)\s*(?:g|gr|gramos)\s*(?:de\s*)?queso/, 60);
-    if (grams < 10) grams = grams * 30;
-    if (grams === 0 || grams > 500) grams = 60;
-    totalProtein += (grams / 100) * 23;
-    totalFat += (grams / 100) * 28;
-    totalCarbs += (grams / 100) * 1.8;
-    totalCalories += (grams / 100) * 350;
-    detectedItems.push(grams + "g queso");
-  }
-
-  // Manteca / Mantequilla / Ghee
-  if (text.includes("manteca") || text.includes("mantequilla") || text.includes("ghee")) {
-    let grams = extractQty(/(\d+)\s*(?:g|gr|gramos)\s*(?:de\s*)?manteca/, 20);
-    if (grams === 0 || grams > 200) grams = 20;
-    totalFat += grams * 0.82;
-    totalCalories += grams * 7.2;
-    detectedItems.push(grams + "g manteca");
-  }
-
-  // Aceite (oliva, coco, mct)
-  if (text.includes("aceite") || text.includes("oliva") || text.includes("mct")) {
-    let spoons = extractQty(/(\d+)\s*(?:cda|cucharada|cucharadas)/, 1);
-    if (spoons === 0) spoons = 1;
-    totalFat += spoons * 14;
-    totalCalories += spoons * 120;
-    detectedItems.push(spoons + " cda aceite");
-  }
-
-  // Panceta / Bacon / Jamon
-  if (text.includes("panceta") || text.includes("bacon") || text.includes("tocino") || text.includes("jamon")) {
-    let grams = extractQty(/(\d+)\s*(?:g|gr|gramos|fetas)/, 50);
-    if (grams < 10) grams = grams * 20;
-    if (grams === 0 || grams > 300) grams = 50;
-    totalProtein += (grams / 100) * 15;
-    totalFat += (grams / 100) * 36;
-    totalCarbs += (grams / 100) * 1;
-    totalCalories += (grams / 100) * 390;
-    detectedItems.push(grams + "g panceta/bacon");
-  }
-
-  // Ensalada / Verduras de hoja verde
-  if (text.includes("ensalada") || text.includes("rucula") || text.includes("lechuga") || text.includes("espinaca") || text.includes("pepino")) {
-    totalCarbs += 3.5;
-    totalFiber += 2.2;
-    totalProtein += 1.5;
-    totalFat += 0.4;
-    totalCalories += 25;
-    detectedItems.push("ensalada verde");
-  }
-
-  // Tomate
-  if (text.includes("tomate")) {
-    totalCarbs += 4.5;
-    totalFiber += 1.5;
-    totalProtein += 1;
-    totalFat += 0.2;
-    totalCalories += 22;
-    detectedItems.push("tomate");
-  }
-
-  // Frutos Secos
-  if (text.includes("nuez") || text.includes("nueces") || text.includes("almendra") || text.includes("almendras") || text.includes("mani")) {
-    let grams = extractQty(/(\d+)\s*(?:g|gr|gramos)/, 35);
-    if (grams === 0 || grams > 200) grams = 35;
-    totalCarbs += (grams / 100) * 14;
-    totalFiber += (grams / 100) * 7;
-    totalProtein += (grams / 100) * 18;
-    totalFat += (grams / 100) * 55;
-    totalCalories += (grams / 100) * 610;
-    detectedItems.push(grams + "g frutos secos");
-  }
-
-  // Café Bulletproof
-  if (text.includes("bulletproof") || text.includes("cafe con manteca")) {
-    totalFat += 24;
-    totalCalories += 220;
-    detectedItems.push("café bulletproof");
-  }
-
-  // Fallback si no hubo coincidencia específica
-  if (detectedItems.length === 0) {
-    totalCarbs = 2.5;
-    totalFiber = 1;
-    totalProtein = 28;
-    totalFat = 22;
-    totalCalories = 320;
-    detectedItems.push("plato proteico keto");
+  // Heurística de Rescate Nutricional si no hubo coincidencia directa
+  if (detectedList.length === 0) {
+    if (text.includes('dulce') || text.includes('postre') || text.includes('torta') || text.includes('azucar') || text.includes('chocolate')) {
+      totalCarbs = 45; totalFiber = 1; totalProtein = 5; totalFat = 16; totalCalories = 340;
+      detectedList.push('Postre / Dulce tradicional (estimado)');
+    } else if (text.includes('cerveza') || text.includes('vino') || text.includes('trago') || text.includes('alcohol') || text.includes('fernet')) {
+      totalCarbs = 18; totalFiber = 0; totalProtein = 1; totalFat = 0; totalCalories = 170;
+      detectedList.push('Bebida / Trago alcohólico (estimado)');
+    } else if (text.includes('gaseosa') || text.includes('jugo') || text.includes('refresco')) {
+      totalCarbs = 32; totalFiber = 0; totalProtein = 0; totalFat = 0; totalCalories = 130;
+      detectedList.push('Bebida dulce / Gaseosa (estimado)');
+    } else if (text.includes('pasta') || text.includes('arroz') || text.includes('fideo') || text.includes('pizza') || text.includes('empanada') || text.includes('pan')) {
+      totalCarbs = 54; totalFiber = 3; totalProtein = 12; totalFat = 11; totalCalories = 360;
+      detectedList.push('Plato de carbohidratos tradicional (estimado)');
+    } else if (text.includes('carne') || text.includes('pollo') || text.includes('pescado') || text.includes('asado') || text.includes('bife')) {
+      totalCarbs = 2; totalFiber = 0.5; totalProtein = 45; totalFat = 28; totalCalories = 440;
+      detectedList.push('Plato proteico / Carne (estimado)');
+    } else {
+      totalCarbs = 22; totalFiber = 2; totalProtein = 20; totalFat = 14; totalCalories = 295;
+      detectedList.push('Plato mixto elaborado (estimado)');
+    }
   }
 
   const netCarbs = Math.max(0, Math.round((totalCarbs - totalFiber) * 10) / 10);
@@ -349,6 +1394,22 @@ function estimateMealMacrosAI(input) {
     roundedCalories = Math.round((roundedFat * 9) + (roundedProtein * 4) + (netCarbs * 4));
   }
 
+  // Evaluación de impacto Cetogénico y cálculo fisiológico de pasos compensatorios Garmin
+  let ketoStatus = 'ok';
+  let ketoBadge = '🥑 100% Keto Compatible';
+  let ketoNote = 'Bajo en carbohidratos netos. Tu cuerpo permanece en cetosis.';
+  
+  if (netCarbs > 25) {
+    ketoStatus = 'exceeded';
+    ketoBadge = '🚨 Alto en Carbohidratos (+' + netCarbs + 'g)';
+    const approxSteps = Math.round((netCarbs - 25) * 292);
+    ketoNote = 'Supera el límite keto diario. Generará ~' + approxSteps.toLocaleString() + ' pasos compensatorios en tu reloj Garmin para vaciar el glucógeno.';
+  } else if (netCarbs > 8) {
+    ketoStatus = 'moderate';
+    ketoBadge = '⚠️ Moderado en Carbohidratos (' + netCarbs + 'g)';
+    ketoNote = 'Consume parte del límite diario keto (25g). Prioriza grasas y proteínas en la siguiente comida.';
+  }
+
   return {
     name: input.trim(),
     carbs: roundedCarbs,
@@ -357,7 +1418,10 @@ function estimateMealMacrosAI(input) {
     protein: roundedProtein,
     fat: roundedFat,
     calories: roundedCalories,
-    detected: detectedItems.join(" + ")
+    detected: detectedList.join(" + "),
+    ketoStatus,
+    ketoBadge,
+    ketoNote
   };
 }
 
@@ -365,7 +1429,7 @@ function estimateMealMacrosAI(input) {
 document.getElementById('btnAiCalc')?.addEventListener('click', async () => {
   const mealName = (document.getElementById('inputMealName')?.value || '').trim();
   if (!mealName) {
-    alert('Escribe el nombre o ingredientes de lo que comiste (ej. Bife con ensalada y 2 huevos).');
+    alert('Escribe el plato, postre o bebida que consumiste (ej. 2 empanadas de carne y una cerveza, flan mixto, bife de chorizo con ensalada).');
     document.getElementById('inputMealName')?.focus();
     return;
   }
@@ -373,7 +1437,7 @@ document.getElementById('btnAiCalc')?.addEventListener('click', async () => {
   const feedback = document.getElementById('aiCalcFeedback');
   if (feedback) {
     feedback.style.display = 'block';
-    feedback.innerHTML = '<span>🤖</span> <em>Calculando macronutrientes y calorías con IA...</em>';
+    feedback.innerHTML = '<span>🤖</span> <em>Analizando plato y calculando macronutrientes con IA...</em>';
   }
 
   const result = estimateMealMacrosAI(mealName);
@@ -385,8 +1449,24 @@ document.getElementById('btnAiCalc')?.addEventListener('click', async () => {
     document.getElementById('inputCalories').value = result.calories;
 
     if (feedback) {
-      feedback.innerHTML = '<strong>✨ IA calculó:</strong> ' + result.detected + '<br>' +
-        '<span>👉 ' + result.net_carbs + 'g carbos netos • ' + result.fat + 'g grasa • ' + result.protein + 'g prot • ' + result.calories + ' kcal</span>';
+      let badgeColor = result.ketoStatus === 'exceeded' ? '#ef4444' : (result.ketoStatus === 'moderate' ? '#f59e0b' : '#10b981');
+      let bgColor = result.ketoStatus === 'exceeded' ? 'rgba(239, 68, 68, 0.14)' : (result.ketoStatus === 'moderate' ? 'rgba(245, 158, 11, 0.14)' : 'rgba(16, 185, 129, 0.14)');
+      feedback.style.borderLeft = `4px solid ${badgeColor}`;
+      feedback.style.background = bgColor;
+      feedback.innerHTML = `
+        <div style="font-size:0.86rem; font-weight:800; color:${badgeColor}; margin-bottom:4px;">
+          ${result.ketoBadge}
+        </div>
+        <div style="font-size:0.82rem; color:var(--text-main); margin-bottom:4px;">
+          <strong>✨ Detectado:</strong> ${result.detected}
+        </div>
+        <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:4px;">
+          👉 <strong>${result.net_carbs}g carbos netos</strong> (${result.carbs}g tot / ${result.fiber}g fibra) • <strong>${result.fat}g grasa</strong> • <strong>${result.protein}g prot</strong> • <strong>${result.calories} kcal</strong>
+        </div>
+        <div style="font-size:0.76rem; color:${badgeColor}; font-style:italic;">
+          💡 ${result.ketoNote}
+        </div>
+      `;
     }
   }
 });
@@ -1111,11 +2191,23 @@ document.getElementById('formMeal')?.addEventListener('submit', (e) => {
   const name = (document.getElementById('inputMealName')?.value || '').trim();
   if (!name) return alert('Por favor ingresa un nombre para la comida');
 
-  const carbs = parseFloat(document.getElementById('inputCarbs')?.value) || 0;
-  const fiber = parseFloat(document.getElementById('inputFiber')?.value) || 0;
-  const protein = parseFloat(document.getElementById('inputProtein')?.value) || 0;
-  const fat = parseFloat(document.getElementById('inputFat')?.value) || 0;
+  let carbs = parseFloat(document.getElementById('inputCarbs')?.value) || 0;
+  let fiber = parseFloat(document.getElementById('inputFiber')?.value) || 0;
+  let protein = parseFloat(document.getElementById('inputProtein')?.value) || 0;
+  let fat = parseFloat(document.getElementById('inputFat')?.value) || 0;
   let calories = parseFloat(document.getElementById('inputCalories')?.value);
+
+  // Si los macros están todos en 0 pero el usuario escribió un plato, autocalcular con IA automáticamente
+  if (carbs === 0 && fiber === 0 && protein === 0 && fat === 0) {
+    const aiAuto = estimateMealMacrosAI(name);
+    if (aiAuto) {
+      carbs = aiAuto.carbs;
+      fiber = aiAuto.fiber;
+      protein = aiAuto.protein;
+      fat = aiAuto.fat;
+      calories = aiAuto.calories;
+    }
+  }
 
   const netCarbs = Math.max(0, Math.round((carbs - fiber) * 10) / 10);
   if (isNaN(calories) || calories === 0) {
