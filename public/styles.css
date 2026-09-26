@@ -1678,52 +1678,54 @@ input:focus, select:focus {
   line-height: 1.35;
 }
 
-/* Métricas de Contraste Metabólico en Peso (Real vs Ideal) */
+/* Métricas de Contraste Metabólico en Peso (Real vs Ideal - 2x2 Perfecto sin desbordamiento) */
 .weight-contrast-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  margin: 14px 0 12px 0;
-}
-
-@media (min-width: 480px) {
-  .weight-contrast-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  margin: 14px 0 12px 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 .weight-contrast-box {
-  background: rgba(15, 23, 42, 0.65);
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
+  background: rgba(15, 23, 42, 0.65) !important;
+  border: 1px solid var(--card-border) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 10px 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 3px !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
 }
 
 .w-lbl {
-  font-size: 0.65rem;
-  color: var(--text-muted);
-  font-weight: 600;
-  text-transform: uppercase;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 0.68rem !important;
+  color: var(--text-muted) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 
 .w-val {
-  font-size: 1.05rem;
-  font-weight: 800;
-  color: var(--text-main);
-  white-space: nowrap;
+  font-size: clamp(1.05rem, 4vw, 1.25rem) !important;
+  font-weight: 800 !important;
+  color: var(--text-main) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 
 .w-sub {
-  font-size: 0.68rem;
-  color: var(--text-muted);
-  white-space: nowrap;
+  font-size: 0.68rem !important;
+  color: var(--text-muted) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 
 /* Gráfica de Doble Curva Real vs Ideal */

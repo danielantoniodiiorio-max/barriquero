@@ -1745,15 +1745,15 @@ function renderWeightWeeklyView(trajectories, weeks) {
     if (paceDiff <= -0.2) {
       elStatus.textContent = '⚡ Adelantado';
       elStatus.style.color = '#38bdf8';
-      elDiff.textContent = Math.abs(paceDiff).toFixed(1) + ' kg menos de lo proyectado';
+      elDiff.textContent = Math.abs(paceDiff).toFixed(1) + ' kg bajo lo ideal';
     } else if (paceDiff <= 0.2) {
-      elStatus.textContent = '🎯 En Ritmo Ideal';
+      elStatus.textContent = '🎯 En Ritmo';
       elStatus.style.color = '#10b981';
-      elDiff.textContent = 'Sincronizado con meta metabólica';
+      elDiff.textContent = 'Sincronizado con meta';
     } else {
       elStatus.textContent = '⚠️ Ajuste Sugerido';
       elStatus.style.color = '#f59e0b';
-      elDiff.textContent = '+' + paceDiff.toFixed(1) + ' kg vs ideal proyectado';
+      elDiff.textContent = '+' + paceDiff.toFixed(1) + ' kg sobre lo ideal';
     }
   }
 

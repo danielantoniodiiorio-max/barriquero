@@ -574,27 +574,27 @@ jobs:
                     </div>
                   </div>
 
-                  <!-- Métricas de Contraste Metabólico (Real vs Ideal) -->
+                  <!-- Métricas de Contraste Metabólico (Real vs Ideal - Cuadrícula 2x2 Elegante) -->
                   <div class="weight-contrast-grid">
                     <div class="weight-contrast-box">
-                      <span class="w-lbl">📉 Pérdida Real Total</span>
+                      <span class="w-lbl">📉 Pérdida Real</span>
                       <strong class="w-val text-success" id="valWeightRealLoss">0.0 kg</strong>
-                      <small class="w-sub" id="subWeightRealLoss">Desde inicio</small>
+                      <small class="w-sub" id="subWeightRealLoss">Desde el inicio</small>
                     </div>
                     <div class="weight-contrast-box">
-                      <span class="w-lbl">🎯 Pérdida Ideal Teórica</span>
+                      <span class="w-lbl">🎯 Pérdida Ideal</span>
                       <strong class="w-val text-cyan" id="valWeightIdealLoss">0.0 kg</strong>
                       <small class="w-sub" id="subWeightIdealLoss">Por déficit acumulado</small>
                     </div>
                     <div class="weight-contrast-box">
-                      <span class="w-lbl">⚖️ Ritmo Semanal Real</span>
+                      <span class="w-lbl">⚖️ Ritmo Semanal</span>
                       <strong class="w-val" id="valWeightWeeklyRate">0.0 kg/sem</strong>
                       <small class="w-sub" id="subWeightWeeklyRate">Ideal: -0.5 kg/sem</small>
                     </div>
                     <div class="weight-contrast-box">
-                      <span class="w-lbl">⚡ Estado Metabólico</span>
+                      <span class="w-lbl">⚡ Estado</span>
                       <strong class="w-val" id="valWeightPaceStatus">En Ritmo</strong>
-                      <small class="w-sub" id="subWeightPaceDiff">±0.0 kg dif</small>
+                      <small class="w-sub" id="subWeightPaceDiff">Sincronizado con meta</small>
                     </div>
                   </div>
 
@@ -2732,52 +2732,54 @@ jobs:
             line-height: 1.35;
           }
 
-          /* Métricas de Contraste Metabólico en Peso (Real vs Ideal) */
+          /* Métricas de Contraste Metabólico en Peso (Real vs Ideal - 2x2 Perfecto sin desbordamiento) */
           .weight-contrast-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 8px;
-            margin: 14px 0 12px 0;
-          }
-
-          @media (min-width: 480px) {
-            .weight-contrast-grid {
-              grid-template-columns: repeat(4, 1fr);
-            }
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            gap: 8px !important;
+            margin: 14px 0 12px 0 !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
           }
 
           .weight-contrast-box {
-            background: rgba(15, 23, 42, 0.65);
-            border: 1px solid var(--card-border);
-            border-radius: var(--radius-sm);
-            padding: 10px 12px;
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-            min-width: 0;
+            background: rgba(15, 23, 42, 0.65) !important;
+            border: 1px solid var(--card-border) !important;
+            border-radius: var(--radius-sm) !important;
+            padding: 10px 12px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 3px !important;
+            min-width: 0 !important;
+            box-sizing: border-box !important;
+            overflow: hidden !important;
           }
 
           .w-lbl {
-            font-size: 0.65rem;
-            color: var(--text-muted);
-            font-weight: 600;
-            text-transform: uppercase;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            font-size: 0.68rem !important;
+            color: var(--text-muted) !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
           }
 
           .w-val {
-            font-size: 1.05rem;
-            font-weight: 800;
-            color: var(--text-main);
-            white-space: nowrap;
+            font-size: clamp(1.05rem, 4vw, 1.25rem) !important;
+            font-weight: 800 !important;
+            color: var(--text-main) !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
           }
 
           .w-sub {
-            font-size: 0.68rem;
-            color: var(--text-muted);
-            white-space: nowrap;
+            font-size: 0.68rem !important;
+            color: var(--text-muted) !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
           }
 
           /* Gráfica de Doble Curva Real vs Ideal */
@@ -5460,15 +5462,15 @@ jobs:
               if (paceDiff <= -0.2) {
                 elStatus.textContent = '⚡ Adelantado';
                 elStatus.style.color = '#38bdf8';
-                elDiff.textContent = Math.abs(paceDiff).toFixed(1) + ' kg menos de lo proyectado';
+                elDiff.textContent = Math.abs(paceDiff).toFixed(1) + ' kg bajo lo ideal';
               } else if (paceDiff <= 0.2) {
-                elStatus.textContent = '🎯 En Ritmo Ideal';
+                elStatus.textContent = '🎯 En Ritmo';
                 elStatus.style.color = '#10b981';
-                elDiff.textContent = 'Sincronizado con meta metabólica';
+                elDiff.textContent = 'Sincronizado con meta';
               } else {
                 elStatus.textContent = '⚠️ Ajuste Sugerido';
                 elStatus.style.color = '#f59e0b';
-                elDiff.textContent = '+' + paceDiff.toFixed(1) + ' kg vs ideal proyectado';
+                elDiff.textContent = '+' + paceDiff.toFixed(1) + ' kg sobre lo ideal';
               }
             }
 
