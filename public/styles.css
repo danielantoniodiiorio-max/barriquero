@@ -2716,3 +2716,67 @@ input:focus, select:focus {
   box-sizing: border-box !important;
 }
 
+
+
+/* ==========================================================================
+   FIX MODALES: Z-INDEX SUPERIOR Y OCULTAR BOTTOM DOCK AL ABRIR CUALQUIER MODAL
+   ========================================================================== */
+
+.modal-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(0, 0, 0, 0.82) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  display: none !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 10000 !important;
+  padding: 16px 16px calc(24px + env(safe-area-inset-bottom, 16px)) 16px !important;
+  box-sizing: border-box !important;
+}
+
+.modal-backdrop.show {
+  display: flex !important;
+}
+
+.modal-card {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--card-border) !important;
+  border-radius: var(--radius-lg) !important;
+  padding: 20px 18px 28px 18px !important;
+  width: 100% !important;
+  max-width: 460px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 14px !important;
+  max-height: calc(100vh - 48px - env(safe-area-inset-bottom, 16px)) !important;
+  overflow-y: auto !important;
+  box-sizing: border-box !important;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.85) !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Ocultar automáticamente el dock de navegación inferior cuando cualquier modal está visible */
+body.modal-open .app-bottom-nav,
+.modal-backdrop.show ~ .app-bottom-nav {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  transform: translate(-50%, 100%) !important;
+  transition: opacity 0.2s ease, transform 0.2s ease !important;
+}
+
+.app-bottom-nav {
+  transition: opacity 0.2s ease, transform 0.2s ease !important;
+}
+
+.btn-save-settings {
+  margin-top: 16px !important;
+  padding: 14px !important;
+  font-size: 1rem !important;
+  font-weight: 800 !important;
+  border-radius: var(--radius-sm) !important;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4) !important;
+}
+

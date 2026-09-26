@@ -44,18 +44,23 @@ const settingsModal = document.getElementById('settingsModal');
 document.getElementById('btnSettingsModal')?.addEventListener('click', () => {
   loadSettings();
   settingsModal.classList.add('show');
+  document.body.classList.add('modal-open');
 });
 document.getElementById('btnCloseSettingsModal')?.addEventListener('click', () => {
   settingsModal.classList.remove('show');
+  document.body.classList.remove('modal-open');
+  document.body.classList.remove('modal-open');
 });
 
 // Science Modal Handlers
 const scienceModal = document.getElementById('scienceModal');
 document.getElementById('btnOpenScienceModal')?.addEventListener('click', () => {
   if (scienceModal) scienceModal.classList.add('show');
+    document.body.classList.add('modal-open');
 });
 document.getElementById('btnCloseScienceModal')?.addEventListener('click', () => {
   if (scienceModal) scienceModal.classList.remove('show');
+  document.body.classList.remove('modal-open');
 });
 
 
