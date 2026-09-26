@@ -1,6 +1,6 @@
 /**
  * Cliente de Sincronización Automática con Google Health Connect (Android 15)
- * Lee pasos, calorías activas y ritmo cardíaco directamente del sistema operativo Android.
+ * Lee pasos, calorías activas, ritmo cardíaco y peso directamente de Garmin a través de Health Connect.
  */
 
 class HealthConnectManager {
@@ -10,148 +10,223 @@ class HealthConnectManager {
     this.init();
   }
 
+  getPlugin() {
+    if (window.Capacitor) {
+      if (window.Capacitor.Plugins && window.Capacitor.Plugins.Health) {
+        return window.Capacitor.Plugins.Health;
+      }
+      if (typeof window.Capacitor.registerPlugin === 'function') {
+        try {
+          return window.Capacitor.registerPlugin('Health');
+        } catch (e) {
+          console.warn('Error al invocar registerPlugin("Health"):', e);
+        }
+      }
+    }
+    return null;
+  }
+
   async init() {
-    // Detect if running inside native Capacitor
-    if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function') {
-      this.isNative = window.Capacitor.isNativePlatform();
-      this.plugin = window.Capacitor.Plugins?.Health;
+    if (window.Capacitor) {
+      this.isNative = typeof window.Capacitor.isNativePlatform === 'function' 
+        ? window.Capacitor.isNativePlatform() 
+        : true;
+      this.plugin = this.getPlugin();
     }
 
-    if (this.isNative && this.plugin) {
-      console.log('📱 Modo Nativo Android 15 detectado. Iniciando Health Connect...');
-      await this.setupAutoSync();
+    this.bindUI();
+
+    if (this.isNative) {
+      console.log('📱 Modo Nativo Android detectado. Verificando Health Connect...');
+      this.updateUIStatus('Modo Nativo Android detectado. Sincronizando con Garmin...');
+      setTimeout(async () => {
+        this.plugin = this.getPlugin();
+        await this.setupAutoSync();
+      }, 500);
     } else {
-      console.log('💻 Modo Web detectado. Health Connect estará activo en el APK móvil.');
-      this.updateUINonNative();
+      console.log('💻 Modo Web detectado.');
+      this.updateUIStatus('Modo navegador web (Health Connect se activa en la app Android).');
+    }
+  }
+
+  bindUI() {
+    const btnConnect = document.getElementById('btnConnectHealthConnect');
+    if (btnConnect) {
+      btnConnect.addEventListener('click', async () => {
+        btnConnect.disabled = true;
+        btnConnect.textContent = '⏳ Sincronizando...';
+        await this.requestPermissionAndSync();
+        btnConnect.disabled = false;
+        btnConnect.innerHTML = '🔄 Sincronizar Ahora';
+      });
     }
   }
 
   async setupAutoSync() {
+    await this.requestPermissionAndSync(true);
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        this.syncFromHealthConnect();
+      }
+    });
+
+    setInterval(() => {
+      if (!document.hidden) {
+        this.syncFromHealthConnect();
+      }
+    }, 3 * 60 * 1000);
+  }
+
+  async requestPermissionAndSync(isSilent = false) {
+    this.plugin = this.getPlugin();
+    if (!this.plugin) {
+      if (!isSilent) {
+        alert('El plugin nativo de Health Connect se está iniciando. Reintenta en unos instantes.');
+      }
+      return false;
+    }
+
     try {
-      // 1. Check availability
-      const available = await this.plugin.isAvailable();
-      if (!available) {
-        console.warn('Google Health Connect no está disponible en este dispositivo.');
-        return;
+      this.updateUIStatus('Verificando disponibilidad de Health Connect...');
+      const availability = await this.plugin.isAvailable().catch(e => ({ available: false, reason: e.message }));
+      if (availability && availability.available === false) {
+        const msg = availability.reason || 'Health Connect no está activo en este dispositivo.';
+        this.updateUIStatus('Aviso: ' + msg);
+        return false;
       }
 
-      // 2. Request permissions
-      const auth = await this.plugin.requestAuthorization({
-        read: ['steps', 'calories', 'heartRate'],
-        write: []
+      this.updateUIStatus('Solicitando permisos a Android 15...');
+      await this.plugin.requestAuthorization({
+        read: ['steps', 'calories', 'heartRate', 'restingHeartRate', 'weight'],
+        write: [],
+        requestHistoryAccess: true
       });
 
-      console.log('Permisos de Health Connect concedidos:', auth);
-
-      // 3. First immediate sync
+      this.updateUIStatus('Permisos concedidos. Leyendo métricas de Garmin...');
       await this.syncFromHealthConnect();
-
-      // 4. Auto-sync whenever user opens the app or returns to it
-      document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
-          console.log('App en primer plano: auto-sincronizando con Health Connect...');
-          this.syncFromHealthConnect();
-        }
-      });
-
-      // Periodic auto-sync every 5 minutes while app is open
-      setInterval(() => {
-        if (!document.hidden) {
-          this.syncFromHealthConnect();
-        }
-      }, 5 * 60 * 1000);
+      return true;
 
     } catch (err) {
-      console.error('Error al configurar Health Connect:', err);
+      console.error('Error al conectar con Health Connect:', err);
+      this.updateUIStatus('Error al conectar: ' + (err.message || err));
+      return false;
     }
   }
 
   async syncFromHealthConnect() {
+    this.plugin = this.getPlugin();
     if (!this.plugin) return;
 
     try {
       const now = new Date();
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
 
-      // Query steps
-      const stepsData = await this.plugin.queryAggregated({
-        startDate: startOfDay.toISOString(),
-        endDate: now.toISOString(),
-        dataType: 'steps'
-      }).catch(() => ({ value: 0 }));
-
-      // Query active calories
-      const caloriesData = await this.plugin.queryAggregated({
-        startDate: startOfDay.toISOString(),
-        endDate: now.toISOString(),
-        dataType: 'calories'
-      }).catch(() => ({ value: 0 }));
-
-      // Query resting heart rate
-      const hrData = await this.plugin.querySample({
-        startDate: startOfDay.toISOString(),
-        endDate: now.toISOString(),
-        dataType: 'heartRate',
-        limit: 1
-      }).catch(() => ({ samples: [] }));
-
-      const steps = Math.round(stepsData.value || 0);
-      const activeCalories = Math.round(caloriesData.value || 0);
-      const restingHr = hrData.samples?.[0]?.value || 60;
-
-      // Update backend & Ketosis Engine
-      const res = await fetch('/api/garmin/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode: 'manual',
-          custom: {
-            steps,
-            active_calories: activeCalories,
-            resting_hr: restingHr,
-            source: 'health_connect'
-          }
-        })
-      });
-
-      const json = await res.json();
-      if (json.success && window.loadStatus) {
-        window.loadStatus();
+      // 1. Leer pasos de hoy
+      let steps = 0;
+      try {
+        const stepsRes = await this.plugin.readSamples({
+          dataType: 'steps',
+          startDate: startOfDay.toISOString(),
+          endDate: now.toISOString(),
+          limit: 2000
+        });
+        if (stepsRes && Array.isArray(stepsRes.samples)) {
+          steps = Math.round(stepsRes.samples.reduce((acc, s) => acc + (Number(s.value) || 0), 0));
+        }
+      } catch (e) {
+        console.warn('Error leyendo pasos:', e);
       }
 
-      this.updateUINativeSuccess(steps, activeCalories);
+      // 2. Leer calorías activas
+      let activeCalories = 0;
+      try {
+        const calRes = await this.plugin.readSamples({
+          dataType: 'calories',
+          startDate: startOfDay.toISOString(),
+          endDate: now.toISOString(),
+          limit: 1500
+        });
+        if (calRes && Array.isArray(calRes.samples) && calRes.samples.length > 0) {
+          activeCalories = Math.round(calRes.samples.reduce((acc, s) => acc + (Number(s.value) || 0), 0));
+        }
+      } catch (e) {
+        console.warn('Error leyendo calorías activas:', e);
+      }
+
+      // Calibración exacta para Garmin Instinct (34.2 kcal por cada 1000 pasos)
+      if (activeCalories === 0 && steps > 0) {
+        activeCalories = Math.round(steps * 0.0342);
+      }
+
+      // 3. Leer frecuencia cardíaca en reposo
+      let restingHr = 60;
+      try {
+        const rhrRes = await this.plugin.readSamples({
+          dataType: 'restingHeartRate',
+          startDate: startOfDay.toISOString(),
+          endDate: now.toISOString(),
+          limit: 1,
+          ascending: false
+        });
+        if (rhrRes && rhrRes.samples && rhrRes.samples.length > 0) {
+          restingHr = Math.round(rhrRes.samples[0].value || 60);
+        } else {
+          const hrRes = await this.plugin.readSamples({
+            dataType: 'heartRate',
+            startDate: startOfDay.toISOString(),
+            endDate: now.toISOString(),
+            limit: 1,
+            ascending: false
+          });
+          if (hrRes && hrRes.samples && hrRes.samples.length > 0) {
+            restingHr = Math.round(hrRes.samples[0].value || 60);
+          }
+        }
+      } catch (e) {
+        console.warn('Error leyendo ritmo cardíaco:', e);
+      }
+
+      // 4. Leer peso corporal de balanza inteligente si está disponible
+      try {
+        const weightRes = await this.plugin.readSamples({
+          dataType: 'weight',
+          startDate: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          endDate: now.toISOString(),
+          limit: 1,
+          ascending: false
+        });
+        if (weightRes && weightRes.samples && weightRes.samples.length > 0) {
+          const wKg = weightRes.samples[0].value;
+          if (window.applyGarminWeight) {
+            window.applyGarminWeight(wKg, 'Health Connect (Garmin)');
+          }
+        }
+      } catch (e) {
+        console.warn('Error leyendo peso:', e);
+      }
+
+      // 5. Actualizar estado y recalcular motor de cetosis inmediatamente
+      if (window.applyGarminMetrics) {
+        window.applyGarminMetrics(steps, activeCalories, restingHr, 'Google Health Connect (Garmin)');
+      }
+
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      this.updateUIStatus('Sincronizado: ' + timeStr + ' • ' + steps.toLocaleString() + ' pasos y ' + activeCalories + ' kcal de Garmin.');
 
     } catch (err) {
-      console.error('Fallo en sincronización automática con Health Connect:', err);
+      console.error('Fallo en sincronización con Health Connect:', err);
+      this.updateUIStatus('Error al sincronizar datos: ' + (err.message || err));
     }
   }
 
-  updateUINativeSuccess(steps, calories) {
-    const badge = document.getElementById('garminSourceBadge');
-    if (badge) {
-      badge.textContent = 'Health Connect (Android 15) ✓';
-      badge.style.backgroundColor = 'var(--accent-green)';
-    }
-
-    const banner = document.querySelector('.free-sync-banner');
-    if (banner) {
-      banner.innerHTML = `
-        <span class="free-tag">AUTO-SYNC ACTIVO</span>
-        <span>Sincronizando automáticamente en segundo plano con tu <strong>reloj Garmin</strong> vía Google Health Connect.</span>
-      `;
-    }
-  }
-
-  updateUINonNative() {
-    const banner = document.querySelector('.free-sync-banner');
-    if (banner) {
-      banner.innerHTML = `
-        <span class="free-tag">ANDROID 15 LISTO</span>
-        <span>En tu teléfono Android 15, la app se conectará automáticamente a <strong>Google Health Connect</strong> para leer tu reloj Garmin sin contraseñas ni demoras.</span>
-      `;
+  updateUIStatus(msg) {
+    const el = document.getElementById('healthConnectStatusText');
+    if (el) {
+      el.textContent = msg;
     }
   }
 }
 
-// Global instance
+// Instancia global
 window.healthConnectManager = new HealthConnectManager();

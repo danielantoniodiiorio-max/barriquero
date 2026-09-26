@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "keto-garmin-tracker",
   "version": "1.0.0",
   "description": "App para control cetogénico con sincronización automática Garmin Health Connect para Android 15",
@@ -8,12 +8,12 @@
     "cap:sync": "npx cap sync android"
   },
   "dependencies": {
-    "@capacitor/core": "^6.2.0",
-    "@capacitor/android": "^6.2.0",
-    "@capgo/capacitor-health": "^6.2.0"
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/android": "^7.0.0",
+    "@capgo/capacitor-health": "^7.2.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.2.0"
+    "@capacitor/cli": "^7.0.0"
   },
   "keywords": [
     "keto",
