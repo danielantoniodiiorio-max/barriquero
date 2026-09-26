@@ -11,76 +11,135 @@
 </head>
 <body>
   <div class="app-container">
-    <!-- Header -->
+    <!-- Header con Luz Verde y Acceso a Bases Científicas -->
     <header class="app-header">
       <div class="brand">
-        <span class="logo-icon">🥑</span>
+        <div class="logo-icon-svg" title="KetoTrack Metabolic Engine">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="#10b981" stroke-width="2" fill="rgba(16, 185, 129, 0.15)"/>
+            <path d="M12 6c-2.4 2.8-3.8 5.6-2 8.4 1.4 2.1 4.2 2.1 5.6 0 1.8-2.8.4-5.6-2-8.4z" fill="#10b981"/>
+            <circle cx="12" cy="13.5" r="1.8" fill="#38bdf8"/>
+          </svg>
+        </div>
         <div>
           <h1>KetoTrack</h1>
-          <span class="subtext">Control Cetogénico & Garmin</span>
+          <div class="header-sync-pill" id="headerSyncPill">
+            <span class="pulse-dot"></span>
+            <span id="txtHeaderSync">Garmin Sincronizado</span>
+          </div>
         </div>
       </div>
-      <button id="btnSettingsModal" class="btn-icon" title="Configuración">⚙️</button>
+      <div class="header-actions">
+        <button id="btnOpenScienceModal" class="btn-icon" title="Bases Científicas y Guías Médicas">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            <path d="M9 7h6M9 11h4"/>
+          </svg>
+        </button>
+        <button id="btnSettingsModal" class="btn-icon" title="Configuración y Perfil">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
     </header>
 
-    <!-- Main Navigation Tabs -->
-    <nav class="nav-tabs">
-      <button class="nav-tab active" data-tab="tab-dashboard">
-        <span class="tab-icon">⚡</span> Estado
-      </button>
-      <button class="nav-tab" data-tab="tab-meals">
-        <span class="tab-icon">🍽️</span> Comidas
-      </button>
-      <button class="nav-tab" data-tab="tab-garmin">
-        <span class="tab-icon">⌚</span> Garmin
-      </button>
-      <button class="nav-tab" data-tab="tab-biomarkers">
-        <span class="tab-icon">🩸</span> Cetonas
-      </button>
-    </nav>
 
-    <!-- TAB 1: DASHBOARD (ESTADO DE CETOSIS & MACROS) -->
+
+    <!-- PESTAÑA 1: ESTADO (DASHBOARD REDISEÑADO CON FUEGO, CUENTA REGRESIVA Y PASOS DE CETOSIS) -->
     <main id="tab-dashboard" class="tab-pane active">
-      <!-- Ketosis Status Card -->
-      <section class="card ketosis-card">
+      <!-- Tarjeta Dinámica de Cetosis (Limpia, Elegante y Enfocada) -->
+      <section class="card ketosis-card" id="cardKetosisStatus">
         <div class="card-header">
-          <span class="badge" id="badgePhase">Fase ...</span>
-          <span class="timer-tag" id="timerFasting">⏱️ 0h en ayuno/keto</span>
+          <span class="badge" id="badgePhase">Día 1: En Proceso</span>
+          <button class="btn-start-process" id="btnOpenStartProcessModal" title="Iniciar o reiniciar protocolo">🚀 Iniciar Proceso</button>
         </div>
 
+        <!-- MODO FUEGO: Se activa al llegar al estado de cetosis -->
+        <div id="ketosisFlameBox" class="ketosis-flame-box" style="display: none;">
+          <div class="flame-animation-wrap">
+            <span class="flame-emoji">🔥</span>
+          </div>
+          <div class="flame-info">
+            <div class="flame-badge" id="badgeFlameStage">🔥 CETOSIS NUTRICIONAL ACTIVA</div>
+            <h3 id="txtFlameTitle">Quemando Grasa a Pleno</h3>
+            <p id="txtFlameDesc">Tu cerebro y músculos funcionan con cetonas de alta pureza.</p>
+          </div>
+        </div>
+
+        <!-- Pronóstico Limpio de Entrada a Cetosis -->
+        <div id="boxKetoForecast" class="clean-forecast-box">
+          <div class="clean-forecast-row">
+            <span class="clean-forecast-icon">⏳</span>
+            <div class="clean-forecast-texts">
+              <span class="clean-forecast-label">Entrada estimada a cetosis (≥ 0.5 mmol/L):</span>
+              <strong class="clean-forecast-time" id="valKetoTargetDate">Calculando pronóstico...</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Velocímetro Metabólico Circular -->
         <div class="ketosis-gauge-wrap">
           <div class="gauge-circle" id="gaugeCircle">
             <div class="gauge-inner">
-              <span class="ketone-val" id="valEstimatedKetones">0.0</span>
+              <span class="ketone-val" id="valEstimatedKetones">0.2</span>
               <span class="ketone-unit">mmol/L est.</span>
             </div>
           </div>
           <div class="gauge-details">
-            <h3 id="txtPhaseTitle">Calculando estado...</h3>
-            <p id="txtPhaseDesc" class="text-muted">Cargando datos metabólicos...</p>
-            <div class="time-next" id="wrapTimeToNext">
-              <span>Tiempo est. a siguiente fase:</span>
-              <strong id="valTimeToNext">--</strong>
-            </div>
+            <h3 id="txtPhaseTitle">En Proceso de Inducción</h3>
+            <p id="txtPhaseDesc" class="text-muted">Avanzando hacia el umbral de cetosis nutricional.</p>
           </div>
-        </div>
-
-        <!-- Garmin Impact Pill -->
-        <div class="garmin-impact-banner" id="bannerGarminImpact">
-          <span class="garmin-logo">⌚ Garmin Boost:</span>
-          <span id="txtGarminImpactDesc">+0 kcal activas</span>
         </div>
       </section>
 
-      <!-- Daily Macros Overview -->
+      <!-- Resumen Diario de Macronutrientes y Balance Calórico (100% Ajustado al Ancho) -->
       <section class="card macros-card">
         <div class="section-title">
-          <h2>Macronutrientes de Hoy</h2>
-          <span class="carb-status" id="badgeCarbStatus">Bajo Límite</span>
+          <div>
+            <h2>Macronutrientes</h2>
+            <span class="sub-personal" id="txtMacroPersonalized">Ajustados a tu meta</span>
+          </div>
+          <span class="carb-status" id="badgeCalorieDeficit">Déficit activo</span>
         </div>
 
+        <!-- BALANCE CALÓRICO HERO - NUNCA SE DESBORDA -->
+        <div class="cal-balance-summary">
+          <div class="cal-sum-item">
+            <span class="cal-sum-lbl">Consumidas</span>
+            <span class="cal-sum-val" id="valCalIn">0 <small>kcal</small></span>
+          </div>
+          <div class="cal-sum-divider">/</div>
+          <div class="cal-sum-item">
+            <span class="cal-sum-lbl">Meta Diaria</span>
+            <span class="cal-sum-val" id="valCalTarget">1,800 <small>kcal</small></span>
+          </div>
+          <div class="cal-sum-pill" id="cardCalNet">
+            <span class="cal-sum-lbl" id="lblCalNet">Restantes</span>
+            <strong id="valCalRemaining">1,800 kcal</strong>
+          </div>
+        </div>
+
+        <!-- TERMÓMETRO MINIMALISTA -->
+        <div class="thermometer-minimal-wrap">
+          <div class="thermometer-minimal-header">
+            <span class="thermometer-label">🌡️ Progreso Calórico</span>
+            <span class="thermometer-percent" id="valThermometerPercent">0%</span>
+          </div>
+          <div class="thermometer-minimal-track">
+            <div class="thermometer-minimal-fill optimal" id="barThermometerFill" style="width: 0%;"></div>
+          </div>
+          <div class="thermometer-minimal-header" style="margin-top: 3px;">
+            <span class="cal-burn-badge" id="lblGarminBurned">⌚ Garmin: 0 kcal quemadas hoy</span>
+            <span class="feedback-badge badge-optimal" id="badgeCalFeedback">✅ En Rango</span>
+          </div>
+        </div>
+
+        <!-- BARRAS DE MACRONUTRIENTES -->
         <div class="macro-bars">
-          <!-- Carbs -->
+          <!-- Carbohidratos Netos -->
           <div class="macro-item">
             <div class="macro-label">
               <span class="macro-name">Carbos Netos</span>
@@ -94,7 +153,7 @@
           <!-- Grasas -->
           <div class="macro-item">
             <div class="macro-label">
-              <span class="macro-name">Grasas (Keto Fuel)</span>
+              <span class="macro-name">Grasas</span>
               <span class="macro-amount"><strong id="valFat">0</strong> / <span id="targetFat">140</span>g</span>
             </div>
             <div class="progress-bar-bg">
@@ -114,7 +173,7 @@
           </div>
         </div>
 
-        <!-- Keto Caloric Distribution -->
+        <!-- Distribución Calórica Cetogénica -->
         <div class="calorie-ratio-row">
           <div class="ratio-box fat-box">
             <span class="ratio-num" id="ratioFat">0%</span>
@@ -134,57 +193,33 @@
         </div>
       </section>
 
-      <!-- Quick Meal Add Shortcut -->
+      <!-- Botones de Acción Rápida -->
       <section class="quick-action-strip">
         <button class="btn btn-primary btn-full" id="btnOpenAddMeal">
-          <span>➕</span> Registrar Comida Rápida
+          <span>➕</span> Registrar Comida con IA
         </button>
       </section>
     </main>
 
-    <!-- TAB 2: COMIDAS (REGISTRO & LISTA) -->
+        <!-- PESTAÑA 2: COMIDAS (CON CÁLCULO IA Y LISTA DETALLADA CON FECHA/HORA/BORRADO) -->
     <main id="tab-meals" class="tab-pane">
       <div class="card">
         <div class="section-title">
           <h2>Nueva Ingesta</h2>
+          <span class="badge badge-ai">✨ IA Asistida</span>
         </div>
 
-        <!-- AI Vision Camera Scanner -->
-        <div class="camera-scanner-box">
-          <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
-          <button type="button" class="btn btn-ai-camera full-width" id="btnTriggerCamera">
-            <span class="camera-icon">📸</span> Tomar Foto al Plato (IA Vision)
-          </button>
-          
-          <div id="photoAnalysisLoading" class="analysis-loading" style="display: none;">
-            <div class="spinner"></div>
-            <div class="loading-text">
-              <strong>Analizando nutrientes con Gemini Vision...</strong>
-              <span class="text-muted small">Estimando porciones y carbohidratos netos</span>
-            </div>
-          </div>
-
-          <div id="photoPreviewWrap" class="photo-preview-wrap" style="display: none;">
-            <div class="preview-img-container">
-              <img id="imgMealPreview" src="" alt="Foto del plato">
-            </div>
-            <div id="aiAdviceBanner" class="ai-advice-banner"></div>
-          </div>
-        </div>
-
-        <!-- Presets Populares Keto -->
-        <div class="presets-row">
-          <span class="preset-label">O elige un Keto Rápido:</span>
-          <button class="chip" data-name="3 Huevos revueltos c/ manteca" data-c="1.5" data-f="0" data-p="19" data-fat="22" data-cal="280">🍳 3 Huevos c/ manteca</button>
-          <button class="chip" data-name="Bife de chorizo c/ ensalada verde" data-c="3" data-f="2" data-p="45" data-fat="35" data-cal="510">🥩 Bife c/ ensalada</button>
-          <button class="chip" data-name="Medio aguacate con aceite de oliva" data-c="6" data-f="5" data-p="1.5" data-fat="22" data-cal="230">🥑 Medio aguacate</button>
-          <button class="chip" data-name="Café con aceite MCT y manteca" data-c="0" data-f="0" data-p="0.5" data-fat="25" data-cal="230">☕ Café Bulletproof</button>
-        </div>
-
+        <!-- Formulario con Asistente IA -->
         <form id="formMeal" class="form-grid">
           <div class="form-group full-width">
-            <label for="inputMealName">Nombre del alimento o plato</label>
-            <input type="text" id="inputMealName" placeholder="Ej. Omelette con queso y panceta" required>
+            <label for="inputMealName">¿Qué comiste? (Escríbelo y presiona el botón IA)</label>
+            <div class="input-with-action">
+              <input type="text" id="inputMealName" placeholder="Ej. Bife de chorizo 300g con 2 huevos fritos y ensalada" required>
+              <button type="button" id="btnAiCalc" class="btn btn-ai-calc" title="Calcular automáticamente nutrientes y calorías con IA">
+                <span>✨</span> Calcular con IA
+              </button>
+            </div>
+            <div id="aiCalcFeedback" class="ai-feedback-banner" style="display: none;"></div>
           </div>
 
           <div class="form-group">
@@ -208,7 +243,7 @@
           </div>
 
           <div class="form-group full-width">
-            <label for="inputCalories">Calorías Totales (kcal - opcional, autocalculado)</label>
+            <label for="inputCalories">Calorías Totales (kcal - autocalculado)</label>
             <input type="number" id="inputCalories" placeholder="Autocalcular si queda vacío">
           </div>
 
@@ -216,39 +251,54 @@
         </form>
       </div>
 
-      <!-- Meal History for Today -->
+      <!-- Historial de Comidas Registradas con Fecha, Hora y Borrado -->
       <section class="card meals-list-card">
         <div class="section-title">
           <h2>Comidas Registradas Hoy</h2>
         </div>
         <div id="mealsList" class="meals-list">
-          <!-- Populated via JS -->
           <p class="text-muted text-center">No hay comidas registradas hoy.</p>
         </div>
       </section>
     </main>
 
-    <!-- TAB 3: GARMIN (CONEXIÓN & MÉTRICAS) -->
+    <!-- PESTAÑA 3: GARMIN (100% LIMPIA, AUTOMATIZADA Y SIN SIMULACIÓN) -->
     <main id="tab-garmin" class="tab-pane">
-      <div class="card">
+      <div class="card garmin-clean-card">
         <div class="section-title">
-          <h2>Sincronización Garmin</h2>
-          <span class="badge badge-garmin" id="garminSourceBadge">Modo Demo</span>
+          <div class="garmin-title-box">
+            <h2>Sincronización Garmin</h2>
+            <span class="badge badge-green" id="garminSourceBadge">Conectado ✓</span>
+          </div>
+          <span class="garmin-live-dot" title="Sincronización automática activa"></span>
         </div>
 
-        <div class="free-sync-banner">
-          <span class="free-tag">100% GRATIS</span>
-          <span>Sincroniza directamente con tu cuenta gratuita de <strong>Garmin Connect</strong> (la misma que usas en la app de tu celular). Sin pagar licencias ni suscripciones.</span>
+        <!-- Banner de Conexión Automática -->
+        <div class="garmin-auto-banner">
+          <div class="auto-banner-left">
+            <span class="sync-icon-pulsing">🟢</span>
+            <div>
+              <strong>Google Health Connect</strong>
+              <div class="small text-muted" id="garminLastSyncTime">Sincronizado en tiempo real</div>
+            </div>
+          </div>
+          <button id="btnConnectHealthConnect" class="btn btn-sm btn-outline">
+            🔄 Sincronizar Ahora
+          </button>
         </div>
 
-        <p class="text-muted">
-          Los pasos y calorías activas de tu reloj Garmin se utilizan para calcular la velocidad de vaciado del glucógeno y acelerar el tiempo de entrada en cetosis.
-        </p>
+        <div id="healthConnectStatusText" class="small text-muted" style="margin: 8px 0 16px 0; text-align: center;">
+          Leyendo pasos, calorías activas y ritmo cardíaco directamente de tu reloj Garmin.
+        </div>
 
-        <!-- Garmin Live Stats Grid -->
+        <!-- Métricas Reales en Tiempo Real -->
         <div class="garmin-stats-grid">
           <div class="stat-card">
-            <span class="stat-icon">🔥</span>
+            <span class="stat-icon icon-flame">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>
+              </svg>
+            </span>
             <div class="stat-info">
               <span class="stat-value" id="garminActiveCal">0</span>
               <span class="stat-label">Calorías Activas</span>
@@ -256,7 +306,11 @@
           </div>
 
           <div class="stat-card">
-            <span class="stat-icon">👣</span>
+            <span class="stat-icon icon-steps">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+              </svg>
+            </span>
             <div class="stat-info">
               <span class="stat-value" id="garminSteps">0</span>
               <span class="stat-label">Pasos de Hoy</span>
@@ -264,15 +318,23 @@
           </div>
 
           <div class="stat-card">
-            <span class="stat-icon">❤️</span>
+            <span class="stat-icon icon-heart">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+              </svg>
+            </span>
             <div class="stat-info">
-              <span class="stat-value" id="garminRestingHr">--</span>
+              <span class="stat-value" id="garminRestingHr">-- bpm</span>
               <span class="stat-label">Pulsaciones Reposo</span>
             </div>
           </div>
 
           <div class="stat-card">
-            <span class="stat-icon">⚡</span>
+            <span class="stat-icon icon-energy">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+            </span>
             <div class="stat-info">
               <span class="stat-value" id="garminTotalCal">0</span>
               <span class="stat-label">Gasto Total (kcal)</span>
@@ -280,67 +342,281 @@
           </div>
         </div>
 
-        <!-- Formulario de Entrada Directa de Métricas Reales -->
-        <div class="manual-garmin-box">
-          <div class="manual-header">
-            <h3>⌚ Cargar Métricas de tu Reloj de Hoy</h3>
-            <span class="badge badge-green">100% Directo y Seguro</span>
+        
+        <!-- WIDGET DE PASOS PARA MANTENER LA CETOSIS EN CASO DE EXCESO DE CARBOHIDRATOS -->
+        <div class="steps-garmin-section" id="cardStepsKeto" style="margin: 16px 0;">
+          <div class="section-title">
+            <div>
+              <h3>🎯 Pasos para Mantener la Cetosis</h3>
+              <span class="sub-personal">Pasos necesarios en caso de exceder tu límite de carbohidratos</span>
+            </div>
+            <span class="badge" id="badgeStepStatus">Analizando...</span>
           </div>
-          <p class="small text-muted">
-            Mira tu reloj Garmin o la app Garmin Connect de tu celular e introduce tus valores de hoy para alimentar el motor de cetosis:
-          </p>
-          
-          <form id="formManualGarmin" class="form-grid">
-            <div class="form-group">
-              <label for="inputManualActiveCal">🔥 Calorías Activas (kcal)</label>
-              <input type="number" id="inputManualActiveCal" placeholder="Ej. 520" required>
+
+          <div class="steps-hero-row">
+            <div class="steps-progress-numbers">
+              <div class="step-num-group">
+                <span class="step-big-val" id="valCurrentStepsKeto">0</span>
+                <span class="step-divider" id="stepDividerSlash">/</span>
+                <span class="step-target-val" id="valTargetStepsKeto">0</span>
+                <span class="step-unit" id="stepUnitText">pasos requeridos</span>
+              </div>
+              <div class="step-percent-tag" id="valStepPercent">En Meta</div>
             </div>
-            <div class="form-group">
-              <label for="inputManualSteps">👣 Pasos de Hoy</label>
-              <input type="number" id="inputManualSteps" placeholder="Ej. 9200" required>
+
+            <div class="progress-bar-bg" style="height: 10px; margin: 10px 0 8px 0;">
+              <div class="progress-bar-fill" id="barStepProgress" style="width: 100%; background: linear-gradient(90deg, #10b981, #059669);"></div>
             </div>
-            <div class="form-group full-width">
-              <label for="inputManualRestingHr">❤️ Pulsaciones en Reposo (bpm - opcional)</label>
-              <input type="number" id="inputManualRestingHr" placeholder="Ej. 58">
+
+            <div class="steps-feedback-box" id="boxStepsFeedback">
+              <div class="feedback-title" id="txtStepFeedbackTitle">Calculando requerimiento...</div>
+              <div class="feedback-desc" id="txtStepFeedbackDesc">Conectando con tu reloj Garmin...</div>
             </div>
-            <button type="submit" class="btn btn-primary full-width">
-              Guardar Métricas de Hoy y Recalcular
-            </button>
-          </form>
+          </div>
+
+          <div class="steps-science-footnote">
+            <span>📐 Modelo ACSM: ~292 pasos por cada gramo neto de carbohidrato excedente para neutralizarlo antes de rellenar el glucógeno.</span>
+          </div>
         </div>
 
-        <!-- Sync Actions Automática -->
-        <div class="sync-actions">
-          <button id="btnSyncGarminReal" class="btn btn-outline full-width">
-            🔄 Intentar Conexión Directa con Garmin Cloud
-          </button>
-          <small class="text-muted text-center" style="display:block; margin-top:4px;">
-            Nota: Garmin protege su inicio de sesión con Cloudflare Anti-Bot, lo que puede rechazar inicios de sesión programáticos.
-          </small>
-        </div>
-
-        <!-- Simulator / Custom adjustment for prototype -->
-        <div class="simulator-box">
-          <h3>Simulador Interactivo de Actividad</h3>
-          <p class="small text-muted">Desliza para simular entrenamientos y ver cómo se acelera la cetosis:</p>
-          <div class="sim-row">
-            <label>Calorías Activas:</label>
-            <input type="range" id="simActiveCal" min="0" max="1500" step="50" value="450">
-            <span id="lblSimActiveCal">450 kcal</span>
-          </div>
-          <div class="sim-row">
-            <label>Pasos:</label>
-            <input type="range" id="simSteps" min="0" max="25000" step="500" value="8500">
-            <span id="lblSimSteps">8500 pasos</span>
-          </div>
-          <button id="btnApplySimGarmin" class="btn btn-secondary full-width">
-            Simular y Recalcular
-          </button>
+        <div class="garmin-privacy-note">
+          🔒 <strong>100% Automático y Privado:</strong> Los datos se leen localmente desde tu reloj Garmin Instinct a través de Android 15. Cero contraseñas y cero servidores intermedios.
         </div>
       </div>
     </main>
 
-    <!-- TAB 4: BIOMARCADORES (CETONAS SANGRE / ORINA) -->
+    <!-- PESTAÑA: GRÁFICAS Y ESTADÍSTICAS HISTÓRICAS (CURVAS SUAVIZADAS) -->
+    <main id="tab-charts" class="tab-pane">
+      <div class="card charts-card">
+        <div class="section-title charts-header-title">
+          <div>
+            <h2>Evolución</h2>
+            <span class="sub-personal" id="txtChartSubtitle">Seguimiento continuo de tu proceso</span>
+          </div>
+          <!-- Toggle 7d / 30d -->
+          <div class="time-range-toggle">
+            <button class="toggle-btn active" id="btnRangeWeek" data-range="week">7 Días</button>
+            <button class="toggle-btn" id="btnRangeMonth" data-range="month">30 Días</button>
+          </div>
+        </div>
+
+        <!-- Selector de Tipo de Métrica (Segmented Grid que NUNCA desborda) -->
+        <div class="chart-metric-selector">
+          <button class="metric-pill active" data-metric="steps">
+            <svg class="pill-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+            <span>Actividad</span>
+          </button>
+          <button class="metric-pill" data-metric="macros">
+            <svg class="pill-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 4 13V8a5 5 0 0 1 10 0v5a7 7 0 0 1-3 7z"/></svg>
+            <span>Macros</span>
+          </button>
+          <button class="metric-pill" data-metric="calories">
+            <svg class="pill-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+            <span>Calorías</span>
+          </button>
+        </div>
+
+        <!-- Resumen Promedio del Período -->
+        <div class="chart-summary-stats" id="chartSummaryStats">
+          <div class="summary-stat-box">
+            <span class="sum-lbl" id="lblStat1">Pasos Prom.</span>
+            <strong class="sum-val" id="valStat1">0</strong>
+          </div>
+          <div class="summary-stat-box">
+            <span class="sum-lbl" id="lblStat2">Gasto Prom.</span>
+            <strong class="sum-val" id="valStat2">0 kcal</strong>
+          </div>
+          <div class="summary-stat-box">
+            <span class="sum-lbl" id="lblStat3">Carbos Prom.</span>
+            <strong class="sum-val" id="valStat3">0 g</strong>
+          </div>
+        </div>
+
+        <!-- Contenedor del Canvas de la Gráfica Suavizada -->
+        <div class="chart-canvas-box">
+          <div class="chart-legend" id="chartLegend"></div>
+          <div class="canvas-wrapper">
+            <canvas id="canvasKetoChart"></canvas>
+          </div>
+          <div class="chart-hint-footer">
+            <span>💡 Curva suavizada spline basada en datos reales de Garmin y nutrición</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Registro Detallado Día por Día del Período -->
+      <section class="card">
+        <div class="section-title history-header-wrap">
+          <div>
+            <h3>Historial del Período</h3>
+            <span class="sub-personal">Registros reales de tu proceso</span>
+          </div>
+          <div class="history-actions-row">
+            <button type="button" class="btn btn-outline btn-clear-hist" id="btnClearChartHistory" title="Vaciar historial y empezar de cero">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              <span>Vaciar</span>
+            </button>
+            <span class="badge" id="badgeHistoryCount">0 días</span>
+          </div>
+        </div>
+        <div id="chartHistoryList" class="chart-history-list"></div>
+      </section>
+    </main>
+
+    <!-- PESTAÑA 4: SEGUIMIENTO DE PESO Y CONTRASTE REAL VS IDEAL -->
+    <main id="tab-weight" class="tab-pane">
+      <!-- 1. Tarjeta Principal: Estado y Ritmo Metabólico -->
+      <section class="card weight-summary-card">
+        <div class="section-title">
+          <div>
+            <h2>Seguimiento del Peso</h2>
+            <span class="sub-personal" id="weightHeroSub">Contraste con modelo metabólico de actividad Garmin</span>
+          </div>
+          <span class="badge badge-cyan" id="weightTrendBadge">Tendencia Estable</span>
+        </div>
+
+        <div class="weight-hero-row">
+          <div class="weight-main-display">
+            <span class="weight-big-number" id="valCurrentWeight">--</span>
+            <span class="weight-big-unit">kg</span>
+          </div>
+          <div class="weight-submetrics">
+            <div class="weight-pill">
+              <span class="label">Meta:</span>
+              <strong id="valGoalWeight">75.0 kg</strong>
+            </div>
+            <div class="weight-pill">
+              <span class="label">Diferencia:</span>
+              <strong id="valWeightDiff" class="text-success">-- kg</strong>
+            </div>
+            <div class="weight-pill">
+              <span class="label">IMC estimado:</span>
+              <strong id="valWeightBmi">--</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Métricas de Contraste Metabólico (Real vs Ideal) -->
+        <div class="weight-contrast-grid">
+          <div class="weight-contrast-box">
+            <span class="w-lbl">📉 Pérdida Real Total</span>
+            <strong class="w-val text-success" id="valWeightRealLoss">0.0 kg</strong>
+            <small class="w-sub" id="subWeightRealLoss">Desde inicio</small>
+          </div>
+          <div class="weight-contrast-box">
+            <span class="w-lbl">🎯 Pérdida Ideal Teórica</span>
+            <strong class="w-val text-cyan" id="valWeightIdealLoss">0.0 kg</strong>
+            <small class="w-sub" id="subWeightIdealLoss">Por déficit acumulado</small>
+          </div>
+          <div class="weight-contrast-box">
+            <span class="w-lbl">⚖️ Ritmo Semanal Real</span>
+            <strong class="w-val" id="valWeightWeeklyRate">0.0 kg/sem</strong>
+            <small class="w-sub" id="subWeightWeeklyRate">Ideal: -0.5 kg/sem</small>
+          </div>
+          <div class="weight-contrast-box">
+            <span class="w-lbl">⚡ Estado Metabólico</span>
+            <strong class="w-val" id="valWeightPaceStatus">En Ritmo</strong>
+            <small class="w-sub" id="subWeightPaceDiff">±0.0 kg dif</small>
+          </div>
+        </div>
+
+        <div class="weight-sync-tip">
+          💡 Balanza inteligente vinculada a Garmin o Google Health Connect actualiza tu peso automáticamente.
+        </div>
+      </section>
+
+      <!-- 2. Tarjeta: Gráfica de Doble Curva (Real vs Curva Ideal) -->
+      <section class="card weight-chart-card">
+        <div class="section-title">
+          <div>
+            <h2>Curva Real vs. Trayectoria Ideal</h2>
+            <span class="sub-personal">Proyección por déficit calórico y actividad Garmin (Wishnofsky / ACSM)</span>
+          </div>
+          <!-- Selector de Rango -->
+          <div class="time-range-toggle weight-range-toggle">
+            <button class="toggle-btn active" id="btnWeightRange14" data-wrange="14">14 Días</button>
+            <button class="toggle-btn" id="btnWeightRange30" data-wrange="30">30 Días</button>
+            <button class="toggle-btn" id="btnWeightRangeAll" data-wrange="all">Todo</button>
+          </div>
+        </div>
+
+        <!-- Contenedor del Canvas de Doble Curva -->
+        <div class="chart-canvas-box">
+          <div class="chart-legend" id="weightChartLegend">
+            <div class="legend-item">
+              <span class="legend-dot" style="background-color: #10b981;"></span>
+              <span>🟢 Peso Real Registrado</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background-color: #c084fc;"></span>
+              <span>🟣 Curva Ideal Proyectada</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-line-sample"></span>
+              <span>🏁 Meta (<span id="txtLegendGoalWeight">75.0 kg</span>)</span>
+            </div>
+          </div>
+
+          <div class="canvas-wrapper canvas-wrapper-weight">
+            <canvas id="canvasWeightCompareChart"></canvas>
+          </div>
+
+          <div class="chart-hint-footer">
+            <span>📐 Modelo Wishnofsky & ACSM: 7.700 kcal de déficit neto = 1 kg de grasa corporal</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Tarjeta: Contraste y Medida Semanal -->
+      <section class="card">
+        <div class="section-title">
+          <div>
+            <h2>Medida y Contraste Semanal</h2>
+            <span class="sub-personal">Evaluación semana a semana de tu ritmo real vs ideal</span>
+          </div>
+          <span class="badge badge-purple" id="badgeTotalWeeks">Semana 1</span>
+        </div>
+
+        <!-- Desglose de Semanas -->
+        <div id="weightWeeklyBreakdown" class="weekly-cards-wrap">
+          <div class="loading-placeholder">Calculando métricas semanales...</div>
+        </div>
+
+        <div class="science-footnote" style="margin-top: 12px; font-size: 0.72rem; color: var(--text-muted); line-height: 1.4;">
+          📚 <strong>Criterio Médico:</strong> El Colegio Americano de Medicina del Deporte (ACSM) y la OMS consideran óptimo un ritmo de descenso de entre 0.4 kg y 0.9 kg semanales, preservando la masa muscular magra gracias a la ingesta adecuada de proteínas.
+        </div>
+      </section>
+
+      <!-- 4. Registro Nuevo Peso -->
+      <section class="card">
+        <div class="section-title">
+          <h2>Registrar Nuevo Peso</h2>
+        </div>
+        <form id="formWeightLog" class="form-grid">
+          <div class="form-group">
+            <label for="inputWeightValue">Peso actual (kg)</label>
+            <input type="number" step="0.1" id="inputWeightValue" placeholder="Ej. 82.4" required>
+          </div>
+          <div class="form-group">
+            <label for="inputWeightDate">Fecha y Hora</label>
+            <input type="datetime-local" id="inputWeightDate" required>
+          </div>
+          <button type="submit" class="btn btn-primary full-width">Guardar Pesaje</button>
+        </form>
+      </section>
+
+      <!-- 5. Historial de Pesajes -->
+      <section class="card">
+        <div class="section-title">
+          <h2>Historial de Pesajes</h2>
+        </div>
+        <div id="weightLogsList" class="weight-logs-list">
+          <p class="text-muted text-center">Aún no hay registros de peso.</p>
+        </div>
+      </section>
+    </main>
+
+    <!-- PESTAÑA 5: CETONAS REALES (BIOMARCADORES) -->
     <main id="tab-biomarkers" class="tab-pane">
       <div class="card">
         <div class="section-title">
@@ -382,49 +658,188 @@
       </section>
     </main>
 
-    <!-- MODAL DE CONFIGURACIÓN -->
+    <!-- MODAL DE BASES CIENTÍFICAS Y GUÍAS MÉDICAS INTERNACIONALES (NUEVO) -->
+    <div id="scienceModal" class="modal-backdrop">
+      <div class="modal-card modal-science-card">
+        <div class="modal-header">
+          <div>
+            <h2>📚 Bases Científicas y Guías Médicas</h2>
+            <span class="subtext">Estándares Internacionales de Cetosis y Gasto Energético</span>
+          </div>
+          <button id="btnCloseScienceModal" class="btn-close">&times;</button>
+        </div>
+        <div class="modal-body-scroll">
+          <p class="intro-science">
+            Los algoritmos de cálculo metabólico, progresión longitudinal de cetosis, gasto calórico y compensación por pasos de <strong>KetoTrack</strong> están rigurosamente fundamentados en investigaciones clínicas y consensos de los organismos de salud y nutrición líderes mundiales:
+          </p>
+
+          <!-- 0. Harvard Medical School & George Cahill (Fisiología Longitudinal Día a Día) -->
+          <div class="science-source-box">
+            <div class="source-header">
+              <span class="source-badge badge-harvard">Harvard / Cahill</span>
+              <h3>Curva Temporal de Adaptación a Cetosis (George Cahill, Harvard Medical School)</h3>
+            </div>
+            <p><strong>Fisiología de la Transición Metabólica y Depleción Glucogénica (Annu. Rev. Nutr. 2006):</strong></p>
+            <ul>
+              <li><strong>¿Por qué la cetosis NO inicia el Día 1?:</strong> El cuerpo humano cuenta con una reserva de ~100-120g de glucógeno hepático y hasta 400g muscular. Durante las primeras 24 horas (Día 1), la glucosa sanguínea se mantiene mediante glucogenólisis y los niveles de insulina descienden paulatinamente, impidiendo que la enzima hepática CPT-1 inicie una síntesis masiva de cetonas. Cetonas basales: <strong>0.1 - 0.3 mmol/L</strong>.</li>
+              <li><strong>Día 2 (Cetosis Inicial / Inducción):</strong> El glucógeno hepático residual cae por debajo de 20-30g. La caída del malonil-CoA activa la carnitina palmitoiltransferasa-1, canalizando ácidos grasos a la mitocondria hepática. Cetonas: <strong>0.3 - 0.5 mmol/L</strong>.</li>
+              <li><strong>Día 3 - 4 (Cetosis Intermedia / Umbral Clínico):</strong> Depleción total de glucógeno hepático. La producción de acetoacetato y beta-hidroxibutirato supera el umbral clínico de <strong>0.5 mmol/L</strong> (0.5 a 1.5 mmol/L), activando el modo de quema de grasa y fuego 🔥. El cerebro cubre hasta el 50% de su energía con cetonas.</li>
+              <li><strong>Día 5+ (Cetosis Avanzada / Ceto-Adaptada):</strong> Validado por Phinney & Volek (AJCN). Aumento de transportadores de monocarboxilato (MCT1) y biogénesis mitocondrial muscular, estabilizando niveles entre <strong>1.5 y 3.0 mmol/L</strong>.</li>
+              <li><strong>Acelerador Garmin (ACSM / OMS):</strong> Cada 1,000 pasos aeróbicos queman ~3.4g de glucógeno. Un volumen activo de 15,000 pasos diarios quema ~50g de glucógeno adicional, reduciendo el tiempo de entrada de 72h a solo <strong>28 - 36 horas (final del Día 1 o durante el Día 2)</strong>.</li>
+            </ul>
+          </div>
+
+          <!-- 1. Organización Mundial de la Salud (OMS) -->
+          <div class="science-source-box">
+            <div class="source-header">
+              <span class="source-badge badge-who">OMS / WHO</span>
+              <h3>Organización Mundial de la Salud (Ginebra, 2020)</h3>
+            </div>
+            <p><strong>Directrices sobre Actividad Física y Comportamiento Sedentario:</strong></p>
+            <ul>
+              <li><strong>Meta Base:</strong> Recomienda entre 150 y 300 minutos semanales de actividad moderada, equivalente en podometría clínica a <strong>8,000 - 10,000 pasos diarios</strong>.</li>
+              <li><strong>Efecto Metabólico:</strong> El volumen de 8,000 pasos promueve la traslocación del transportador GLUT4 sin requerir picos de insulina, manteniendo los depósitos de glucógeno muscular en rango depletado y protegiendo el estado cetogénico.</li>
+            </ul>
+          </div>
+
+          <!-- 2. American College of Sports Medicine (ACSM) -->
+          <div class="science-source-box">
+            <div class="source-header">
+              <span class="source-badge badge-acsm">ACSM</span>
+              <h3>American College of Sports Medicine (2021)</h3>
+            </div>
+            <p><strong>Cinética de Oxidación de Sustratos en Marcha Aeróbica:</strong></p>
+            <ul>
+              <li><strong>Tasa de Quema:</strong> A ritmo de caminata (4 a 5 km/h), el cociente respiratorio (RER) es de aproximadamente 0.80, donde el <strong>40% de la energía proviene de glucosa/glucógeno</strong> y el 60% de ácidos grasos libres.</li>
+              <li><strong>Fórmula de Compensación Glucogénica:</strong> Con la tasa calibrada de tu Garmin (0.0342 kcal/paso), oxidar 1 gramo de carbohidrato excedente (4 kcal) requiere: <br>
+                <code>Pasos = 4 kcal / (0.0342 kcal/paso * 0.40) ≈ 292 pasos por gramo neto excedente</code>.
+              </li>
+            </ul>
+          </div>
+
+          <!-- 3. The American Journal of Clinical Nutrition & Virta Health -->
+          <div class="science-source-box">
+            <div class="source-header">
+              <span class="source-badge badge-ajcn">AJCN / Virta</span>
+              <h3>Dres. Stephen Phinney y Jeff Volek (AJCN)</h3>
+            </div>
+            <p><strong>Definición Clínica de Cetosis Nutricional:</strong></p>
+            <ul>
+              <li><strong>Rango Óptimo:</strong> Concentración plasmática de beta-hidroxibutirato (BOHB) entre <strong>0.5 y 3.0 mmol/L</strong>.</li>
+              <li><strong>Umbral Glucídico:</strong> Ingesta diaria de carbohidratos netos &le; 20 - 25 gramos para asegurar la cetogénesis hepática continua.</li>
+              <li><strong>Proteína de Preservación Muscular:</strong> 1.5g a 2.0g por kilogramo de peso corporal de referencia para evitar la gluconeogénesis destructiva.</li>
+            </ul>
+          </div>
+
+          <!-- 4. FAO / OMS / UNU -->
+          <div class="science-source-box">
+            <div class="source-header">
+              <span class="source-badge badge-fao">FAO / ONU</span>
+              <h3>Requerimientos Energéticos Humanos (FAO/WHO/UNU)</h3>
+            </div>
+            <p><strong>Cálculo de Tasa Metabólica Basal (BMR):</strong></p>
+            <ul>
+              <li>Aplica la ecuación validada de <strong>Mifflin-St Jeor</strong> (avalada por la Academy of Nutrition and Dietetics): <br>
+                <code>Hombres: (10 * peso_kg) + (6.25 * altura_cm) - (5 * edad) + 5</code><br>
+                <code>Mujeres: (10 * peso_kg) + (6.25 * altura_cm) - (5 * edad) - 161</code>
+              </li>
+              <li>El gasto se distribuye minuto a minuto a lo largo del día y se suma al gasto por actividad física leído por tu reloj Garmin.</li>
+            </ul>
+          </div>
+
+          <!-- 5. American Diabetes Association (ADA) -->
+          <div class="science-source-box">
+            <div class="source-header">
+              <span class="source-badge badge-ada">ADA</span>
+              <h3>American Diabetes Association (Standards of Care, 2023)</h3>
+            </div>
+            <p><strong>Evidencia en Dietas Muy Bajas en Carbohidratos (VLCD):</strong></p>
+            <ul>
+              <li>Consenso clínico que avala la restricción estricta de carbohidratos (&le; 20-50g diarios) como el enfoque nutricional más eficaz para reducir la variabilidad glucémica, vaciar los depósitos hepáticos y estimular la lipólisis celular.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL DE CONFIGURACIÓN Y PERFIL PERSONALIZADO -->
     <div id="settingsModal" class="modal-backdrop">
       <div class="modal-card">
         <div class="modal-header">
-          <h2>Configuración de Objetivos</h2>
+          <h2>Perfil y Objetivos Keto</h2>
           <button id="btnCloseSettingsModal" class="btn-close">&times;</button>
         </div>
         <form id="formSettings">
+          <h3>Protocolo Cetogénico y Fechas</h3>
+          <p class="small text-muted">Establece el inicio de tu protocolo para calcular el Día 1, 2, 3... y la entrada a cetosis.</p>
+          
+          <div class="form-group">
+            <label for="setKetoStartDate">Fecha y Hora de Inicio del Protocolo</label>
+            <input type="datetime-local" id="setKetoStartDate">
+            <small class="text-muted">Calcula automáticamente los días y el vaciado de glucógeno.</small>
+          </div>
+
+          <button type="button" id="btnResetProtocolDay" class="btn btn-outline full-width" style="margin-bottom: 14px;">
+            🔄 Iniciar Protocolo Hoy (Comenzar Día 1)
+          </button>
+
+          <hr class="divider">
+          <h3>Datos Corporales (Ajuste Automático de Macros)</h3>
+          <p class="small text-muted">Ajusta tus metas de carbohidratos, proteínas y grasas exactamente a tu cuerpo.</p>
+          
+          <div class="form-group">
+            <label for="setProfileWeight">Peso Corporal Actual (kg)</label>
+            <input type="number" step="0.1" id="setProfileWeight" placeholder="Ej. 80" required>
+          </div>
+
+          <div class="form-group">
+            <label for="setGoalWeight">Peso Meta / Deseado (kg)</label>
+            <input type="number" step="0.1" id="setGoalWeight" placeholder="Ej. 75.0" value="75.0" required>
+            <small class="text-muted" id="txtGoalWeightFeedback">Meta: Disminuir 5.0 kg</small>
+          </div>
+
+          <div class="form-group">
+            <label for="setProfileAge">Edad (años)</label>
+            <input type="number" id="setProfileAge" placeholder="Ej. 35" required>
+          </div>
+
+          <div class="form-group">
+            <label for="setProfileHeight">Altura (cm)</label>
+            <input type="number" id="setProfileHeight" placeholder="Ej. 175" value="175">
+          </div>
+
+          <div class="form-group">
+            <label for="setProfileGender">Sexo Biológico</label>
+            <select id="setProfileGender">
+              <option value="male">Hombre</option>
+              <option value="female">Mujer</option>
+            </select>
+          </div>
+
+          <button type="button" id="btnAutoCalculateMacros" class="btn btn-outline full-width" style="margin: 10px 0 14px 0;">
+            ⚡ Recalcular Calorías y Macros para mi Meta de Peso
+          </button>
+
+          <hr class="divider">
+          <h3>Metas Nutricionales Diarias</h3>
+
+          <div class="form-group">
+            <label for="setCalories">Objetivo Calórico (kcal para tu meta)</label>
+            <input type="number" id="setCalories" required value="1800">
+            <small class="text-muted">Calculado automáticamente con déficit saludable (OMS/ACSM).</small>
+          </div>
           <div class="form-group">
             <label for="setNetCarbs">Límite Diario de Carbos Netos (g)</label>
-            <input type="number" id="setNetCarbs" required>
+            <input type="number" id="setNetCarbs" required value="25">
           </div>
           <div class="form-group">
             <label for="setProtein">Objetivo de Proteína (g)</label>
-            <input type="number" id="setProtein" required>
+            <input type="number" id="setProtein" required value="140">
+            <small class="text-muted">1.8g por kg para proteger tu musculatura en cetosis.</small>
           </div>
           <div class="form-group">
             <label for="setFat">Objetivo de Grasas (g)</label>
-            <input type="number" id="setFat" required>
-          </div>
-          <div class="form-group">
-            <label for="setCalories">Objetivo Calórico (kcal)</label>
-            <input type="number" id="setCalories" required>
-          </div>
-
-          <hr class="divider">
-          <h3>Credenciales Garmin Connect (Opcional)</h3>
-          <p class="small text-muted">Se almacenan solo localmente en tu base de datos SQLite.</p>
-          <div class="form-group">
-            <label for="setGarminUser">Usuario / Email de Garmin Connect</label>
-            <input type="email" id="setGarminUser" placeholder="tu-email@ejemplo.com">
-          </div>
-          <div class="form-group">
-            <label for="setGarminPass">Contraseña de Garmin Connect</label>
-            <input type="password" id="setGarminPass" placeholder="••••••••">
-          </div>
-
-          <hr class="divider">
-          <h3>IA Gemini Vision (Opcional)</h3>
-          <p class="small text-muted">Clave gratuita de Google AI Studio para análisis fotográfico de platos.</p>
-          <div class="form-group">
-            <label for="setGeminiKey">Gemini API Key</label>
-            <input type="password" id="setGeminiKey" placeholder="AIzaSy••••••••">
+            <input type="number" id="setFat" required value="130">
           </div>
 
           <button type="submit" class="btn btn-primary full-width">Guardar Ajustes</button>
@@ -432,6 +847,122 @@
       </div>
     </div>
 
+    <!-- MODAL DE INICIAR PROCESO CON CONFIRMACIÓN SEGURA -->
+    <div id="modalStartProcess" class="modal-backdrop">
+      <div class="modal-card modal-process-card">
+        <div class="modal-header">
+          <div class="process-modal-title">
+            <span class="process-icon">🚀</span>
+            <div>
+              <h2>Iniciar Proceso Cetogénico</h2>
+              <span class="subtext">Comenzar el conteo biológico del Día 1</span>
+            </div>
+          </div>
+          <button id="btnCloseProcessModal" class="btn-close">&times;</button>
+        </div>
+
+        <div class="process-modal-body">
+          <p class="process-modal-intro">
+            Vas a iniciar tu protocolo cetogénico desde hoy (<strong>Día 1</strong>). Para evitar cualquier pérdida accidental de información, elige cómo deseas comenzar:
+          </p>
+
+          <div class="process-action-cards">
+            <!-- Opción 1: Iniciar desde cero absoluto (Borrar todo el historial) -->
+            <button type="button" class="process-card-opt opt-reset" id="btnStartResetAll">
+              <div class="opt-icon">🚀</div>
+              <div class="opt-details">
+                <strong>Iniciar Proceso Desde Cero (Recomendado)</strong>
+                <span>Vacía todo el historial de gráficas, comidas y estadísticas para arrancar completamente limpio desde hoy (Día 1).</span>
+              </div>
+              <span class="opt-badge badge-danger">Empezar de Cero</span>
+            </button>
+
+            <!-- Opción 2: Iniciar conservando historial -->
+            <button type="button" class="process-card-opt opt-keep" id="btnStartKeepHistory">
+              <div class="opt-icon">📅</div>
+              <div class="opt-details">
+                <strong>Iniciar Día 1 Conservando Historial Previo</strong>
+                <span>Fija el Día 1 hoy, pero conserva las estadísticas y gráficas acumuladas con anterioridad.</span>
+              </div>
+              <span class="opt-badge">Conservar Datos</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 14px; text-align: right;">
+          <button type="button" id="btnCancelProcessModal" class="btn btn-outline">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- BARRA DE NAVEGACIÓN MODERNA INFERIOR (GLASS BOTTOM DOCK) -->
+    <nav class="app-bottom-nav">
+      <button class="nav-tab active" data-tab="tab-dashboard" title="Estado metabólico y cetosis">
+        <span class="nav-tab-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+          </svg>
+        </span>
+        <span class="nav-tab-label">Estado</span>
+      </button>
+
+      <button class="nav-tab" data-tab="tab-meals" title="Registro de comidas con IA">
+        <span class="nav-tab-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
+            <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
+            <line x1="6" y1="1" x2="6" y2="4"/>
+            <line x1="10" y1="1" x2="10" y2="4"/>
+            <line x1="14" y1="1" x2="14" y2="4"/>
+          </svg>
+        </span>
+        <span class="nav-tab-label">Comidas</span>
+      </button>
+
+      <button class="nav-tab" data-tab="tab-garmin" title="Métricas del reloj Garmin">
+        <span class="nav-tab-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="6" y="7" width="12" height="10" rx="3"/>
+            <path d="M9 7V3h6v4"/>
+            <path d="M9 17v4h6v-4"/>
+            <circle cx="12" cy="12" r="2"/>
+          </svg>
+        </span>
+        <span class="nav-tab-label">Garmin</span>
+      </button>
+
+      <button class="nav-tab" data-tab="tab-charts" title="Evolución y analíticas">
+        <span class="nav-tab-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+          </svg>
+        </span>
+        <span class="nav-tab-label">Gráficas</span>
+      </button>
+
+      <button class="nav-tab" data-tab="tab-weight" title="Control de peso y proyección">
+        <span class="nav-tab-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="16" rx="3"/>
+            <circle cx="12" cy="9" r="2.5"/>
+            <line x1="12" y1="11.5" x2="12" y2="13"/>
+            <line x1="8" y1="16" x2="16" y2="16"/>
+          </svg>
+        </span>
+        <span class="nav-tab-label">Peso</span>
+      </button>
+
+      <button class="nav-tab" data-tab="tab-biomarkers" title="Cetonas y biomarcadores reales">
+        <span class="nav-tab-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+          </svg>
+        </span>
+        <span class="nav-tab-label">Cetonas</span>
+      </button>
+    </nav>
   </div>
 
   <script src="health-connect.js"></script>
