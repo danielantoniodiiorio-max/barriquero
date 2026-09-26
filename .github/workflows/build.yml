@@ -48,16 +48,28 @@ jobs:
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <title>Privacidad - KetoTrack</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; line-height: 1.6; color: #222; max-width: 680px; margin: auto; background: #fafafa; }
+              h1 { color: #059669; }
+              .card { background: white; padding: 20px; border-radius: 12px; border: 1px solid #e5e7eb; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+            </style>
           </head>
-          <body style="font-family:sans-serif; padding:20px; color:#1e293b; line-height:1.6;">
-            <h1 style="color:#10b981;">Política de Privacidad de KetoTrack</h1>
-            <p>KetoTrack lee pasos, calorías activas y frecuencia cardíaca de Google Health Connect exclusivamente para calcular el vaciado de glucógeno y entrada en cetosis.</p>
-            <p>Tus datos se procesan 100% de manera local en tu teléfono y nunca son compartidos con terceros.</p>
+          <body>
+            <div class="card">
+              <h1>Política de Privacidad de KetoTrack</h1>
+              <p><strong>KetoTrack</strong> se integra de forma transparente con <strong>Google Health Connect</strong> para leer datos de actividad física (pasos diarios, calorías quemadas y frecuencia cardíaca) generados por tu reloj <strong>Garmin</strong>.</p>
+              <h3>Uso de Datos de Salud</h3>
+              <ul>
+                <li><strong>Local y Privado:</strong> Tus métricas de Garmin se leen y procesan exclusivamente de forma local en tu teléfono para calcular el vaciado de glucógeno y el estado de cetosis en tiempo real.</li>
+                <li><strong>Cero Rastreo / Cero Servidores Externos:</strong> No compartimos ni vendemos tu información con terceros, ni la enviamos a servidores de publicidad.</li>
+              </ul>
+              <p>Puedes revocar los permisos de Health Connect en cualquier momento desde los ajustes de tu teléfono Android en <em>Ajustes &gt; Seguridad y privacidad &gt; Health Connect</em>.</p>
+            </div>
           </body>
           </html>
           EOF
 
-          # 3. Inyectar health-connect.js actualizado
+          # 3. Generar cliente oficial de Google Health Connect
           cat << 'EOF' > public/health-connect.js
           class HealthConnectManager {
             constructor() {
@@ -134,10 +146,8 @@ jobs:
               });
 
               setInterval(() => {
-                if (!document.hidden) {
-                  this.syncFromHealthConnect();
-                }
-              }, 3 * 60 * 1000);
+                this.syncFromHealthConnect();
+              }, 5 * 60 * 1000);
             }
 
             async requestPermissionAndSync(isSilent = false) {
@@ -159,9 +169,8 @@ jobs:
 
                 this.updateUIStatus('Solicitando permisos a Android 15...');
                 await this.plugin.requestAuthorization({
-                  read: ['steps', 'calories', 'heartRate', 'restingHeartRate'],
-                  write: [],
-                  requestHistoryAccess: true
+                  read: ['steps', 'calories', 'heartRate'],
+                  write: []
                 });
 
                 this.updateUIStatus('Permisos concedidos. Sincronizando datos de Garmin...');
@@ -183,6 +192,7 @@ jobs:
                 const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
 
                 let steps = 0;
+                let garminDeviceName = 'Garmin Watch';
                 try {
                   const stepsRes = await this.plugin.readSamples({
                     dataType: 'steps',
@@ -192,6 +202,10 @@ jobs:
                   });
                   if (stepsRes && Array.isArray(stepsRes.samples)) {
                     steps = Math.round(stepsRes.samples.reduce((acc, s) => acc + (Number(s.value) || 0), 0));
+                    const garminSample = stepsRes.samples.find(s => (s.sourceName && s.sourceName.toLowerCase().includes('garmin')) || (s.sourceId && s.sourceId.toLowerCase().includes('garmin')));
+                    if (garminSample && garminSample.sourceName) {
+                      garminDeviceName = garminSample.sourceName;
+                    }
                   }
                 } catch (e) {
                   console.warn('Error leyendo pasos:', e);
@@ -212,71 +226,44 @@ jobs:
                   console.warn('Error leyendo calorías:', e);
                 }
 
-                let restingHr = 60;
+                let heartRate = null;
                 try {
-                  const rhrRes = await this.plugin.readSamples({
-                    dataType: 'restingHeartRate',
-                    startDate: startOfDay.toISOString(),
+                  const hrRes = await this.plugin.readSamples({
+                    dataType: 'heartRate',
+                    startDate: new Date(now.getTime() - 30 * 60 * 1000).toISOString(),
                     endDate: now.toISOString(),
-                    limit: 1,
+                    limit: 5,
                     ascending: false
                   });
-                  if (rhrRes && rhrRes.samples && rhrRes.samples.length > 0) {
-                    restingHr = Math.round(rhrRes.samples[0].value || 60);
-                  } else {
-                    const hrRes = await this.plugin.readSamples({
-                      dataType: 'heartRate',
-                      startDate: startOfDay.toISOString(),
-                      endDate: now.toISOString(),
-                      limit: 1,
-                      ascending: false
-                    });
-                    if (hrRes && hrRes.samples && hrRes.samples.length > 0) {
-                      restingHr = Math.round(hrRes.samples[0].value || 60);
-                    }
+                  if (hrRes && Array.isArray(hrRes.samples) && hrRes.samples.length > 0) {
+                    heartRate = Math.round(hrRes.samples[0].value);
                   }
                 } catch (e) {
-                  console.warn('Error leyendo ritmo cardíaco:', e);
+                  console.warn('Error leyendo frecuencia cardíaca:', e);
                 }
 
-                if (window.applyGarminMetrics) {
-                  window.applyGarminMetrics(steps, activeCalories, restingHr, 'Google Health Connect (Garmin)');
-                }
-
-                try {
-                  await fetch('/api/garmin/sync', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      mode: 'manual',
-                      custom: { steps, active_calories: activeCalories, resting_hr: restingHr, source: 'health_connect' }
-                    })
+                if (typeof window.applyGarminMetrics === 'function') {
+                  window.applyGarminMetrics({
+                    steps: steps,
+                    activeCalories: activeCalories,
+                    heartRate: heartRate,
+                    source: 'Health Connect (' + garminDeviceName + ')'
                   });
-                } catch (err) {}
+                }
 
-                this.updateUINativeSuccess(steps, activeCalories, restingHr);
+                const banner = document.querySelector('.free-sync-banner');
+                if (banner) {
+                  banner.innerHTML = `
+                    <span class="free-tag" style="background:#10b981;color:#fff;">✓ CONECTADO</span>
+                    <span>Google Health Connect sincronizado en vivo con tu <strong>reloj Garmin</strong>.</span>
+                  `;
+                }
+
+                this.updateUIStatus(`Última sincronización: ${new Date().toLocaleTimeString()} • ${steps.toLocaleString()} pasos leídos de Garmin`);
               } catch (err) {
-                console.error('Error al sincronizar Health Connect:', err);
-                this.updateUIStatus(`Error al sincronizar: ${err.message || err}`);
+                console.error('Error sincronizando muestras:', err);
+                this.updateUIStatus(`Error al sincronizar datos: ${err.message || err}`);
               }
-            }
-
-            updateUINativeSuccess(steps, calories, hr) {
-              const badge = document.getElementById('garminSourceBadge');
-              if (badge) {
-                badge.textContent = 'Health Connect (Garmin) ✓';
-                badge.style.backgroundColor = 'var(--accent-green)';
-              }
-
-              const banner = document.querySelector('.free-sync-banner');
-              if (banner) {
-                banner.innerHTML = `
-                  <span class="free-tag">AUTO-SYNC CONECTADO</span>
-                  <span>Sincronizado con tu <strong>reloj Garmin</strong> vía Google Health Connect (${steps.toLocaleString()} pasos, ${calories} kcal activas).</span>
-                `;
-              }
-
-              this.updateUIStatus(`Última sincronización: ${new Date().toLocaleTimeString()} • ${steps.toLocaleString()} pasos leídos de Garmin`);
             }
 
             updateUIStatus(msg) {
@@ -328,10 +315,11 @@ jobs:
           rm -rf android
           npx cap add android
 
-          # Configurar variables.gradle (SDK 35 y Kotlin 1.9.24)
+          # 1. Configurar variables.gradle con minSdk 26 y compileSdk 35
           node -e "
             const fs = require('fs');
             let vg = fs.readFileSync('android/variables.gradle', 'utf8');
+            vg = vg.replace(/minSdkVersion\s*=\s*\d+/, 'minSdkVersion = 26');
             vg = vg.replace(/compileSdkVersion\s*=\s*\d+/, 'compileSdkVersion = 35');
             vg = vg.replace(/targetSdkVersion\s*=\s*\d+/, 'targetSdkVersion = 35');
             if (!vg.includes('kotlinVersion')) {
@@ -340,7 +328,7 @@ jobs:
             fs.writeFileSync('android/variables.gradle', vg, 'utf8');
           "
 
-          # Configurar android/build.gradle (Kotlin Gradle plugin)
+          # 2. Configurar android/build.gradle con Kotlin Gradle plugin
           node -e "
             const fs = require('fs');
             let bg = fs.readFileSync('android/build.gradle', 'utf8');
@@ -350,7 +338,7 @@ jobs:
             }
           "
 
-          # Inyectar AndroidManifest.xml con permisos de Health Connect y Rationale oficial
+          # 3. Inyectar AndroidManifest.xml con permisos de Health Connect y Rationale oficial
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -410,18 +398,22 @@ jobs:
           </manifest>
           EOF
 
-          # Sincronizar plugins de Capacitor en el proyecto Android
+          # 4. Sincronizar plugins de Capacitor en el proyecto Android
           npx cap sync android
 
-          # Habilitar coreLibraryDesugaring en app/build.gradle
+          # 5. Configurar android/app/build.gradle con Java 21 y Desugaring
           node -e "
             const fs = require('fs');
             let abg = fs.readFileSync('android/app/build.gradle', 'utf8');
-            if (!abg.includes('coreLibraryDesugaring')) {
-              abg = abg.replace(/compileOptions\s*\{/, \"compileOptions {\n        coreLibraryDesugaringEnabled true\");
-              abg = abg.replace(/dependencies\s*\{/, \"dependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'\");
-              fs.writeFileSync('android/app/build.gradle', abg, 'utf8');
+            if (abg.includes('compileOptions {')) {
+              abg = abg.replace(/compileOptions\s*\{[\s\S]*?\}/, \"compileOptions {\n        sourceCompatibility JavaVersion.VERSION_21\n        targetCompatibility JavaVersion.VERSION_21\n        coreLibraryDesugaringEnabled true\n    }\");
+            } else {
+              abg = abg.replace(/android\s*\{/, \"android {\n    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_21\n        targetCompatibility JavaVersion.VERSION_21\n        coreLibraryDesugaringEnabled true\n    }\");
             }
+            if (!abg.includes('desugar_jdk_libs')) {
+              abg = abg.replace(/dependencies\s*\{/, \"dependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'\");
+            }
+            fs.writeFileSync('android/app/build.gradle', abg, 'utf8');
           "
 
       - name: Compilar APK con Gradle
