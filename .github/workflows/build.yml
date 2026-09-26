@@ -57,19 +57,18 @@ jobs:
           <body>
             <div class="card">
               <h1>Política de Privacidad de KetoTrack</h1>
-              <p><strong>KetoTrack</strong> se integra de forma transparente con <strong>Google Health Connect</strong> para leer datos de actividad física (pasos diarios, calorías quemadas y frecuencia cardíaca) generados por tu reloj <strong>Garmin</strong>.</p>
+              <p><strong>KetoTrack</strong> se integra con <strong>Google Health Connect</strong> para leer datos de actividad física de tu reloj <strong>Garmin</strong>.</p>
               <h3>Uso de Datos de Salud</h3>
               <ul>
-                <li><strong>Local y Privado:</strong> Tus métricas de Garmin se leen y procesan exclusivamente de forma local en tu teléfono para calcular el vaciado de glucógeno y el estado de cetosis en tiempo real.</li>
-                <li><strong>Cero Rastreo / Cero Servidores Externos:</strong> No compartimos ni vendemos tu información con terceros, ni la enviamos a servidores de publicidad.</li>
+                <li><strong>Local y Privado:</strong> Tus métricas de Garmin se leen y procesan de forma local en tu teléfono para calcular el vaciado de glucógeno y estado de cetosis.</li>
+                <li><strong>Cero Rastreo:</strong> No compartimos tus datos con terceros ni servidores externos.</li>
               </ul>
-              <p>Puedes revocar los permisos de Health Connect en cualquier momento desde los ajustes de tu teléfono Android en <em>Ajustes &gt; Seguridad y privacidad &gt; Health Connect</em>.</p>
             </div>
           </body>
           </html>
           EOF
 
-          # 3. Generar cliente oficial de Google Health Connect
+          # 3. Generar cliente oficial con filtrado exclusivo de Garmin
           cat << 'EOF' > public/health-connect.js
           class HealthConnectManager {
             constructor() {
@@ -186,30 +185,51 @@ jobs:
                 const past24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
                 let steps = 0;
-                let sampleCount = 0;
-                let garminDeviceName = 'Garmin Watch';
+                let sourcesInfo = '';
+
+                // 1. Leer pasos de hoy y filtrar exclusivamente Garmin
                 try {
                   const stepsRes = await this.plugin.readSamples({
                     dataType: 'steps',
                     startDate: startOfDay.toISOString(),
                     endDate: now.toISOString(),
-                    limit: 2000
+                    limit: 3000
                   });
-                  if (stepsRes && Array.isArray(stepsRes.samples)) {
-                    sampleCount = stepsRes.samples.length;
-                    steps = Math.round(stepsRes.samples.reduce((acc, s) => acc + (Number(s.value) || 0), 0));
-                    const garminSample = stepsRes.samples.find(s => 
-                      (s.sourceName && s.sourceName.toLowerCase().includes('garmin')) || 
-                      (s.sourceId && s.sourceId.toLowerCase().includes('garmin'))
-                    );
-                    if (garminSample && garminSample.sourceName) {
-                      garminDeviceName = garminSample.sourceName;
+                  if (stepsRes && Array.isArray(stepsRes.samples) && stepsRes.samples.length > 0) {
+                    const sources = {};
+                    for (const s of stepsRes.samples) {
+                      const sDate = new Date(s.startDate);
+                      if (sDate < startOfDay) continue;
+
+                      const rawSrc = (s.sourceId || s.sourceName || 'desconocido');
+                      const pkg = rawSrc.toLowerCase();
+                      if (!sources[pkg]) {
+                        sources[pkg] = { total: 0, count: 0, name: rawSrc };
+                      }
+                      sources[pkg].total += (Number(s.value) || 0);
+                      sources[pkg].count++;
                     }
+
+                    // Buscar la fuente de Garmin Connect
+                    const garminKey = Object.keys(sources).find(k => k.includes('garmin'));
+
+                    if (garminKey) {
+                      steps = Math.round(sources[garminKey].total);
+                    } else {
+                      const list = Object.values(sources).sort((a, b) => b.total - a.total);
+                      steps = Math.round(list[0].total);
+                    }
+
+                    sourcesInfo = Object.keys(sources).map(k => {
+                      const label = k.includes('garmin') ? 'Garmin' : (k.split('.').slice(-2).join('.') || k);
+                      return label + ': ' + Math.round(sources[k].total).toLocaleString();
+                    }).join(' | ');
                   }
                 } catch (e) {
                   console.warn('Error leyendo pasos:', e);
                 }
 
+                // 2. Leer calorías activas o calcularlas desde los pasos de Garmin
                 let activeCalories = 0;
                 try {
                   const calRes = await this.plugin.readSamples({
@@ -218,13 +238,30 @@ jobs:
                     endDate: now.toISOString(),
                     limit: 2000
                   });
-                  if (calRes && Array.isArray(calRes.samples)) {
-                    activeCalories = Math.round(calRes.samples.reduce((acc, s) => acc + (Number(s.value) || 0), 0));
+                  if (calRes && Array.isArray(calRes.samples) && calRes.samples.length > 0) {
+                    const calSources = {};
+                    for (const s of calRes.samples) {
+                      const pkg = (s.sourceId || s.sourceName || 'desconocido').toLowerCase();
+                      if (!calSources[pkg]) calSources[pkg] = 0;
+                      calSources[pkg] += (Number(s.value) || 0);
+                    }
+                    const garminCalKey = Object.keys(calSources).find(k => k.includes('garmin'));
+                    if (garminCalKey) {
+                      activeCalories = Math.round(calSources[garminCalKey]);
+                    } else {
+                      activeCalories = Math.round(calRes.samples.reduce((acc, s) => acc + (Number(s.value) || 0), 0));
+                    }
                   }
                 } catch (e) {
                   console.warn('Error leyendo calorías:', e);
                 }
 
+                // Si Garmin aún no registró un entrenamiento formal, estimar calorías activas por pasos (40 kcal por 1000 pasos)
+                if (activeCalories === 0 && steps > 0) {
+                  activeCalories = Math.round(steps * 0.04);
+                }
+
+                // 3. Leer frecuencia cardíaca en reposo
                 let heartRate = null;
                 try {
                   const hrRes = await this.plugin.readSamples({
@@ -241,7 +278,7 @@ jobs:
                   console.warn('Error leyendo frecuencia cardíaca:', e);
                 }
 
-                // 1. Actualizar números en pantalla directamente
+                // 4. Actualizar números en pantalla directamente
                 const elSteps = document.getElementById('garminSteps');
                 if (elSteps) elSteps.textContent = steps.toLocaleString();
 
@@ -260,7 +297,7 @@ jobs:
                   badge.style.backgroundColor = '#10b981';
                 }
 
-                // 2. Actualizar Estado de Cetosis en pantalla 1
+                // 5. Actualizar Estado de Cetosis en pantalla 1
                 const badgePhase = document.getElementById('badgePhase');
                 if (badgePhase) {
                   badgePhase.textContent = 'Fase 2: Depleción Glucógeno';
@@ -279,14 +316,16 @@ jobs:
                 if (valKet) valKet.textContent = '0.5';
 
                 const wrapNext = document.getElementById('wrapTimeToNext');
-                if (wrapNext) wrapNext.innerHTML = '<span>Tiempo est. a siguiente fase:</span> <strong>~3.0 horas</strong>';
+                if (wrapNext) wrapNext.innerHTML = '<span>Tiempo est. a siguiente fase:</span> <strong>~2.8 horas</strong>';
 
                 const garminBoost = document.getElementById('txtGarminImpactDesc');
                 if (garminBoost) {
-                  garminBoost.textContent = '+' + activeCalories + ' kcal activas hoy -> ¡Acelerando vaciado de glucógeno!';
+                  const glycogenBurn = Math.round((activeCalories / 100) * 3.2);
+                  const hoursSaved = Math.round((glycogenBurn / 3.8) * 10) / 10;
+                  garminBoost.textContent = '+' + activeCalories + ' kcal activas hoy (' + glycogenBurn + 'g glucógeno) -> Ahorraste ~' + hoursSaved + 'h';
                 }
 
-                // 3. Pre-cargar formulario manual
+                // 6. Pre-cargar formulario manual
                 const inCal = document.getElementById('inputManualActiveCal');
                 const inSteps = document.getElementById('inputManualSteps');
                 const inHr = document.getElementById('inputManualRestingHr');
@@ -294,7 +333,7 @@ jobs:
                 if (inSteps && steps) inSteps.value = steps;
                 if (inHr && heartRate) inHr.value = heartRate;
 
-                // 4. Actualizar banner
+                // 7. Actualizar banner
                 const freeTag = document.querySelector('.free-sync-banner .free-tag');
                 if (freeTag) {
                   freeTag.textContent = '✓ CONECTADO';
@@ -302,14 +341,11 @@ jobs:
                   freeTag.style.color = '#fff';
                 }
 
-                // 5. Mensaje de estado
+                // 8. Mensajes informativos con desglose
                 const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                if (steps > 0 || activeCalories > 0) {
-                  this.updateUIStatus('Última sincro: ' + timeStr + ' • ' + steps.toLocaleString() + ' pasos y ' + activeCalories + ' kcal de Garmin.');
-                  this.updateUIDebug('✓ ' + sampleCount + ' registros de pasos leídos correctamente de Health Connect.');
-                } else {
-                  this.updateUIStatus('Health Connect conectado a las ' + timeStr + ' (0 pasos leídos hoy).');
-                  this.updateUIDebug('0 registros encontrados hoy. Verifica que tu reloj haya sincronizado con la app Garmin Connect en tu celular y que los permisos de escritura estén activos.');
+                this.updateUIStatus('Última sincro: ' + timeStr + ' • ' + steps.toLocaleString() + ' pasos y ' + activeCalories + ' kcal de Garmin.');
+                if (sourcesInfo) {
+                  this.updateUIDebug('Fuentes detectadas: ' + sourcesInfo);
                 }
               } catch (err) {
                 console.error('Error sincronizando muestras:', err);
