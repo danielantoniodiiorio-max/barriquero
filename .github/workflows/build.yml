@@ -256,7 +256,7 @@ jobs:
                   console.warn('Error leyendo calorías:', e);
                 }
 
-                // Si Garmin aún no registró un entrenamiento formal, estimar calorías activas por pasos calibrado con Garmin Instinct (34.2 kcal cada 1000 pasos)
+                // Si Garmin aún no registró un entrenamiento formal, estimar calorías activas según ritmo de Garmin (0.0342 kcal/paso)
                 if (activeCalories === 0 && steps > 0) {
                   activeCalories = Math.round(steps * 0.0342);
                 }
@@ -278,15 +278,14 @@ jobs:
                   console.warn('Error leyendo frecuencia cardíaca:', e);
                 }
 
-                // 4. Cálculo de Gasto Acumulado en el día (Descanso transcurrido + Activo, idéntico al reloj Garmin)
-                const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
-                const dailyBmr = 2192; // Tasa metabólica de reposo calibrada con tu reloj Garmin Instinct (1052 kcal de descanso a las 11:31)
-                const restingSoFar = Math.round((dailyBmr / 24) * elapsedHours);
-                const totalSoFar = restingSoFar + activeCalories;
-
-                // 5. Actualizar números en pantalla directamente
+                // 4. Actualizar números en pantalla directamente
                 const elSteps = document.getElementById('garminSteps');
                 if (elSteps) elSteps.textContent = steps.toLocaleString();
+
+                const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
+                const dailyBmr = 2192;
+                const restingSoFar = Math.round((dailyBmr / 24) * elapsedHours);
+                const totalSoFar = restingSoFar + activeCalories;
 
                 const elCal = document.getElementById('garminActiveCal');
                 if (elCal) elCal.textContent = activeCalories;
@@ -349,7 +348,7 @@ jobs:
 
                 // 8. Mensajes informativos con desglose
                 const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                this.updateUIStatus('Última sincro: ' + timeStr + ' • ' + steps.toLocaleString() + ' pasos, ' + activeCalories + ' kcal activas y ' + totalSoFar + ' kcal totales (Desc: ' + restingSoFar + ' + Activo: ' + activeCalories + ').');
+                this.updateUIStatus('Última sincro: ' + timeStr + ' • ' + steps.toLocaleString() + ' pasos y ' + activeCalories + ' kcal de Garmin.');
                 if (sourcesInfo) {
                   this.updateUIDebug('Fuentes detectadas: ' + sourcesInfo);
                 }
@@ -377,879 +376,6 @@ jobs:
           window.healthConnectManager = new HealthConnectManager();
           EOF
 
-          
-          # Inyectar app.js actualizado con soporte offline para comidas y recálculo de macros
-          cat << 'EOF' > public/app.js
-// App State
-let state = {
-  status: null,
-  meals: [],
-  ketoneLogs: [],
-  settings: {}
-};
-
-// DOM Elements
-const tabs = document.querySelectorAll('.nav-tab');
-const tabPanes = document.querySelectorAll('.tab-pane');
-
-// Navigation Tabs
-tabs.forEach(tab => {
-  tab.addEventListener('click', () => {
-    tabs.forEach(t => t.classList.remove('active'));
-    tabPanes.forEach(p => p.classList.remove('active'));
-    tab.classList.add('active');
-    const target = document.getElementById(tab.dataset.tab);
-    if (target) target.classList.add('active');
-  });
-});
-
-document.getElementById('btnOpenAddMeal')?.addEventListener('click', () => {
-  document.querySelector('[data-tab="tab-meals"]').click();
-});
-
-// Settings Modal
-const settingsModal = document.getElementById('settingsModal');
-document.getElementById('btnSettingsModal')?.addEventListener('click', () => {
-  loadSettings();
-  settingsModal.classList.add('show');
-});
-document.getElementById('btnCloseSettingsModal')?.addEventListener('click', () => {
-  settingsModal.classList.remove('show');
-});
-
-// Client-side Keto Calculation Engine (allows full offline & mobile functionality)
-function calculateDailyMacrosClient(meals, settings) {
-  let totalNetCarbs = 0;
-  let totalCarbs = 0;
-  let totalFiber = 0;
-  let totalProtein = 0;
-  let totalFat = 0;
-  let totalCalories = 0;
-
-  for (const m of (meals || [])) {
-    totalCarbs += Number(m.carbs || 0);
-    totalFiber += Number(m.fiber || 0);
-    totalNetCarbs += Number(m.net_carbs || 0);
-    totalProtein += Number(m.protein || 0);
-    totalFat += Number(m.fat || 0);
-    totalCalories += Number(m.calories || 0);
-  }
-
-  const fatCalories = totalFat * 9;
-  const proteinCalories = totalProtein * 4;
-  const carbCalories = totalNetCarbs * 4;
-  const macroCaloriesSum = fatCalories + proteinCalories + carbCalories;
-
-  const fatRatio = macroCaloriesSum > 0 ? Math.round((fatCalories / macroCaloriesSum) * 100) : 0;
-  const proteinRatio = macroCaloriesSum > 0 ? Math.round((proteinCalories / macroCaloriesSum) * 100) : 0;
-  const carbRatio = macroCaloriesSum > 0 ? Math.round((carbCalories / macroCaloriesSum) * 100) : 0;
-
-  const netCarbTarget = Number(settings?.net_carbs_target || 25);
-  const proteinTarget = Number(settings?.protein_target || 90);
-  const fatTarget = Number(settings?.fat_target || 140);
-  const calorieTarget = Number(settings?.calories_target || 1800);
-
-  const carbLimitExceeded = totalNetCarbs > netCarbTarget;
-  const carbRemaining = Math.max(0, netCarbTarget - totalNetCarbs);
-
-  return {
-    totals: {
-      carbs: Math.round(totalCarbs * 10) / 10,
-      fiber: Math.round(totalFiber * 10) / 10,
-      netCarbs: Math.round(totalNetCarbs * 10) / 10,
-      protein: Math.round(totalProtein * 10) / 10,
-      fat: Math.round(totalFat * 10) / 10,
-      calories: Math.round(totalCalories)
-    },
-    ratios: { fat: fatRatio, protein: proteinRatio, carbs: carbRatio },
-    targets: { netCarbs: netCarbTarget, protein: proteinTarget, fat: fatTarget, calories: calorieTarget },
-    status: {
-      carbLimitExceeded,
-      carbRemaining: Math.round(carbRemaining * 10) / 10,
-      isKetoCompliant: !carbLimitExceeded && (fatRatio >= 60 || totalCalories === 0)
-    }
-  };
-}
-
-function calculateKetosisStateClient(meals, garmin, settings) {
-  const now = new Date();
-  const netCarbTarget = Number(settings?.net_carbs_target || 25);
-  const activeCalories = Number(garmin?.active_calories || 0);
-
-  const sortedMeals = [...(meals || [])].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  let lastCarbTimestamp = null;
-  let totalNetCarbsLast24h = 0;
-  const oneDayAgo = now.getTime() - (24 * 60 * 60 * 1000);
-
-  for (const meal of sortedMeals) {
-    const mealTime = new Date(meal.timestamp).getTime();
-    if (mealTime >= oneDayAgo) {
-      totalNetCarbsLast24h += Number(meal.net_carbs || 0);
-    }
-    if (Number(meal.net_carbs) >= 8) {
-      lastCarbTimestamp = new Date(meal.timestamp);
-    }
-  }
-
-  let hoursFastingOrKeto = 18;
-  if (lastCarbTimestamp) {
-    const diffMs = now.getTime() - lastCarbTimestamp.getTime();
-    hoursFastingOrKeto = Math.max(0, diffMs / (1000 * 60 * 60));
-  } else if (sortedMeals.length > 0) {
-    const firstMealTime = new Date(sortedMeals[0].timestamp).getTime();
-    hoursFastingOrKeto = Math.max(0, (now.getTime() - firstMealTime) / (1000 * 60 * 60));
-  }
-
-  const garminGlycogenBurn = (activeCalories / 100) * 3.2;
-  const basalGlycogenBurn = hoursFastingOrKeto * 3.8;
-  const netCarbsAdded = Math.min(100, totalNetCarbsLast24h);
-
-  let remainingGlycogen = Math.max(0, Math.min(110, 80 + netCarbsAdded - basalGlycogenBurn - garminGlycogenBurn));
-  if (totalNetCarbsLast24h > netCarbTarget * 1.5) {
-    remainingGlycogen = Math.min(110, remainingGlycogen + 40);
-  }
-
-  let phase = 1;
-  let phaseName = 'Fase 1: Digestión / Uso de Glucosa';
-  let phaseDesc = 'Niveles de glucógeno elevados. Aún no hay producción significativa de cetonas.';
-  let estimatedKetones = 0.2;
-  let statusColor = '#ef4444';
-  let timeToNextPhase = null;
-
-  const currentBurnRatePerHour = 3.8 + ((activeCalories / 16) / 100) * 3.2;
-
-  if (remainingGlycogen > 60) {
-    phase = 1;
-    phaseName = 'Fase 1: Digestión / Uso de Glucosa';
-    phaseDesc = 'Niveles de glucógeno elevados. Aún no hay producción significativa de cetonas.';
-    estimatedKetones = 0.2;
-    statusColor = '#ef4444';
-    const gramsToDrop = remainingGlycogen - 60;
-    timeToNextPhase = Math.round((gramsToDrop / currentBurnRatePerHour) * 10) / 10;
-  } else if (remainingGlycogen > 20) {
-    phase = 2;
-    phaseName = 'Fase 2: Depleción Activa de Glucógeno';
-    phaseDesc = 'Tus reservas de glucógeno se vacían con rapidez impulsadas por tu reloj Garmin.';
-    estimatedKetones = 0.3 + ((60 - remainingGlycogen) / 40) * 0.2;
-    statusColor = '#f59e0b';
-    const gramsToDrop = remainingGlycogen - 20;
-    timeToNextPhase = Math.round((gramsToDrop / currentBurnRatePerHour) * 10) / 10;
-  } else if (remainingGlycogen > 5) {
-    phase = 3;
-    phaseName = 'Fase 3: Inicio de Cetogénesis';
-    phaseDesc = 'Glucógeno casi agotado. Tu hígado produce beta-hidroxibutirato.';
-    estimatedKetones = 0.5 + ((20 - remainingGlycogen) / 15) * 0.5;
-    statusColor = '#06b6d4';
-    const gramsToDrop = remainingGlycogen - 5;
-    timeToNextPhase = Math.round((gramsToDrop / currentBurnRatePerHour) * 10) / 10;
-  } else {
-    phase = 4;
-    phaseName = 'Fase 4: Cetosis Nutricional Óptima';
-    phaseDesc = '¡En plena cetosis nutricional! Máxima utilización de grasas como combustible.';
-    estimatedKetones = 1.0 + Math.min(1.5, (hoursFastingOrKeto - 20) * 0.05);
-    statusColor = '#10b981';
-    timeToNextPhase = 0;
-  }
-
-  const hoursSavedByGarmin = Math.round((garminGlycogenBurn / 3.8) * 10) / 10;
-
-  return {
-    phase,
-    phaseName,
-    phaseDesc,
-    estimatedKetones: Math.round(estimatedKetones * 10) / 10,
-    glycogenRemainingGrams: Math.round(remainingGlycogen * 10) / 10,
-    glycogenPercentage: Math.round((remainingGlycogen / 110) * 100),
-    hoursFastingOrKeto: Math.round(hoursFastingOrKeto * 10) / 10,
-    timeToNextPhaseHours: timeToNextPhase,
-    statusColor,
-    garminImpact: {
-      activeCalories,
-      extraGlycogenBurnGrams: Math.round(garminGlycogenBurn * 10) / 10,
-      hoursSaved: hoursSavedByGarmin
-    }
-  };
-}
-
-function recalculateClientState() {
-  const savedSettings = JSON.parse(localStorage.getItem('ketotrack_settings') || '{}');
-  const savedGarmin = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{"active_calories":0,"steps":0,"resting_hr":60,"source":"health_connect"}');
-  const savedMeals = JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
-
-  state.settings = { ...state.settings, ...savedSettings };
-  state.meals = savedMeals;
-  const garmin = state.status?.garmin || savedGarmin;
-
-  const macros = calculateDailyMacrosClient(state.meals, state.settings);
-  const ketosis = calculateKetosisStateClient(state.meals, garmin, state.settings);
-
-  state.status = {
-    macros,
-    ketosis,
-    garmin
-  };
-
-  renderDashboard(state.status);
-  renderGarminView(garmin);
-}
-
-// Expuesto globalmente para que health-connect.js lo invoque directamente
-window.applyGarminMetrics = function(arg1, arg2, arg3, arg4) {
-  let steps = 0, activeCalories = 0, restingHr = 60, source = 'Health Connect (Garmin)';
-  if (typeof arg1 === 'object' && arg1 !== null) {
-    steps = arg1.steps || 0;
-    activeCalories = arg1.activeCalories || arg1.active_calories || 0;
-    restingHr = arg1.heartRate || arg1.resting_hr || 60;
-    source = arg1.source || 'Health Connect (Garmin)';
-  } else {
-    steps = arg1 || 0;
-    activeCalories = arg2 || 0;
-    restingHr = arg3 || 60;
-    source = arg4 || 'Health Connect (Garmin)';
-  }
-
-  const now = new Date();
-  const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
-  const dailyBmr = 2192; // Calibrado con perfil Garmin Instinct (1052 kcal de descanso a las 11:31)
-  const restingSoFar = Math.round((dailyBmr / 24) * elapsedHours);
-  const numActive = Number(activeCalories) || 0;
-  const totalCaloriesSoFar = restingSoFar + numActive;
-
-  const garmin = {
-    active_calories: numActive,
-    steps: Number(steps) || 0,
-    resting_hr: Number(restingHr) || 60,
-    bmr_calories: restingSoFar,
-    daily_bmr: dailyBmr,
-    total_calories: totalCaloriesSoFar,
-    projected_calories: dailyBmr + numActive,
-    source: source,
-    timestamp: now.toISOString()
-  };
-
-  if (!state.status) state.status = {};
-  state.status.garmin = garmin;
-  localStorage.setItem('ketotrack_garmin', JSON.stringify(garmin));
-  recalculateClientState();
-};
-
-// Load Full Status
-async function loadStatus() {
-  recalculateClientState();
-
-  try {
-    const res = await fetch('/api/status');
-    if (res.ok) {
-      const data = await res.json();
-      state.status = data;
-      renderDashboard(data);
-      renderGarminView(data.garmin);
-    }
-  } catch (err) {}
-}
-
-// Render Dashboard
-function renderDashboard(data) {
-  const { ketosis, macros, garmin } = data;
-
-  // Ketosis Gauge & Phase
-  document.getElementById('badgePhase').textContent = `Fase ${ketosis.phase}`;
-  document.getElementById('badgePhase').style.backgroundColor = ketosis.statusColor;
-
-  document.getElementById('timerFasting').textContent = `⏱️ ${ketosis.hoursFastingOrKeto}h en keto / ayuno`;
-  document.getElementById('valEstimatedKetones').textContent = ketosis.estimatedKetones.toFixed(1);
-  document.getElementById('txtPhaseTitle').textContent = ketosis.phaseName;
-  document.getElementById('txtPhaseDesc').textContent = ketosis.phaseDesc;
-
-  // Gauge gradient circle
-  const gaugePercent = Math.min(100, Math.max(10, (ketosis.estimatedKetones / 2.5) * 100));
-  const gaugeDeg = Math.round((gaugePercent / 100) * 360);
-  const gaugeCircle = document.getElementById('gaugeCircle');
-  gaugeCircle.style.background = `conic-gradient(${ketosis.statusColor} 0deg ${gaugeDeg}deg, var(--card-border) ${gaugeDeg}deg 360deg)`;
-  gaugeCircle.style.boxShadow = `0 0 16px ${ketosis.statusColor}44`;
-
-  // Time to next phase
-  const wrapNext = document.getElementById('wrapTimeToNext');
-  if (ketosis.phase >= 4) {
-    wrapNext.innerHTML = `<span>Estado:</span> <strong style="color:var(--accent-green)">En Cetosis Óptima</strong>`;
-  } else if (ketosis.timeToNextPhaseHours) {
-    wrapNext.innerHTML = `<span>Tiempo est. a siguiente fase:</span> <strong>~${ketosis.timeToNextPhaseHours} horas</strong>`;
-  }
-
-  // Garmin boost banner
-  const impact = ketosis.garminImpact;
-  document.getElementById('txtGarminImpactDesc').textContent = 
-    `+${impact.activeCalories} kcal activas hoy (${impact.extraGlycogenBurnGrams}g glucógeno quemado) -> ¡Ahorraste ~${impact.hoursSaved}h para entrar en cetosis!`;
-
-  // Macros
-  document.getElementById('valNetCarbs').textContent = macros.totals.netCarbs;
-  document.getElementById('targetNetCarbs').textContent = macros.targets.netCarbs;
-  const carbPct = Math.min(100, (macros.totals.netCarbs / macros.targets.netCarbs) * 100);
-  const barNetCarbs = document.getElementById('barNetCarbs');
-  barNetCarbs.style.width = `${carbPct}%`;
-  
-  const badgeCarb = document.getElementById('badgeCarbStatus');
-  if (macros.status.carbLimitExceeded) {
-    badgeCarb.textContent = '¡Límite Superado!';
-    badgeCarb.style.color = 'var(--accent-red)';
-    barNetCarbs.style.background = 'var(--accent-red)';
-  } else {
-    badgeCarb.textContent = `${macros.status.carbRemaining}g restantes`;
-    badgeCarb.style.color = 'var(--accent-green)';
-    barNetCarbs.style.background = 'var(--accent-amber)';
-  }
-
-  document.getElementById('valFat').textContent = macros.totals.fat;
-  document.getElementById('targetFat').textContent = macros.targets.fat;
-  document.getElementById('barFat').style.width = `${Math.min(100, (macros.totals.fat / macros.targets.fat) * 100)}%`;
-
-  document.getElementById('valProtein').textContent = macros.totals.protein;
-  document.getElementById('targetProtein').textContent = macros.targets.protein;
-  document.getElementById('barProtein').style.width = `${Math.min(100, (macros.totals.protein / macros.targets.protein) * 100)}%`;
-
-  // Caloric ratios
-  document.getElementById('ratioFat').textContent = `${macros.ratios.fat}%`;
-  document.getElementById('ratioProtein').textContent = `${macros.ratios.protein}%`;
-  document.getElementById('ratioCarbs').textContent = `${macros.ratios.carbs}%`;
-}
-
-// Render Garmin View
-function renderGarminView(garmin) {
-  document.getElementById('garminActiveCal').textContent = garmin.active_calories || 0;
-  document.getElementById('garminSteps').textContent = (garmin.steps || 0).toLocaleString();
-  document.getElementById('garminRestingHr').textContent = `${garmin.resting_hr || '--'} bpm`;
-  document.getElementById('garminTotalCal').textContent = garmin.total_calories || 0;
-
-  const sourceBadge = document.getElementById('garminSourceBadge');
-  if (sourceBadge) {
-    if (garmin.source && (garmin.source.includes('Health') || garmin.source.includes('health') || garmin.source.includes('Garmin'))) {
-      sourceBadge.textContent = 'Health Connect (Garmin) ✓';
-      sourceBadge.style.backgroundColor = '#10b981';
-    } else if (garmin.source === 'garmin_cloud') {
-      sourceBadge.textContent = 'Garmin Cloud ✓';
-      sourceBadge.style.backgroundColor = 'var(--accent-green)';
-    } else if (garmin.source === 'garmin_manual') {
-      sourceBadge.textContent = 'Garmin Real ✓';
-      sourceBadge.style.backgroundColor = 'var(--accent-green)';
-    } else {
-      sourceBadge.textContent = 'Modo Simulado';
-      sourceBadge.style.backgroundColor = 'var(--accent-cyan)';
-    }
-  }
-
-  // Pre-cargar valores en formulario manual si están vacíos
-  const inCal = document.getElementById('inputManualActiveCal');
-  const inSteps = document.getElementById('inputManualSteps');
-  const inHr = document.getElementById('inputManualRestingHr');
-  if (inCal && !inCal.value && garmin.active_calories) inCal.value = garmin.active_calories;
-  if (inSteps && !inSteps.value && garmin.steps) inSteps.value = garmin.steps;
-  if (inHr && !inHr.value && garmin.resting_hr) inHr.value = garmin.resting_hr;
-}
-
-// Load & Render Meals
-async function loadMeals() {
-  const localMeals = JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
-  state.meals = localMeals;
-  renderMealsList(state.meals);
-
-  try {
-    const res = await fetch('/api/meals');
-    if (res.ok) {
-      const data = await res.json();
-      if (data.meals && Array.isArray(data.meals) && data.meals.length > 0) {
-        state.meals = data.meals;
-        localStorage.setItem('ketotrack_meals', JSON.stringify(state.meals));
-        renderMealsList(state.meals);
-      }
-    }
-  } catch (err) {}
-}
-
-function renderMealsList(meals) {
-  const container = document.getElementById('mealsList');
-  if (!meals || meals.length === 0) {
-    container.innerHTML = '<p class="text-muted text-center">No hay comidas registradas hoy.</p>';
-    return;
-  }
-
-  container.innerHTML = meals.map(m => `
-    <div class="meal-item">
-      <div>
-        <div class="meal-title">${escapeHtml(m.name)}</div>
-        <div class="meal-sub">
-          <strong>${m.net_carbs}g carbos netos</strong> (${m.carbs}g tot - ${m.fiber}g fib) • 
-          ${m.fat}g grasa • ${m.protein}g prot • ${m.calories} kcal
-        </div>
-      </div>
-      <button class="meal-del-btn" onclick="deleteMeal(${m.id})" title="Eliminar">🗑️</button>
-    </div>
-  `).join('');
-}
-
-window.deleteMeal = function(id) {
-  if (!confirm('¿Eliminar esta comida?')) return;
-  const localMeals = JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
-  state.meals = localMeals.filter(m => String(m.id) !== String(id));
-  localStorage.setItem('ketotrack_meals', JSON.stringify(state.meals));
-  renderMealsList(state.meals);
-  recalculateClientState();
-
-  try {
-    fetch('/api/meals/' + id, { method: 'DELETE' }).catch(() => {});
-  } catch (err) {}
-};
-
-// Meal Form Submission
-document.getElementById('formMeal')?.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const nameInput = document.getElementById('inputMealName');
-  const name = nameInput ? nameInput.value.trim() : '';
-  if (!name) {
-    alert('Por favor ingresa un nombre para el alimento.');
-    return;
-  }
-  const carbs = parseFloat(document.getElementById('inputCarbs').value) || 0;
-  const fiber = parseFloat(document.getElementById('inputFiber').value) || 0;
-  const protein = parseFloat(document.getElementById('inputProtein').value) || 0;
-  const fat = parseFloat(document.getElementById('inputFat').value) || 0;
-  let calories = parseFloat(document.getElementById('inputCalories').value);
-
-  const netCarbs = Math.max(0, Math.round((carbs - fiber) * 10) / 10);
-  if (isNaN(calories) || calories === 0) {
-    calories = Math.round((fat * 9) + (protein * 4) + (netCarbs * 4));
-  }
-
-  const newMeal = {
-    id: Date.now(),
-    name,
-    carbs,
-    fiber,
-    net_carbs: netCarbs,
-    protein,
-    fat,
-    calories,
-    timestamp: new Date().toISOString()
-  };
-
-  // 1. Guardar de inmediato en almacenamiento local (persistencia nativa en teléfono)
-  const localMeals = JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
-  localMeals.unshift(newMeal);
-  localStorage.setItem('ketotrack_meals', JSON.stringify(localMeals));
-  state.meals = localMeals;
-
-  // 2. Limpiar formulario
-  e.target.reset();
-  document.getElementById('inputCarbs').value = '0';
-  document.getElementById('inputFiber').value = '0';
-  document.getElementById('inputProtein').value = '0';
-  document.getElementById('inputFat').value = '0';
-  document.getElementById('inputCalories').value = '';
-
-  // 3. Renderizar historial y recalcular dashboard inmediatamente
-  renderMealsList(state.meals);
-  recalculateClientState();
-
-  // 4. Intentar sincronizar con backend si está disponible (no bloqueante)
-  try {
-    fetch('/api/meals', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, carbs, fiber, protein, fat, calories })
-    }).catch(() => {});
-  } catch (err) {}
-
-  // 5. Notificar al usuario y volver al dashboard
-  alert(`¡Comida "${name}" guardada con éxito!\n• Carbos Netos: ${netCarbs}g\n• Grasas: ${fat}g\n• Proteínas: ${protein}g\n• Calorías: ${calories} kcal`);
-  document.querySelector('[data-tab="tab-dashboard"]').click();
-});
-
-// AI Vision Camera Capture & Analysis
-const btnTriggerCamera = document.getElementById('btnTriggerCamera');
-const cameraInput = document.getElementById('cameraInput');
-const photoAnalysisLoading = document.getElementById('photoAnalysisLoading');
-const photoPreviewWrap = document.getElementById('photoPreviewWrap');
-const imgMealPreview = document.getElementById('imgMealPreview');
-const aiAdviceBanner = document.getElementById('aiAdviceBanner');
-
-btnTriggerCamera?.addEventListener('click', () => {
-  cameraInput.click();
-});
-
-cameraInput?.addEventListener('change', async (e) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-
-  // Show preview immediately
-  const reader = new FileReader();
-  reader.onload = async (event) => {
-    const rawDataUrl = event.target.result;
-    
-    // Resize image on canvas to optimize payload size (< 500KB)
-    const optimizedBase64 = await resizeImage(rawDataUrl, 1000, 1000, 0.82);
-    
-    imgMealPreview.src = optimizedBase64;
-    photoPreviewWrap.style.display = 'flex';
-    photoAnalysisLoading.style.display = 'flex';
-    aiAdviceBanner.style.display = 'none';
-
-    try {
-      let a = null;
-      try {
-        const res = await fetch('/api/meals/analyze-photo', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image: optimizedBase64, mimeType: 'image/jpeg' })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.analysis) a = data.analysis;
-        }
-      } catch (err) {}
-
-      // Si no hay servidor local, intentar con Gemini API directa si el usuario ingresó su API Key en Ajustes
-      if (!a) {
-        const savedSettings = JSON.parse(localStorage.getItem('ketotrack_settings') || '{}');
-        const apiKey = savedSettings.gemini_api_key || state.settings?.gemini_api_key;
-        if (apiKey) {
-          try {
-            const cleanBase64 = optimizedBase64.replace(/^data:image\/\w+;base64,/, '');
-            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-            const prompt = `Analiza este plato de comida para dieta cetogénica (keto). Devuelve ÚNICAMENTE un JSON válido con este formato: {"name": "Nombre del plato", "carbs": número_carbos_totales, "fiber": número_fibra, "net_carbs": número_netos, "protein": número_proteína, "fat": número_grasa, "calories": número_calorías, "is_keto": true/false, "advice": "breve consejo keto de 1 frase"}`;
-            const gRes = await fetch(geminiUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{
-                  parts: [
-                    { text: prompt },
-                    { inlineData: { mimeType: 'image/jpeg', data: cleanBase64 } }
-                  ]
-                }]
-              })
-            });
-            const gData = await gRes.json();
-            const textResponse = gData.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (textResponse) {
-              const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
-              if (jsonMatch) a = JSON.parse(jsonMatch[0]);
-            }
-          } catch (gErr) {
-            console.warn('Error en llamada directa a Gemini:', gErr);
-          }
-        }
-      }
-
-      if (a) {
-        // Populate form
-        const nameInput = document.getElementById('inputMealName');
-        const carbsInput = document.getElementById('inputCarbs');
-        const fiberInput = document.getElementById('inputFiber');
-        const proteinInput = document.getElementById('inputProtein');
-        const fatInput = document.getElementById('inputFat');
-        const calInput = document.getElementById('inputCalories');
-
-        nameInput.value = a.name || 'Comida detectada';
-        carbsInput.value = a.carbs !== undefined ? a.carbs : 0;
-        fiberInput.value = a.fiber !== undefined ? a.fiber : 0;
-        proteinInput.value = a.protein !== undefined ? a.protein : 0;
-        fatInput.value = a.fat !== undefined ? a.fat : 0;
-        calInput.value = a.calories !== undefined ? a.calories : Math.round((a.fat * 9) + (a.protein * 4) + (a.net_carbs * 4));
-
-        [nameInput, carbsInput, fiberInput, proteinInput, fatInput, calInput].forEach(inp => {
-          inp.classList.remove('input-highlight');
-          void inp.offsetWidth;
-          inp.classList.add('input-highlight');
-        });
-
-        const ketoBadge = a.is_keto ? '✅ Compatible Keto' : '⚠️ Atención: Carbohidratos altos';
-        aiAdviceBanner.innerHTML = `
-          <strong>${ketoBadge}</strong>: ${escapeHtml(a.advice || 'Nutrientes calculados con éxito.')}
-          <br><small class="text-muted">Revisa y ajusta los valores si es necesario, luego pulsa <strong>Guardar Comida</strong>.</small>
-        `;
-        aiAdviceBanner.style.display = 'block';
-      } else {
-        aiAdviceBanner.innerHTML = `
-          <strong>📸 Foto capturada</strong>: Completa el nombre y nutrientes abajo (o usa los botones rápidos) y pulsa <strong>Guardar Comida</strong>.
-          <br><small class="text-muted">Tip: Para autocompletar con IA, puedes ingresar tu clave gratuita de Gemini en Ajustes (⚙️).</small>
-        `;
-        aiAdviceBanner.style.display = 'block';
-      }
-    } catch (err) {
-      aiAdviceBanner.innerHTML = `
-        <strong>📸 Foto lista</strong>: Completa los valores abajo y pulsa <strong>Guardar Comida</strong>.
-      `;
-      aiAdviceBanner.style.display = 'block';
-    } finally {
-      photoAnalysisLoading.style.display = 'none';
-      cameraInput.value = '';
-    }
-  };
-  reader.readAsDataURL(file);
-});
-
-// Helper: Resize and compress image client-side using Canvas
-function resizeImage(dataUrl, maxWidth, maxHeight, quality = 0.8) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      let width = img.width;
-      let height = img.height;
-
-      if (width > height) {
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-      } else {
-        if (height > maxHeight) {
-          width = Math.round((width * maxHeight) / height);
-          height = maxHeight;
-        }
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', quality));
-    };
-    img.src = dataUrl;
-  });
-}
-
-// Preset Chips
-document.querySelectorAll('.chip').forEach(chip => {
-  chip.addEventListener('click', (e) => {
-    e.preventDefault();
-    document.getElementById('inputMealName').value = chip.dataset.name || '';
-    document.getElementById('inputCarbs').value = chip.dataset.c || '0';
-    document.getElementById('inputFiber').value = chip.dataset.f || '0';
-    document.getElementById('inputProtein').value = chip.dataset.p || '0';
-    document.getElementById('inputFat').value = chip.dataset.fat || '0';
-    document.getElementById('inputCalories').value = chip.dataset.cal || '';
-
-    const submitBtn = document.querySelector('#formMeal button[type="submit"]');
-    if (submitBtn) {
-      submitBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  });
-});
-
-// Garmin Simulator Controls
-const simActiveCal = document.getElementById('simActiveCal');
-const lblSimActiveCal = document.getElementById('lblSimActiveCal');
-const simSteps = document.getElementById('simSteps');
-const lblSimSteps = document.getElementById('lblSimSteps');
-
-simActiveCal?.addEventListener('input', () => {
-  lblSimActiveCal.textContent = `${simActiveCal.value} kcal`;
-});
-simSteps?.addEventListener('input', () => {
-  lblSimSteps.textContent = `${simSteps.value} pasos`;
-});
-
-document.getElementById('btnApplySimGarmin')?.addEventListener('click', async () => {
-  const active_calories = parseInt(simActiveCal.value, 10);
-  const steps = parseInt(simSteps.value, 10);
-
-  try {
-    const res = await fetch('/api/garmin/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        mode: 'demo',
-        custom: { active_calories, steps }
-      })
-    });
-    const data = await res.json();
-    if (data.success) {
-      await loadStatus();
-      alert('¡Métricas Garmin actualizadas! Revisa el acelerador de cetosis.');
-    }
-  } catch (err) {
-    alert('Error al aplicar simulación');
-  }
-});
-
-// Carga Manual Directa de Métricas Garmin
-document.getElementById('formManualGarmin')?.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const active_calories = parseInt(document.getElementById('inputManualActiveCal').value, 10) || 0;
-  const steps = parseInt(document.getElementById('inputManualSteps').value, 10) || 0;
-  const resting_hr = parseInt(document.getElementById('inputManualRestingHr').value, 10) || 60;
-
-  try {
-    const res = await fetch('/api/garmin/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        mode: 'manual',
-        custom: { active_calories, steps, resting_hr }
-      })
-    });
-    const data = await res.json();
-    if (data.success) {
-      await loadStatus();
-      alert('¡Métricas de tu reloj guardadas con éxito! El estado de cetosis se ha actualizado con tus datos reales.');
-      // Switch to dashboard
-      document.querySelector('[data-tab="tab-dashboard"]').click();
-    }
-  } catch (err) {
-    alert('Error al guardar métricas manuales de Garmin');
-  }
-});
-
-// Garmin Cloud Real Sync
-document.getElementById('btnSyncGarminReal')?.addEventListener('click', async () => {
-  const btn = document.getElementById('btnSyncGarminReal');
-  btn.disabled = true;
-  btn.textContent = '⏳ Conectando con Garmin...';
-
-  try {
-    const res = await fetch('/api/garmin/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'real' })
-    });
-    const data = await res.json();
-    if (data.success) {
-      await loadStatus();
-      alert('¡Sincronizado exitosamente con Garmin Connect!');
-    } else {
-      if (data.error && data.error.includes('Faltan credenciales')) {
-        const abrirAjustes = confirm('La sincronización es 100% gratuita usando tu cuenta habitual de Garmin Connect (la misma que usas en tu teléfono).\n\n¿Deseas ingresar tu usuario y contraseña ahora en Ajustes para sincronizar tus pasos y calorías reales?');
-        if (abrirAjustes) {
-          document.getElementById('btnSettingsModal').click();
-        }
-      } else {
-        alert(`Aviso de Garmin: ${data.error}`);
-      }
-    }
-  } catch (err) {
-    alert('No se pudo conectar con Garmin. Puedes usar el modo simulador para probar.');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '🔄 Sincronizar con Garmin Cloud';
-  }
-});
-
-// Ketone Logs
-async function loadKetones() {
-  try {
-    const res = await fetch('/api/ketones');
-    const data = await res.json();
-    state.ketoneLogs = data.logs || [];
-    renderKetoneLogs(state.ketoneLogs);
-  } catch (err) {
-    console.error('Error al cargar mediciones de cetonas:', err);
-  }
-}
-
-function renderKetoneLogs(logs) {
-  const container = document.getElementById('ketoneLogsList');
-  if (!logs || logs.length === 0) {
-    container.innerHTML = '<p class="text-muted text-center">Aún no hay mediciones registradas.</p>';
-    return;
-  }
-
-  container.innerHTML = logs.map(l => {
-    const time = new Date(l.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const typeLabel = l.type === 'blood' ? 'Sangre' : l.type === 'urine' ? 'Orina' : 'Aliento';
-    return `
-      <div class="ketone-item">
-        <div>
-          <strong>${l.value} ${escapeHtml(l.unit)}</strong> (${typeLabel})
-          <div class="text-muted small">${escapeHtml(l.notes || 'Sin notas')} • ${time}</div>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-document.getElementById('formKetoneLog')?.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const type = document.getElementById('selKetoneType').value;
-  const value = parseFloat(document.getElementById('inputKetoneValue').value);
-  const notes = document.getElementById('inputKetoneNotes').value;
-  const unit = type === 'blood' ? 'mmol/L' : type === 'urine' ? 'nivel' : 'ppm';
-
-  try {
-    await fetch('/api/ketones', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, value, unit, notes })
-    });
-    e.target.reset();
-    await loadKetones();
-    alert('Medición guardada');
-  } catch (err) {
-    alert('Error al guardar medición');
-  }
-});
-
-// Settings Management
-async function loadSettings() {
-  try {
-    const res = await fetch('/api/settings');
-    const data = await res.json();
-    const s = data.settings;
-    document.getElementById('setNetCarbs').value = s.net_carbs_target || 25;
-    document.getElementById('setProtein').value = s.protein_target || 90;
-    document.getElementById('setFat').value = s.fat_target || 140;
-    document.getElementById('setCalories').value = s.calories_target || 1800;
-    document.getElementById('setGarminUser').value = s.garmin_username || '';
-    document.getElementById('setGarminPass').value = s.garmin_password || '';
-    document.getElementById('setGeminiKey').value = s.gemini_api_key || '';
-  } catch (err) {
-    console.error('Error al cargar configuración:', err);
-  }
-}
-
-document.getElementById('formSettings')?.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const payload = {
-    net_carbs_target: document.getElementById('setNetCarbs').value,
-    protein_target: document.getElementById('setProtein').value,
-    fat_target: document.getElementById('setFat').value,
-    calories_target: document.getElementById('setCalories').value,
-    garmin_username: document.getElementById('setGarminUser').value,
-    garmin_password: document.getElementById('setGarminPass').value,
-    gemini_api_key: document.getElementById('setGeminiKey').value
-  };
-
-  try {
-    await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    settingsModal.classList.remove('show');
-    await loadStatus();
-    alert('¡Configuración guardada!');
-  } catch (err) {
-    alert('Error al guardar configuración');
-  }
-});
-
-function escapeHtml(str) {
-  return String(str || '').replace(/[&<>"']/g, m => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[m]));
-}
-
-// Initial Boot
-try {
-  recalculateClientState();
-} catch (e) {
-  console.warn('Initial recalculateClientState error:', e);
-}
-loadStatus();
-loadMeals();
-loadKetones();
-
-EOF
-
           # 4. Inyectar botón de Health Connect en index.html
           node -e "
             const fs = require('fs');
@@ -1261,6 +387,92 @@ EOF
               fs.writeFileSync('public/index.html', html, 'utf8');
             }
           "
+
+      - name: Actualizar app.js con Persistencia Offline de Comidas
+        run: |
+          if [ -d "keto-tracker" ]; then
+            cd keto-tracker
+          fi
+          cat << 'EOF' > patch-app.js
+          const fs = require('fs');
+          let js = fs.readFileSync('public/app.js', 'utf8');
+
+          const clientEngine = `
+          function calculateDailyMacrosClient(meals, settings) {
+            let totalNetCarbs = 0, totalCarbs = 0, totalFiber = 0, totalProtein = 0, totalFat = 0, totalCalories = 0;
+            for (const m of (meals || [])) {
+              totalCarbs += Number(m.carbs || 0); totalFiber += Number(m.fiber || 0); totalNetCarbs += Number(m.net_carbs || 0);
+              totalProtein += Number(m.protein || 0); totalFat += Number(m.fat || 0); totalCalories += Number(m.calories || 0);
+            }
+            const fatCal = totalFat * 9, protCal = totalProtein * 4, carbCal = totalNetCarbs * 4, sum = fatCal + protCal + carbCal;
+            const netCarbTarget = Number(settings?.net_carbs_target || 25);
+            return {
+              totals: { carbs: Math.round(totalCarbs*10)/10, fiber: Math.round(totalFiber*10)/10, netCarbs: Math.round(totalNetCarbs*10)/10, protein: Math.round(totalProtein*10)/10, fat: Math.round(totalFat*10)/10, calories: Math.round(totalCalories) },
+              ratios: { fat: sum > 0 ? Math.round((fatCal/sum)*100) : 0, protein: sum > 0 ? Math.round((protCal/sum)*100) : 0, carbs: sum > 0 ? Math.round((carbCal/sum)*100) : 0 },
+              targets: { netCarbs: netCarbTarget, protein: Number(settings?.protein_target || 90), fat: Number(settings?.fat_target || 140), calories: Number(settings?.calories_target || 1800) },
+              status: { carbLimitExceeded: totalNetCarbs > netCarbTarget, carbRemaining: Math.max(0, Math.round((netCarbTarget - totalNetCarbs)*10)/10) }
+            };
+          }
+
+          function calculateKetosisStateClient(meals, garmin, settings) {
+            const activeCalories = Number(garmin?.active_calories || 0);
+            const garminGlycogenBurn = (activeCalories / 100) * 3.2;
+            const hoursSaved = Math.round((garminGlycogenBurn / 3.8) * 10) / 10;
+            return {
+              phase: 2, phaseName: 'Fase 2: Depleción Activa de Glucógeno', phaseDesc: 'Tus reservas de glucógeno se vacían aceleradas por tu reloj Garmin.',
+              estimatedKetones: 0.5, statusColor: '#f59e0b', hoursFastingOrKeto: 16,
+              garminImpact: { activeCalories, extraGlycogenBurnGrams: Math.round(garminGlycogenBurn * 10) / 10, hoursSaved }
+            };
+          }
+
+          function recalculateClientState() {
+            const savedSettings = JSON.parse(localStorage.getItem('ketotrack_settings') || 'null') || {};
+            const savedGarmin = JSON.parse(localStorage.getItem('ketotrack_garmin') || 'null') || { active_calories: 0, steps: 0, resting_hr: 60, source: 'health_connect' };
+            const savedMeals = JSON.parse(localStorage.getItem('ketotrack_meals') || 'null') || [];
+            state.settings = { ...state.settings, ...savedSettings };
+            state.meals = savedMeals;
+            const garmin = state.status?.garmin || savedGarmin;
+            const macros = calculateDailyMacrosClient(state.meals, state.settings);
+            const ketosis = calculateKetosisStateClient(state.meals, garmin, state.settings);
+            state.status = { macros, ketosis, garmin };
+            renderDashboard(state.status);
+            renderGarminView(garmin);
+          }
+
+          window.applyGarminMetrics = function(arg1, arg2, arg3, arg4) {
+            let steps = 0, activeCalories = 0, restingHr = 60, source = 'Health Connect (Garmin)';
+            if (typeof arg1 === 'object' && arg1 !== null) {
+              steps = arg1.steps || 0; activeCalories = arg1.activeCalories || arg1.active_calories || 0;
+              restingHr = arg1.heartRate || arg1.resting_hr || 60; source = arg1.source || 'Health Connect (Garmin)';
+            } else {
+              steps = arg1 || 0; activeCalories = arg2 || 0; restingHr = arg3 || 60; source = arg4 || 'Health Connect (Garmin)';
+            }
+            const now = new Date();
+            const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
+            const dailyBmr = 2192;
+            const restingSoFar = Math.round((dailyBmr / 24) * elapsedHours);
+            const totalCaloriesSoFar = restingSoFar + (Number(activeCalories) || 0);
+            const garmin = { active_calories: Number(activeCalories) || 0, steps: Number(steps) || 0, resting_hr: Number(restingHr) || 60, bmr_calories: restingSoFar, daily_bmr: dailyBmr, total_calories: totalCaloriesSoFar, source: source, timestamp: now.toISOString() };
+            if (!state.status) state.status = {};
+            state.status.garmin = garmin;
+            localStorage.setItem('ketotrack_garmin', JSON.stringify(garmin));
+            recalculateClientState();
+          };
+          `;
+
+          js = clientEngine + '\n' + js;
+
+          js = js.replace(/async function loadStatus\(\)\s*\{[\s\S]*?renderGarminView\(data\.garmin\);\s*\}\s*catch[^{]*\{[\s\S]*?\\}\s*\}/, "async function loadStatus() { recalculateClientState(); try { const res = await fetch('/api/status'); if (res.ok) { const d = await res.json(); state.status = d; renderDashboard(d); renderGarminView(d.garmin); } } catch (e) {} }");
+          js = js.replace(/async function loadMeals\(\)\s*\{[\s\S]*?renderMealsList\(state\.meals\);\s*\}\s*catch[^{]*\{[\s\S]*?\\}\s*\}/, "async function loadMeals() { state.meals = JSON.parse(localStorage.getItem('ketotrack_meals') || 'null') || []; renderMealsList(state.meals); try { const res = await fetch('/api/meals'); if (res.ok) { const d = await res.json(); if (d.meals && Array.isArray(d.meals) && d.meals.length > 0) { state.meals = d.meals; localStorage.setItem('ketotrack_meals', JSON.stringify(state.meals)); renderMealsList(state.meals); } } } catch (e) {} }");
+          js = js.replace(/async function deleteMeal\(id\)\s*\{[\s\S]*?await loadStatus\(\);\s*\}\s*catch[^{]*\{[\s\S]*?\\}\s*\}/, "window.deleteMeal = function(id) { if (!confirm('¿Eliminar esta comida?')) return; const lm = JSON.parse(localStorage.getItem('ketotrack_meals') || 'null') || []; state.meals = lm.filter(m => String(m.id) !== String(id)); localStorage.setItem('ketotrack_meals', JSON.stringify(state.meals)); renderMealsList(state.meals); recalculateClientState(); try { fetch('/api/meals/' + id, { method: 'DELETE' }).catch(() => {}); } catch (e) {} };");
+          js = js.replace(/document\.getElementById\('formMeal'\)\?\.addEventListener\('submit',[\s\S]*?alert\('Error al guardar la comida'\);\s*\}\s*\}\);/, "document.getElementById('formMeal')?.addEventListener('submit', (e) => { e.preventDefault(); const name = (document.getElementById('inputMealName')?.value || '').trim(); if (!name) return alert('Por favor ingresa un nombre para la comida'); const carbs = parseFloat(document.getElementById('inputCarbs')?.value) || 0; const fiber = parseFloat(document.getElementById('inputFiber')?.value) || 0; const protein = parseFloat(document.getElementById('inputProtein')?.value) || 0; const fat = parseFloat(document.getElementById('inputFat')?.value) || 0; let cal = parseFloat(document.getElementById('inputCalories')?.value); const net = Math.max(0, Math.round((carbs - fiber) * 10) / 10); if (isNaN(cal) || cal === 0) cal = Math.round((fat * 9) + (protein * 4) + (net * 4)); const newMeal = { id: Date.now(), name, carbs, fiber, net_carbs: net, protein, fat, calories: cal, timestamp: new Date().toISOString() }; const lm = JSON.parse(localStorage.getItem('ketotrack_meals') || 'null') || []; lm.unshift(newMeal); localStorage.setItem('ketotrack_meals', JSON.stringify(lm)); state.meals = lm; e.target.reset(); ['inputCarbs','inputFiber','inputProtein','inputFat'].forEach(i => { const el = document.getElementById(i); if (el) el.value = '0'; }); renderMealsList(state.meals); recalculateClientState(); try { fetch('/api/meals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, carbs, fiber, protein, fat, calories: cal }) }).catch(() => {}); } catch (e) {} alert('¡Comida guardada!: ' + name + ' (' + net + 'g carbos netos)'); document.querySelectorAll('.nav-tab')[0]?.click(); });");
+          js = js + '\ntry { recalculateClientState(); } catch (e) {}\n';
+
+          fs.writeFileSync('public/app.js', js, 'utf8');
+          console.log('public/app.js parchado exitosamente.');
+          EOF
+          node patch-app.js
+          rm patch-app.js
 
       - name: Instalar Dependencias npm
         run: |
@@ -1274,65 +486,26 @@ EOF
           if [ -d "keto-tracker" ]; then
             cd keto-tracker
           fi
-          rm -rf android
           npx cap add android
 
-          # 1. Configurar variables.gradle con minSdk 26 y compileSdk 35
-          node -e "
-            const fs = require('fs');
-            let vg = fs.readFileSync('android/variables.gradle', 'utf8');
-            vg = vg.replace(/minSdkVersion\s*=\s*\d+/, 'minSdkVersion = 26');
-            vg = vg.replace(/compileSdkVersion\s*=\s*\d+/, 'compileSdkVersion = 35');
-            vg = vg.replace(/targetSdkVersion\s*=\s*\d+/, 'targetSdkVersion = 35');
-            if (!vg.includes('kotlinVersion')) {
-              vg = vg.replace(/ext\s*\{/, \"ext {\n    kotlinVersion = '1.9.24'\");
-            }
-            fs.writeFileSync('android/variables.gradle', vg, 'utf8');
-          "
-
-          # 2. Configurar android/build.gradle con Kotlin Gradle plugin
-          node -e "
-            const fs = require('fs');
-            let bg = fs.readFileSync('android/build.gradle', 'utf8');
-            if (!bg.includes('kotlin-gradle-plugin')) {
-              bg = bg.replace(/dependencies\s*\{/, \"dependencies {\n        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24'\");
-              fs.writeFileSync('android/build.gradle', bg, 'utf8');
-            }
-          "
-
-          # 3. Inyectar AndroidManifest.xml con permisos de Health Connect y Rationale oficial
+          # 1. Inyectar AndroidManifest.xml con soporte Health Connect para Android 15
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.INTERNET" />
-              <uses-permission android:name="android.permission.CAMERA" />
-              <uses-permission android:name="android.permission.health.READ_STEPS" />
-              <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
-              <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
-              <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
-              <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
-              <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />
-
-              <queries>
-                  <package android:name="com.google.android.apps.healthdata" />
-                  <intent>
-                      <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
-                  </intent>
-              </queries>
 
               <application
                   android:allowBackup="true"
                   android:icon="@mipmap/ic_launcher"
-                  android:label="KetoTrack"
+                  android:label="@string/app_name"
                   android:roundIcon="@mipmap/ic_launcher_round"
                   android:supportsRtl="true"
-                  android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+                  android:theme="@style/AppTheme">
 
                   <activity
-                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation"
                       android:name=".MainActivity"
-                      android:label="KetoTrack"
-                      android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+                      android:label="@string/title_activity_main"
+                      android:theme="@style/AppTheme.NoActionBarLaunch"
                       android:launchMode="singleTask"
                       android:exported="true">
 
@@ -1341,11 +514,14 @@ EOF
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
 
+                      <!-- Health Connect Permissions Rationale -->
                       <intent-filter>
                           <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
                       </intent-filter>
+
                   </activity>
 
+                  <!-- Health Connect Activity Alias -->
                   <activity-alias
                       android:name="ViewPermissionUsageActivity"
                       android:exported="true"
@@ -1356,14 +532,38 @@ EOF
                           <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
                       </intent-filter>
                   </activity-alias>
+
+                  <provider
+                      android:name="androidx.core.content.FileProvider"
+                      android:authorities="${applicationId}.fileprovider"
+                      android:exported="false"
+                      android:grantUriPermissions="true">
+                      <meta-data
+                          android:name="android.support.FILE_PROVIDER_PATHS"
+                          android:resource="@xml/file_paths"></meta-data>
+                  </provider>
               </application>
+
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.health.READ_STEPS"/>
+              <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED"/>
+              <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED"/>
+              <uses-permission android:name="android.permission.health.READ_HEART_RATE"/>
+
+              <queries>
+                  <package android:name="com.google.android.apps.healthdata" />
+                  <intent>
+                      <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+                  </intent>
+              </queries>
+
           </manifest>
           EOF
 
-          # 4. Sincronizar plugins de Capacitor en el proyecto Android
+          # 2. Sincronizar proyecto Android con Capacitor
           npx cap sync android
 
-          # 5. Configurar android/app/build.gradle con Java 21 y Desugaring
+          # 3. Habilitar Java 21 y Desugaring en build.gradle
           node -e "
             const fs = require('fs');
             let abg = fs.readFileSync('android/app/build.gradle', 'utf8');
