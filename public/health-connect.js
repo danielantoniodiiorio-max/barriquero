@@ -96,12 +96,19 @@ class HealthConnectManager {
         return false;
       }
 
-      this.updateUIStatus('Solicitando permisos a Android 15...');
-      await this.plugin.requestAuthorization({
-        read: ['steps', 'calories', 'heartRate', 'restingHeartRate', 'weight'],
-        write: [],
-        requestHistoryAccess: true
-      });
+      this.updateUIStatus('Solicitando permisos a Google Health Connect...');
+      try {
+        await this.plugin.requestAuthorization({
+          read: ['steps', 'calories', 'heartRate', 'weight'],
+          write: []
+        });
+      } catch (authErr) {
+        console.warn('Fallo con permisos ampliados, solicitando pasos y calorías:', authErr);
+        await this.plugin.requestAuthorization({
+          read: ['steps', 'calories'],
+          write: []
+        });
+      }
 
       this.updateUIStatus('Permisos concedidos. Leyendo métricas de Garmin...');
       await this.syncFromHealthConnect();
@@ -159,29 +166,18 @@ class HealthConnectManager {
         activeCalories = Math.round(steps * 0.0342);
       }
 
-      // 3. Leer frecuencia cardíaca en reposo
+      // 3. Leer frecuencia cardíaca de Garmin
       let restingHr = 60;
       try {
-        const rhrRes = await this.plugin.readSamples({
-          dataType: 'restingHeartRate',
+        const hrRes = await this.plugin.readSamples({
+          dataType: 'heartRate',
           startDate: startOfDay.toISOString(),
           endDate: now.toISOString(),
-          limit: 1,
+          limit: 10,
           ascending: false
         });
-        if (rhrRes && rhrRes.samples && rhrRes.samples.length > 0) {
-          restingHr = Math.round(rhrRes.samples[0].value || 60);
-        } else {
-          const hrRes = await this.plugin.readSamples({
-            dataType: 'heartRate',
-            startDate: startOfDay.toISOString(),
-            endDate: now.toISOString(),
-            limit: 1,
-            ascending: false
-          });
-          if (hrRes && hrRes.samples && hrRes.samples.length > 0) {
-            restingHr = Math.round(hrRes.samples[0].value || 60);
-          }
+        if (hrRes && hrRes.samples && hrRes.samples.length > 0) {
+          restingHr = Math.round(hrRes.samples[0].value || 60);
         }
       } catch (e) {
         console.warn('Error leyendo ritmo cardíaco:', e);

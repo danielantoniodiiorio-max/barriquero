@@ -36,6 +36,7 @@ tabs.forEach(tab => {
 
 document.getElementById('btnOpenAddMeal')?.addEventListener('click', () => {
   document.querySelector('[data-tab="tab-meals"]')?.click();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
 // Settings Modal
