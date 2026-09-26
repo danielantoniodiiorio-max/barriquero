@@ -121,6 +121,45 @@ class HealthConnectManager {
     }
   }
 
+  /**
+   * Extrae de forma estricta las métricas de Garmin evitando sumar múltiples fuentes
+   * (Google Fit, Samsung Health o podómetro del teléfono) que duplican o triplican los pasos.
+   */
+  extractGarminMetric(samples) {
+    if (!Array.isArray(samples) || samples.length === 0) return 0;
+
+    // 1. Filtrar por Garmin Connect (paquete com.garmin.android.apps.connectmobile o dispositivo Garmin)
+    const garminSamples = samples.filter(s => {
+      const src = ((s.sourceId || '') + ' ' + (s.sourceName || '')).toLowerCase();
+      return src.includes('garmin') || src.includes('connectmobile');
+    });
+
+    const targetList = garminSamples.length > 0 ? garminSamples : null;
+
+    if (targetList) {
+      // Deduplicar registros con mismo rango de tiempo para evitar sumas duplicadas
+      const seenRanges = new Set();
+      let total = 0;
+      for (const s of targetList) {
+        const key = (s.startDate || '') + '_' + (s.endDate || '');
+        if (key && seenRanges.has(key)) continue;
+        if (key) seenRanges.add(key);
+        total += Number(s.value) || 0;
+      }
+      return Math.round(total);
+    }
+
+    // 2. Si no hay etiqueta explícita de Garmin, agrupar por origen único y tomar el origen principal (NUNCA sumarlos todos juntos)
+    const bySource = {};
+    for (const s of samples) {
+      const src = s.sourceId || s.sourceName || 'default';
+      bySource[src] = (bySource[src] || 0) + (Number(s.value) || 0);
+    }
+
+    const sourceTotals = Object.values(bySource);
+    return Math.round(Math.max(0, ...sourceTotals));
+  }
+
   async syncFromHealthConnect() {
     this.plugin = this.getPlugin();
     if (!this.plugin) return;
@@ -129,55 +168,67 @@ class HealthConnectManager {
       const now = new Date();
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
 
-      // 1. Leer pasos de hoy
+      // 1. Leer pasos de hoy (Filtrado estricto para Garmin Connect)
       let steps = 0;
       try {
         const stepsRes = await this.plugin.readSamples({
           dataType: 'steps',
           startDate: startOfDay.toISOString(),
           endDate: now.toISOString(),
-          limit: 2000
+          limit: 3000
         });
         if (stepsRes && Array.isArray(stepsRes.samples)) {
-          steps = Math.round(stepsRes.samples.reduce((acc, s) => acc + (Number(s.value) || 0), 0));
+          steps = this.extractGarminMetric(stepsRes.samples);
         }
       } catch (e) {
         console.warn('Error leyendo pasos:', e);
       }
 
-      // 2. Leer calorías activas
+      // 2. Leer calorías activas (Filtrado estricto para Garmin Connect)
       let activeCalories = 0;
       try {
         const calRes = await this.plugin.readSamples({
           dataType: 'calories',
           startDate: startOfDay.toISOString(),
           endDate: now.toISOString(),
-          limit: 1500
+          limit: 2000
         });
         if (calRes && Array.isArray(calRes.samples) && calRes.samples.length > 0) {
-          activeCalories = Math.round(calRes.samples.reduce((acc, s) => acc + (Number(s.value) || 0), 0));
+          activeCalories = this.extractGarminMetric(calRes.samples);
         }
       } catch (e) {
         console.warn('Error leyendo calorías activas:', e);
       }
 
-      // Calibración exacta para Garmin Instinct (34.2 kcal por cada 1000 pasos)
+      // Si Garmin no exportó muestras de calorías activas en Health Connect,
+      // calcular con el factor real verificado de Garmin (~31.84 kcal por cada 1.000 pasos: 27.015 pasos = 860 kcal)
       if (activeCalories === 0 && steps > 0) {
-        activeCalories = Math.round(steps * 0.0342);
+        activeCalories = Math.round(steps * 0.03184);
       }
 
-      // 3. Leer frecuencia cardíaca de Garmin
-      let restingHr = 60;
+      // 3. Leer frecuencia cardíaca en reposo de Garmin
+      let restingHr = 52;
       try {
         const hrRes = await this.plugin.readSamples({
           dataType: 'heartRate',
           startDate: startOfDay.toISOString(),
           endDate: now.toISOString(),
-          limit: 10,
+          limit: 100,
           ascending: false
         });
-        if (hrRes && hrRes.samples && hrRes.samples.length > 0) {
-          restingHr = Math.round(hrRes.samples[0].value || 60);
+        if (hrRes && Array.isArray(hrRes.samples) && hrRes.samples.length > 0) {
+          const gHr = hrRes.samples.filter(s => {
+            const src = ((s.sourceId || '') + ' ' + (s.sourceName || '')).toLowerCase();
+            return src.includes('garmin') || src.includes('connectmobile');
+          });
+          const pool = gHr.length > 0 ? gHr : hrRes.samples;
+          const bpmValues = pool.map(s => Number(s.value)).filter(v => v >= 38 && v <= 180);
+          if (bpmValues.length > 0) {
+            bpmValues.sort((a, b) => a - b);
+            // El RHR (resting heart rate) corresponde a los valores más bajos en reposo del día
+            const lowIdx = Math.min(2, bpmValues.length - 1);
+            restingHr = Math.round(bpmValues[lowIdx]);
+          }
         }
       } catch (e) {
         console.warn('Error leyendo ritmo cardíaco:', e);
