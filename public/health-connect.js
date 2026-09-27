@@ -271,23 +271,48 @@ class HealthConnectManager {
       const now = new Date();
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
 
-      // Ventana de consulta amplia (24h antes del inicio del día hasta 4h en el futuro)
-      // para evitar desfases de huso horario UTC o truncamiento de intervalos activos
-      const queryStart = new Date(startOfDay.getTime() - 24 * 60 * 60 * 1000).toISOString();
-      const queryEnd = new Date(now.getTime() + 4 * 60 * 60 * 1000).toISOString();
+      // Consultar la jornada de hoy (desde las 00:00:00 local hasta 2h en el futuro para tolerancia horaria)
+      const queryStart = startOfDay.toISOString();
+      const queryEnd = new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString();
 
       let steps = 0;
       let stepsDiagnostic = null;
       let stepsError = null;
 
+      // Lector resiliente para Health Connect
+      const safeReadSamples = async (dataType, startIso, endIso, limit = 5000) => {
+        try {
+          return await this.plugin.readSamples({
+            dataType,
+            startDate: startIso,
+            endDate: endIso,
+            limit
+          });
+        } catch (err) {
+          const errMsg = (err && (err.message || String(err))) || '';
+          console.warn(`safeReadSamples ${dataType} arrojó: ${errMsg}`);
+          // Si el rango contiene un intervalo con count < 1 (inactividad en reposo),
+          // consultar la ventana más reciente (últimas 4 horas) para rescatar los intervalos activos del día
+          if (errMsg.includes('count must not be less than 1') || errMsg.includes('IllegalArgumentException')) {
+            try {
+              const recentStart = new Date(Math.max(startOfDay.getTime(), now.getTime() - 4 * 60 * 60 * 1000)).toISOString();
+              return await this.plugin.readSamples({
+                dataType,
+                startDate: recentStart,
+                endDate: endIso,
+                limit
+              });
+            } catch (errRecent) {
+              console.warn(`Fallback reciente para ${dataType} arrojó:`, errRecent);
+            }
+          }
+          throw err;
+        }
+      };
+
       // 1. Leer Pasos de Hoy
       try {
-        const stepsRes = await this.plugin.readSamples({
-          dataType: 'steps',
-          startDate: queryStart,
-          endDate: queryEnd,
-          limit: 5000
-        });
+        const stepsRes = await safeReadSamples('steps', queryStart, queryEnd, 5000);
         if (stepsRes && Array.isArray(stepsRes.samples)) {
           stepsDiagnostic = this.extractMetric(stepsRes.samples, now);
           steps = stepsDiagnostic.value;
@@ -305,12 +330,7 @@ class HealthConnectManager {
       let activeCalories = 0;
       let calError = null;
       try {
-        const calRes = await this.plugin.readSamples({
-          dataType: 'calories',
-          startDate: queryStart,
-          endDate: queryEnd,
-          limit: 3000
-        });
+        const calRes = await safeReadSamples('calories', queryStart, queryEnd, 3000);
         if (calRes && Array.isArray(calRes.samples) && calRes.samples.length > 0) {
           const calDiag = this.extractMetric(calRes.samples, now);
           activeCalories = calDiag.value;
@@ -398,7 +418,7 @@ class HealthConnectManager {
 
       // 6. Mensaje de Estado Claro e Informativo para el Usuario
       if (stepsError) {
-        this.updateUIStatus('⚠️ Error de Health Connect: ' + stepsError + '. Toca "Sincronizar Ahora" para conceder permisos.');
+        this.updateUIStatus('⚠️ Error al leer pasos: ' + stepsError + ' (Toca para reintentar o ver diagnóstico)');
       } else if (steps > 0) {
         const garminTag = (stepsDiagnostic && stepsDiagnostic.garminFound) ? 'de Garmin' : 'de Health Connect';
         this.updateUIStatus('Sincronizado: ' + timeStr + ' • ' + steps.toLocaleString() + ' pasos y ' + activeCalories + ' kcal ' + garminTag + ' ✓ (toca para detalles)');

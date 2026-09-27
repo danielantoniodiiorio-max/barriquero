@@ -27,6 +27,13 @@ jobs:
         run: |
           npm install
 
+      - name: Aplicar Parche Nativo a Health Connect (Bypass Error Count < 1)
+        run: |
+          echo "Aplicando HealthManager.kt resiliente a @capgo/capacitor-health..."
+          cp patches/HealthManager.kt node_modules/@capgo/capacitor-health/android/src/main/java/app/capgo/plugin/health/HealthManager.kt
+          echo "Verificando aplicacion del parche:"
+          head -n 25 node_modules/@capgo/capacitor-health/android/src/main/java/app/capgo/plugin/health/HealthManager.kt
+
       - name: Configurar Proyecto Android y Permisos
         run: |
           rm -rf android
