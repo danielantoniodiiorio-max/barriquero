@@ -1,4 +1,4 @@
-﻿name: Compilar APK Android (KetoTrack)
+name: Compilar APK Android (KetoTrack)
 on: [push, workflow_dispatch]
 
 jobs:
