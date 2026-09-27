@@ -4,6 +4,8 @@ jobs:
   build:
     name: Compilar APK Android 15 con Health Connect
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Descargar Código del Repositorio
         uses: actions/checkout@v4
@@ -8115,3 +8117,16 @@ jobs:
             android/app/build/outputs/apk/debug/app-debug.apk
             keto-tracker/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 14
+
+      - name: Publicar APK Directo en Releases (Sin ZIP)
+        uses: softprops/action-gh-release@v2
+        continue-on-error: true
+        with:
+          tag_name: latest
+          name: "KetoTrack APK (Última Versión)"
+          body: "Descarga directa del APK para tu celular Android con Health Connect, Garmin y reconocimiento IA de comidas."
+          files: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            keto-tracker/android/app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
