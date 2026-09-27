@@ -2834,4 +2834,143 @@ body.modal-open .app-bottom-nav,
   width: 100% !important;
 }
 
+/* ==========================================================================
+   SISTEMA DE CENTRADO, SIMETRÍA Y RESPONSIVIDAD TOTAL (PC Y MÓVIL)
+   ========================================================================== */
+
+/* 1. Centrado absoluto del contenedor en cualquier pantalla (PC / Móvil) */
+.app-container {
+  margin-left: auto !important;
+  margin-right: auto !important;
+  box-sizing: border-box !important;
+}
+
+/* 2. Pestañas y tarjetas con ancho simétrico sin desbordes */
+.tab-pane {
+  width: 100% !important;
+  max-width: 500px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  box-sizing: border-box !important;
+  padding-left: 16px !important;
+  padding-right: 16px !important;
+}
+
+.card {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding: 18px !important;
+  overflow: hidden !important;
+}
+
+/* 3. Rejilla de Formularios (Comidas, Peso, Cetonas) con simetría perfecta */
+.form-grid {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 12px !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+.form-group {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* 4. Inputs uniformes que jamás exceden el ancho de su columna */
+.form-group input,
+.form-group select {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 10px 12px !important;
+  font-size: 0.88rem !important;
+}
+
+/* 5. Centrado estético de números y etiquetas en métricas de macros */
+.form-grid .form-group:not(.full-width) label {
+  text-align: center !important;
+  display: block !important;
+  font-size: 0.74rem !important;
+}
+
+.form-grid .form-group:not(.full-width) input[type="number"] {
+  text-align: center !important;
+  font-weight: 700 !important;
+  font-size: 1rem !important;
+  letter-spacing: 0.5px !important;
+}
+
+/* Calorías autocalculadas centradas */
+#inputCalories {
+  text-align: center !important;
+  font-weight: 600 !important;
+}
+
+.form-group:has(#inputCalories) label {
+  text-align: center !important;
+}
+
+/* 6. Botones de acción perfectamente centrados y simétricos */
+.btn.full-width,
+button[type="submit"].full-width,
+.btn-ai-calc {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+/* 7. Mensaje vacío de comidas centradas con espaciado balanceado */
+.meals-list-card .meals-list {
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.meals-list-card .meals-list p.text-muted {
+  text-align: center !important;
+  padding: 22px 14px !important;
+  margin: 0 auto !important;
+}
+
+/* 8. Dock de navegación inferior: iconos y textos centrados en cada botón */
+.app-bottom-nav .nav-tab {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  min-width: 0 !important;
+}
+
+.app-bottom-nav .nav-tab-label {
+  text-align: center !important;
+  display: block !important;
+}
+
+
 
