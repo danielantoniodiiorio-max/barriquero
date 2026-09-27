@@ -1,5 +1,5 @@
 /**
- * Cliente de Sincronización Automática con Google Health Connect (Android 15)
+ * Cliente de Sincronización Automática con Google Health Connect (Android 14 y 15)
  * Lee pasos, calorías activas, ritmo cardíaco y peso directamente de Garmin a través de Health Connect.
  */
 
@@ -7,6 +7,17 @@ class HealthConnectManager {
   constructor() {
     this.isNative = false;
     this.plugin = null;
+    this.lastDiagnostics = {
+      timestamp: null,
+      permissions: null,
+      stepsFound: 0,
+      stepsValue: 0,
+      stepsSources: [],
+      caloriesValue: 0,
+      restingHr: null,
+      weightValue: null,
+      errors: {}
+    };
     this.init();
   }
 
@@ -37,7 +48,7 @@ class HealthConnectManager {
     this.bindUI();
 
     if (this.isNative) {
-      console.log('📱 Modo Nativo Android detectado. Verificando Health Connect...');
+      console.log('📱 Modo Nativo Android detectado. Iniciando Health Connect...');
       this.updateUIStatus('Modo Nativo Android detectado. Sincronizando con Garmin...');
       setTimeout(async () => {
         this.plugin = this.getPlugin();
@@ -55,9 +66,19 @@ class HealthConnectManager {
       btnConnect.addEventListener('click', async () => {
         btnConnect.disabled = true;
         btnConnect.textContent = '⏳ Sincronizando...';
-        await this.requestPermissionAndSync();
+        await this.requestPermissionAndSync(false);
         btnConnect.disabled = false;
         btnConnect.innerHTML = '🔄 Sincronizar Ahora';
+      });
+    }
+
+    // Permitir ver diagnóstico tocando el texto de estado
+    const statusTextEl = document.getElementById('healthConnectStatusText');
+    if (statusTextEl) {
+      statusTextEl.style.cursor = 'pointer';
+      statusTextEl.title = 'Toca para ver el diagnóstico de Health Connect';
+      statusTextEl.addEventListener('click', () => {
+        this.showDiagnosticsModal();
       });
     }
   }
@@ -65,17 +86,43 @@ class HealthConnectManager {
   async setupAutoSync() {
     await this.requestPermissionAndSync(true);
 
+    // Auto-sincronizar al volver a la app (ej. después de sincronizar en Garmin Connect)
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) {
         this.syncFromHealthConnect();
       }
     });
 
+    // Periódicamente cada 3 minutos
     setInterval(() => {
       if (!document.hidden) {
         this.syncFromHealthConnect();
       }
     }, 3 * 60 * 1000);
+  }
+
+  async checkPermissions() {
+    this.plugin = this.getPlugin();
+    if (!this.plugin || typeof this.plugin.checkAuthorization !== 'function') {
+      return { authorized: false, missing: ['steps', 'calories', 'heartRate', 'weight'] };
+    }
+
+    try {
+      const res = await this.plugin.checkAuthorization({
+        read: ['steps', 'calories', 'heartRate', 'weight'],
+        write: []
+      });
+      const granted = res.readAuthorized || [];
+      const denied = res.readDenied || [];
+      return {
+        authorized: denied.length === 0,
+        granted,
+        denied
+      };
+    } catch (e) {
+      console.warn('Error al verificar autorización de Health Connect:', e);
+      return { authorized: false, granted: [], denied: ['steps', 'calories', 'heartRate', 'weight'], error: e.message };
+    }
   }
 
   async requestPermissionAndSync(isSilent = false) {
@@ -96,21 +143,33 @@ class HealthConnectManager {
         return false;
       }
 
-      this.updateUIStatus('Solicitando permisos a Google Health Connect...');
-      try {
-        await this.plugin.requestAuthorization({
-          read: ['steps', 'calories', 'heartRate', 'weight'],
-          write: []
-        });
-      } catch (authErr) {
-        console.warn('Fallo con permisos ampliados, solicitando pasos y calorías:', authErr);
-        await this.plugin.requestAuthorization({
-          read: ['steps', 'calories'],
-          write: []
-        });
+      // 1. Verificar si ya tenemos permisos concedidos
+      const authCheck = await this.checkPermissions();
+      this.lastDiagnostics.permissions = authCheck;
+
+      if (!authCheck.authorized) {
+        if (!isSilent) {
+          this.updateUIStatus('Solicitando permisos a Google Health Connect...');
+        }
+        try {
+          await this.plugin.requestAuthorization({
+            read: ['steps', 'calories', 'heartRate', 'weight'],
+            write: []
+          });
+        } catch (authErr) {
+          console.warn('Error en requestAuthorization con conjunto completo:', authErr);
+          try {
+            await this.plugin.requestAuthorization({
+              read: ['steps', 'calories', 'heartRate'],
+              write: []
+            });
+          } catch (authErr2) {
+            console.warn('Error en fallback de requestAuthorization:', authErr2);
+          }
+        }
       }
 
-      this.updateUIStatus('Permisos concedidos. Leyendo métricas de Garmin...');
+      this.updateUIStatus('Leyendo métricas de Garmin desde Health Connect...');
       await this.syncFromHealthConnect();
       return true;
 
@@ -122,42 +181,86 @@ class HealthConnectManager {
   }
 
   /**
-   * Extrae de forma estricta las métricas de Garmin evitando sumar múltiples fuentes
-   * (Google Fit, Samsung Health o podómetro del teléfono) que duplican o triplican los pasos.
+   * Extrae métricas de Garmin evitando sumar múltiples fuentes duplicadas
+   * y manejando tanto intervalos de tiempo (15 min) como resúmenes diarios acumulativos.
    */
-  extractGarminMetric(samples) {
-    if (!Array.isArray(samples) || samples.length === 0) return 0;
+  extractMetric(samples, now = new Date()) {
+    if (!Array.isArray(samples) || samples.length === 0) {
+      return { value: 0, count: 0, sources: [], garminFound: false };
+    }
 
-    // 1. Filtrar por Garmin Connect (paquete com.garmin.android.apps.connectmobile o dispositivo Garmin)
-    const garminSamples = samples.filter(s => {
+    // Delimitar el día local de hoy (00:00:00 a 23:59:59.999 hora del teléfono)
+    const startOfTodayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+    const endOfTodayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+
+    // 1. Filtrar registros que pertenezcan a la jornada de hoy
+    const todaySamples = samples.filter(s => {
+      const sStart = s.startDate ? new Date(s.startDate).getTime() : 0;
+      const sEnd = s.endDate ? new Date(s.endDate).getTime() : sStart;
+      return sStart <= endOfTodayMs && sEnd >= startOfTodayMs;
+    });
+
+    if (todaySamples.length === 0) {
+      return { value: 0, count: 0, sources: [], garminFound: false };
+    }
+
+    // Registrar todas las fuentes presentes
+    const sourcesFound = [...new Set(todaySamples.map(s => s.sourceName || s.sourceId || 'desconocido'))];
+
+    // 2. Filtrar por Garmin Connect (paquete com.garmin.android.apps.connectmobile o dispositivo Garmin)
+    const garminSamples = todaySamples.filter(s => {
       const src = ((s.sourceId || '') + ' ' + (s.sourceName || '')).toLowerCase();
       return src.includes('garmin') || src.includes('connectmobile');
     });
 
-    const targetList = garminSamples.length > 0 ? garminSamples : null;
+    const isGarmin = garminSamples.length > 0;
+    const targetList = isGarmin ? garminSamples : todaySamples;
 
-    if (targetList) {
-      // Deduplicar registros con mismo rango de tiempo para evitar sumas duplicadas
-      const seenRanges = new Set();
-      let total = 0;
-      for (const s of targetList) {
+    // 3. Procesar deduplicación inteligente:
+    //    Distinguir entre intervalos periódicos (< 3h) y resúmenes diarios acumulativos (>= 3h)
+    let cumulativeMax = 0;
+    let intervalSum = 0;
+    const seenIntervals = new Set();
+
+    for (const s of targetList) {
+      const val = Number(s.value) || 0;
+      if (val <= 0) continue;
+
+      const sStart = s.startDate ? new Date(s.startDate).getTime() : 0;
+      const sEnd = s.endDate ? new Date(s.endDate).getTime() : sStart;
+      const durationHours = (sEnd - sStart) / (1000 * 60 * 60);
+
+      if (durationHours >= 3) {
+        // Resumen acumulativo del día exportado por la app
+        if (val > cumulativeMax) cumulativeMax = val;
+      } else {
+        // Intervalo granular (ej. 15 minutos o 1 hora)
         const key = (s.startDate || '') + '_' + (s.endDate || '');
-        if (key && seenRanges.has(key)) continue;
-        if (key) seenRanges.add(key);
-        total += Number(s.value) || 0;
+        if (!seenIntervals.has(key)) {
+          seenIntervals.add(key);
+          intervalSum += val;
+        }
       }
-      return Math.round(total);
     }
 
-    // 2. Si no hay etiqueta explícita de Garmin, agrupar por origen único y tomar el origen principal (NUNCA sumarlos todos juntos)
-    const bySource = {};
-    for (const s of samples) {
-      const src = s.sourceId || s.sourceName || 'default';
-      bySource[src] = (bySource[src] || 0) + (Number(s.value) || 0);
+    // Si no es Garmin y hay múltiples fuentes no-Garmin, agrupar por origen para no triplicar
+    let finalValue = Math.round(Math.max(cumulativeMax, intervalSum));
+    if (!isGarmin && sourcesFound.length > 1) {
+      // Tomar el origen con mayor total
+      const bySource = {};
+      for (const s of targetList) {
+        const src = s.sourceId || s.sourceName || 'default';
+        bySource[src] = (bySource[src] || 0) + (Number(s.value) || 0);
+      }
+      finalValue = Math.round(Math.max(0, ...Object.values(bySource)));
     }
 
-    const sourceTotals = Object.values(bySource);
-    return Math.round(Math.max(0, ...sourceTotals));
+    return {
+      value: finalValue,
+      count: targetList.length,
+      sources: sourcesFound,
+      garminFound: isGarmin
+    };
   }
 
   async syncFromHealthConnect() {
@@ -168,35 +271,54 @@ class HealthConnectManager {
       const now = new Date();
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
 
-      // 1. Leer pasos de hoy (Filtrado estricto para Garmin Connect)
+      // Ventana de consulta amplia (24h antes del inicio del día hasta 4h en el futuro)
+      // para evitar desfases de huso horario UTC o truncamiento de intervalos activos
+      const queryStart = new Date(startOfDay.getTime() - 24 * 60 * 60 * 1000).toISOString();
+      const queryEnd = new Date(now.getTime() + 4 * 60 * 60 * 1000).toISOString();
+
       let steps = 0;
+      let stepsDiagnostic = null;
+      let stepsError = null;
+
+      // 1. Leer Pasos de Hoy
       try {
         const stepsRes = await this.plugin.readSamples({
           dataType: 'steps',
-          startDate: startOfDay.toISOString(),
-          endDate: now.toISOString(),
-          limit: 3000
+          startDate: queryStart,
+          endDate: queryEnd,
+          limit: 5000
         });
         if (stepsRes && Array.isArray(stepsRes.samples)) {
-          steps = this.extractGarminMetric(stepsRes.samples);
+          stepsDiagnostic = this.extractMetric(stepsRes.samples, now);
+          steps = stepsDiagnostic.value;
+          this.lastDiagnostics.stepsFound = stepsRes.samples.length;
+          this.lastDiagnostics.stepsValue = steps;
+          this.lastDiagnostics.stepsSources = stepsDiagnostic.sources;
         }
       } catch (e) {
-        console.warn('Error leyendo pasos:', e);
+        stepsError = e.message || String(e);
+        this.lastDiagnostics.errors.steps = stepsError;
+        console.error('Error leyendo pasos de Health Connect:', e);
       }
 
-      // 2. Leer calorías activas (Filtrado estricto para Garmin Connect)
+      // 2. Leer Calorías Activas de Hoy
       let activeCalories = 0;
+      let calError = null;
       try {
         const calRes = await this.plugin.readSamples({
           dataType: 'calories',
-          startDate: startOfDay.toISOString(),
-          endDate: now.toISOString(),
-          limit: 2000
+          startDate: queryStart,
+          endDate: queryEnd,
+          limit: 3000
         });
         if (calRes && Array.isArray(calRes.samples) && calRes.samples.length > 0) {
-          activeCalories = this.extractGarminMetric(calRes.samples);
+          const calDiag = this.extractMetric(calRes.samples, now);
+          activeCalories = calDiag.value;
+          this.lastDiagnostics.caloriesValue = activeCalories;
         }
       } catch (e) {
+        calError = e.message || String(e);
+        this.lastDiagnostics.errors.calories = calError;
         console.warn('Error leyendo calorías activas:', e);
       }
 
@@ -204,16 +326,17 @@ class HealthConnectManager {
       // calcular con el factor real verificado de Garmin (~31.84 kcal por cada 1.000 pasos: 27.015 pasos = 860 kcal)
       if (activeCalories === 0 && steps > 0) {
         activeCalories = Math.round(steps * 0.03184);
+        this.lastDiagnostics.caloriesValue = activeCalories;
       }
 
-      // 3. Leer frecuencia cardíaca en reposo de Garmin
-      let restingHr = 52;
+      // 3. Leer Frecuencia Cardíaca en Reposo de Garmin
+      let restingHr = 55;
       try {
         const hrRes = await this.plugin.readSamples({
           dataType: 'heartRate',
-          startDate: startOfDay.toISOString(),
-          endDate: now.toISOString(),
-          limit: 100,
+          startDate: queryStart,
+          endDate: queryEnd,
+          limit: 200,
           ascending: false
         });
         if (hrRes && Array.isArray(hrRes.samples) && hrRes.samples.length > 0) {
@@ -225,46 +348,112 @@ class HealthConnectManager {
           const bpmValues = pool.map(s => Number(s.value)).filter(v => v >= 38 && v <= 180);
           if (bpmValues.length > 0) {
             bpmValues.sort((a, b) => a - b);
-            // El RHR (resting heart rate) corresponde a los valores más bajos en reposo del día
+            // El RHR (resting heart rate) corresponde a los valores basales en reposo
             const lowIdx = Math.min(2, bpmValues.length - 1);
             restingHr = Math.round(bpmValues[lowIdx]);
+            this.lastDiagnostics.restingHr = restingHr;
           }
         }
       } catch (e) {
+        this.lastDiagnostics.errors.heartRate = e.message || String(e);
         console.warn('Error leyendo ritmo cardíaco:', e);
       }
 
-      // 4. Leer peso corporal de balanza inteligente si está disponible
+      // 4. Leer Peso Corporal si está disponible
       try {
         const weightRes = await this.plugin.readSamples({
           dataType: 'weight',
           startDate: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-          endDate: now.toISOString(),
+          endDate: queryEnd,
           limit: 1,
           ascending: false
         });
         if (weightRes && weightRes.samples && weightRes.samples.length > 0) {
-          const wKg = weightRes.samples[0].value;
-          if (window.applyGarminWeight) {
-            window.applyGarminWeight(wKg, 'Health Connect (Garmin)');
+          const wKg = Number(weightRes.samples[0].value) || 0;
+          if (wKg > 0) {
+            this.lastDiagnostics.weightValue = wKg;
+            if (window.applyGarminWeight) {
+              window.applyGarminWeight(wKg, 'Health Connect (Garmin)');
+            }
           }
         }
       } catch (e) {
+        this.lastDiagnostics.errors.weight = e.message || String(e);
         console.warn('Error leyendo peso:', e);
       }
 
-      // 5. Actualizar estado y recalcular motor de cetosis inmediatamente
+      // 5. Aplicar métricas a la aplicación y motor metabólico
+      const sourceLabel = (stepsDiagnostic && stepsDiagnostic.garminFound) 
+        ? 'Google Health Connect (Garmin)' 
+        : ((stepsDiagnostic && stepsDiagnostic.sources.length > 0) 
+            ? 'Health Connect (' + stepsDiagnostic.sources[0] + ')' 
+            : 'Google Health Connect (Garmin)');
+
       if (window.applyGarminMetrics) {
-        window.applyGarminMetrics(steps, activeCalories, restingHr, 'Google Health Connect (Garmin)');
+        window.applyGarminMetrics(steps, activeCalories, restingHr, sourceLabel);
       }
 
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      this.updateUIStatus('Sincronizado: ' + timeStr + ' • ' + steps.toLocaleString() + ' pasos y ' + activeCalories + ' kcal de Garmin.');
+      this.lastDiagnostics.timestamp = timeStr;
+
+      // 6. Mensaje de Estado Claro e Informativo para el Usuario
+      if (stepsError) {
+        this.updateUIStatus('⚠️ Error de Health Connect: ' + stepsError + '. Toca "Sincronizar Ahora" para conceder permisos.');
+      } else if (steps > 0) {
+        const garminTag = (stepsDiagnostic && stepsDiagnostic.garminFound) ? 'de Garmin' : 'de Health Connect';
+        this.updateUIStatus('Sincronizado: ' + timeStr + ' • ' + steps.toLocaleString() + ' pasos y ' + activeCalories + ' kcal ' + garminTag + ' ✓ (toca para detalles)');
+      } else {
+        // Pasos = 0: explicar la causa exacta
+        const auth = await this.checkPermissions();
+        if (auth.denied && auth.denied.includes('steps')) {
+          this.updateUIStatus('⚠️ Falta permiso de Pasos en Health Connect. Toca "Sincronizar Ahora" para activarlo.');
+        } else if (this.lastDiagnostics.stepsFound === 0) {
+          this.updateUIStatus('ℹ️ Sincronizado ' + timeStr + ': Sin pasos registrados hoy en Health Connect. Abre Garmin Connect y desliza hacia abajo para sincronizar tu reloj.');
+        } else {
+          this.updateUIStatus('Sincronizado: ' + timeStr + ' • 0 pasos y ' + activeCalories + ' kcal de Garmin. (Toca para diagnóstico)');
+        }
+      }
 
     } catch (err) {
-      console.error('Fallo en sincronización con Health Connect:', err);
+      console.error('Fallo general en sincronización con Health Connect:', err);
       this.updateUIStatus('Error al sincronizar datos: ' + (err.message || err));
     }
+  }
+
+  showDiagnosticsModal() {
+    const diag = this.lastDiagnostics;
+    const permStatus = diag.permissions 
+      ? (diag.permissions.authorized ? 'Todos concedidos ✓' : 'Denegados: ' + (diag.permissions.denied || []).join(', '))
+      : 'No verificado';
+
+    const sourcesText = (diag.stepsSources && diag.stepsSources.length > 0)
+      ? diag.stepsSources.join(', ')
+      : 'Ninguna detectada';
+
+    const errorsText = Object.keys(diag.errors).length > 0
+      ? Object.entries(diag.errors).map(([k, v]) => k + ': ' + v).join('\n')
+      : 'Ninguno ✓';
+
+    const msg = [
+      '🔍 DIAGNÓSTICO DE SINCRONIZACIÓN',
+      '─────────────────────────────',
+      '• Última sincronización: ' + (diag.timestamp || 'Nunca'),
+      '• Estado de Permisos: ' + permStatus,
+      '• Pasos detectados: ' + diag.stepsValue.toLocaleString() + ' (de ' + diag.stepsFound + ' muestras)',
+      '• Calorías Activas: ' + diag.caloriesValue + ' kcal',
+      '• Ritmo en Reposo: ' + (diag.restingHr ? diag.restingHr + ' bpm' : '--'),
+      '• Peso: ' + (diag.weightValue ? diag.weightValue + ' kg' : '--'),
+      '• Fuentes encontradas: ' + sourcesText,
+      '• Errores: ' + errorsText,
+      '─────────────────────────────',
+      '💡 SI LOS PASOS NO APARECEN:',
+      '1. Abre la app Garmin Connect en tu teléfono.',
+      '2. Desliza hacia abajo en la pantalla principal para que el reloj transfiera los pasos al teléfono.',
+      '3. En Garmin Connect > Ajustes > Health Connect, verifica que esté Activado.',
+      '4. Vuelve a KetoTrack y toca "Sincronizar Ahora".'
+    ].join('\n');
+
+    alert(msg);
   }
 
   updateUIStatus(msg) {
@@ -277,3 +466,4 @@ class HealthConnectManager {
 
 // Instancia global
 window.healthConnectManager = new HealthConnectManager();
+
