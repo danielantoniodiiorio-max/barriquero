@@ -342,7 +342,46 @@
           </div>
         </div>
 
-        
+        <!-- Desglose de Calorías Activas: Pasos vs Musculación -->
+        <div class="card" style="margin: 14px 0 16px 0; padding: 14px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <strong style="font-size: 0.95rem; color: #f8fafc;">📊 Desglose de Gasto Activo</strong>
+            <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 0.76rem;">Garmin</span>
+          </div>
+          <div id="garminActiveBreakdown">
+            <div style="display:flex; justify-content:space-between; font-size:0.83rem; color:#94a3b8; padding: 4px 0;">
+              <span>🚶‍♂️ Marcha / Pasos:</span>
+              <strong style="color:#e2e8f0;">0 kcal</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:0.83rem; color:#94a3b8; padding: 4px 0;">
+              <span>🏋️ Musculación & Entrenamientos:</span>
+              <strong style="color:#38bdf8;">0 kcal</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECCIÓN: ENTRENAMIENTOS Y MUSCULACIÓN (POR FUERA DE LOS PASOS) -->
+        <div class="card" style="margin: 16px 0; padding: 16px; background: rgba(56, 189, 248, 0.04); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 14px;">
+          <div class="section-title" style="margin-bottom: 10px;">
+            <div>
+              <h3 style="font-size: 1.05rem; margin: 0; color: #f8fafc;">🏋️ Actividades de Gimnasio / Musculación</h3>
+              <span class="sub-personal" style="color: #94a3b8; font-size: 0.8rem;">Calorías de fuerza y pesas registradas en tu reloj</span>
+            </div>
+          </div>
+          
+          <p style="font-size: 0.82rem; color: #94a3b8; line-height: 1.45; margin-bottom: 12px;">
+            Las sesiones de musculación y fuerza queman calorías intensas por frecuencia cardíaca sin generar pasos. Se suman de inmediato a tus calorías activas y al balance calórico.
+          </p>
+
+          <div id="garminExercisesList" style="margin-bottom: 14px;">
+            <!-- Renderizado dinámico de ejercicios -->
+          </div>
+
+          <button type="button" class="btn btn-outline btn-full" id="btnOpenAddExercise" style="border-color: #38bdf8; color: #38bdf8; font-weight: 600;">
+            ➕ Cargar Actividad / Musculación del Reloj
+          </button>
+        </div>
+
         <!-- WIDGET DE PASOS PARA MANTENER LA CETOSIS EN CASO DE EXCESO DE CARBOHIDRATOS -->
         <div class="steps-garmin-section" id="cardStepsKeto" style="margin: 16px 0;">
           <div class="section-title">
@@ -891,6 +930,45 @@
 
         <div class="modal-footer" style="margin-top: 14px; text-align: right;">
           <button type="button" id="btnCancelProcessModal" class="btn btn-outline">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: CARGAR ACTIVIDAD / MUSCULACIÓN DEL RELOJ GARMIN -->
+    <div id="modalGarminExercise" class="modal-backdrop">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>🏋️ Cargar Actividad de Garmin</h2>
+          <button type="button" class="btn-close" id="btnCloseExerciseModal">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 16px 20px 24px 20px;">
+          <p class="modal-desc" style="font-size: 0.86rem; color: #94a3b8; line-height: 1.45; margin-bottom: 16px;">
+            Ingresa las calorías activas registradas en tu reloj Garmin (gimnasio, musculación, pesas o cardio) para sumarlas directamente a tu balance y gasto calórico de hoy.
+          </p>
+          <form id="formGarminExercise" class="form-grid">
+            <div class="form-group full-width">
+              <label for="selectExerciseType">Tipo de Actividad</label>
+              <select id="selectExerciseType" style="width: 100%; padding: 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 8px; color: #f8fafc; font-size: 0.95rem;">
+                <option value="Musculación / Gimnasio">🏋️ Musculación / Gimnasio</option>
+                <option value="Entrenamiento de Fuerza">💪 Entrenamiento de Fuerza / Pesas</option>
+                <option value="Cardio / HIIT">🔥 Cardio / HIIT</option>
+                <option value="Ciclismo / Spinning">🚴 Ciclismo / Spinning</option>
+                <option value="Natación">🏊 Natación</option>
+                <option value="Otro Ejercicio">⚡ Otro Ejercicio</option>
+              </select>
+            </div>
+            <div class="form-group full-width">
+              <label for="inputExerciseCalories">Calorías Quemadas en el Reloj (kcal) *</label>
+              <input type="number" id="inputExerciseCalories" placeholder="Ej. 350" required min="1" max="5000">
+            </div>
+            <div class="form-group full-width">
+              <label for="inputExerciseDuration">Duración aproximada (minutos, opcional)</label>
+              <input type="number" id="inputExerciseDuration" placeholder="Ej. 45" min="1" max="600">
+            </div>
+            <button type="submit" class="btn btn-primary full-width" style="margin-top: 8px;">
+              Guardar en Garmin y Actualizar Balance
+            </button>
+          </form>
         </div>
       </div>
     </div>

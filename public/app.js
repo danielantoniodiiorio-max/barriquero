@@ -92,6 +92,145 @@ function formatDateTime(isoString) {
   return dateStr + ', ' + timeStr;
 }
 
+// Obtiene la clave de fecha local YYYY-MM-DD sin desfasaje UTC
+function getLocalDateKey(dateInput = new Date()) {
+  if (!dateInput) return new Date().toISOString().slice(0, 10);
+  const d = (typeof dateInput === 'string' || typeof dateInput === 'number') ? new Date(dateInput) : dateInput;
+  if (isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Consolida días pasados en el historial permanente (ketotrack_daily_history)
+function consolidatePastDaysIntoHistory(todayKey) {
+  const allMeals = JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
+  let history = JSON.parse(localStorage.getItem('ketotrack_daily_history') || '[]');
+  const savedGarmin = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
+  const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+  // Agrupar comidas pasadas estrictamente por su fecha local
+  const mealsByDate = {};
+  for (const m of allMeals) {
+    const dKey = getLocalDateKey(m.timestamp);
+    if (dKey < todayKey) {
+      if (!mealsByDate[dKey]) mealsByDate[dKey] = [];
+      mealsByDate[dKey].push(m);
+    }
+  }
+
+  // Recolectar todas las fechas pasadas que deben documentarse
+  const pastDates = new Set(Object.keys(mealsByDate));
+  if (savedGarmin.date && savedGarmin.date < todayKey) {
+    pastDates.add(savedGarmin.date);
+  }
+  for (const h of history) {
+    if (h.date < todayKey) pastDates.add(h.date);
+  }
+
+  const sortedPastDates = Array.from(pastDates).sort();
+
+  for (const dKey of sortedPastDates) {
+    const dayMeals = mealsByDate[dKey] || [];
+    let netCarbs = 0, fat = 0, protein = 0, calIn = 0;
+    for (const m of dayMeals) {
+      netCarbs += Number(m.net_carbs || 0);
+      fat += Number(m.fat || 0);
+      protein += Number(m.protein || 0);
+      calIn += Number(m.calories || 0);
+    }
+
+    const dObj = new Date(dKey + 'T12:00:00');
+    const dayLabel = daysOfWeek[dObj.getDay()] + ' ' + String(dObj.getDate()).padStart(2, '0') + '/' + String(dObj.getMonth() + 1).padStart(2, '0');
+
+    const existingIdx = history.findIndex(h => h.date === dKey);
+    const pastRecord = existingIdx !== -1 ? history[existingIdx] : null;
+
+    let steps = pastRecord?.steps || 0;
+    let caloriesOut = pastRecord?.calories_out || 0;
+    let activeCal = pastRecord?.active_calories || 0;
+    let exercises = pastRecord?.exercises || [];
+
+    if (savedGarmin.date === dKey) {
+      steps = Number(savedGarmin.steps || steps);
+      caloriesOut = Number(savedGarmin.total_calories || caloriesOut);
+      activeCal = Number(savedGarmin.active_calories || activeCal);
+      if (Array.isArray(savedGarmin.exercises)) exercises = savedGarmin.exercises;
+    }
+
+    const consolidatedRecord = {
+      date: dKey,
+      day_label: dayLabel,
+      steps,
+      calories_out: caloriesOut,
+      active_calories: activeCal,
+      calories_in: Math.round(calIn),
+      net_carbs: Math.round(netCarbs * 10) / 10,
+      fat: Math.round(fat * 10) / 10,
+      protein: Math.round(protein * 10) / 10,
+      ketones: pastRecord?.ketones || 0.2,
+      exercises
+    };
+
+    if (existingIdx !== -1) {
+      history[existingIdx] = consolidatedRecord;
+    } else {
+      history.push(consolidatedRecord);
+    }
+  }
+
+  history.sort((a, b) => a.date.localeCompare(b.date));
+  localStorage.setItem('ketotrack_daily_history', JSON.stringify(history));
+  return history;
+}
+
+// Verifica si cambió el día (a medianoche o apertura) y ejecuta el rollover automático
+function checkAndPerformDailyRollover() {
+  const now = new Date();
+  const todayKey = getLocalDateKey(now);
+  const lastActiveDate = localStorage.getItem('ketotrack_last_active_date');
+
+  if (!lastActiveDate) {
+    localStorage.setItem('ketotrack_last_active_date', todayKey);
+    return false;
+  }
+
+  if (lastActiveDate !== todayKey) {
+    console.log(`🌅 Rollover Diario: Cerrando ${lastActiveDate} e iniciando ${todayKey}`);
+    consolidatePastDaysIntoHistory(todayKey);
+
+    // Reiniciar métricas de Garmin si pertenecían a un día anterior
+    const savedGarmin = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
+    if (savedGarmin.date && savedGarmin.date !== todayKey) {
+      const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
+      const dailyBmr = 2192;
+      const restingSoFar = Math.round((dailyBmr / 24) * elapsedHours);
+      const freshGarmin = {
+        date: todayKey,
+        steps: 0,
+        active_calories: 0,
+        step_calories: 0,
+        exercise_calories: 0,
+        exercises: [],
+        resting_hr: savedGarmin.resting_hr || 60,
+        bmr_calories: restingSoFar,
+        daily_bmr: dailyBmr,
+        total_calories: restingSoFar,
+        source: savedGarmin.source || 'Health Connect (Garmin)',
+        timestamp: now.toISOString()
+      };
+      localStorage.setItem('ketotrack_garmin', JSON.stringify(freshGarmin));
+      if (state.status) state.status.garmin = freshGarmin;
+    }
+
+    localStorage.setItem('ketotrack_last_active_date', todayKey);
+    return true;
+  }
+
+  return false;
+}
+
 // ==========================================================================
 // 1. CÁLCULO DE MACRONUTRIENTES PERSONALIZADOS SEGÚN PESO Y EDAD
 // ==========================================================================
@@ -1474,7 +1613,11 @@ document.getElementById('btnAiCalc')?.addEventListener('click', async () => {
 // ==========================================================================
 // 3. MOTOR DE CETOSIS Y MACROS CLIENTE
 // ==========================================================================
-function calculateDailyMacrosClient(meals, settings) {
+function calculateDailyMacrosClient(meals, settings, targetDateKey = null) {
+  const targetKey = targetDateKey || getLocalDateKey(new Date());
+  // Filtrar ESTRICTAMENTE las comidas que corresponden a la fecha consultada (por defecto HOY)
+  const filteredMeals = (meals || []).filter(m => getLocalDateKey(m.timestamp) === targetKey);
+
   let totalNetCarbs = 0;
   let totalCarbs = 0;
   let totalFiber = 0;
@@ -1482,7 +1625,7 @@ function calculateDailyMacrosClient(meals, settings) {
   let totalFat = 0;
   let totalCalories = 0;
 
-  for (const m of (meals || [])) {
+  for (const m of filteredMeals) {
     totalCarbs += Number(m.carbs || 0);
     totalFiber += Number(m.fiber || 0);
     totalNetCarbs += Number(m.net_carbs || 0);
@@ -1509,6 +1652,8 @@ function calculateDailyMacrosClient(meals, settings) {
   const carbRemaining = Math.max(0, Math.round((netCarbTarget - totalNetCarbs) * 10) / 10);
 
   return {
+    date: targetKey,
+    mealCount: filteredMeals.length,
     totals: {
       carbs: Math.round(totalCarbs * 10) / 10,
       fiber: Math.round(totalFiber * 10) / 10,
@@ -1726,15 +1871,42 @@ function calculateKetosisStateClient(meals, garmin, settings) {
 }
 
 function recalculateClientState() {
+  checkAndPerformDailyRollover();
+
   const savedSettings = JSON.parse(localStorage.getItem('ketotrack_settings') || '{}');
-  const savedGarmin = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{"active_calories":0,"steps":0,"resting_hr":60,"source":"health_connect"}');
+  const savedGarmin = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
   const savedMeals = JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
 
   state.settings = { ...state.settings, ...savedSettings };
   state.meals = savedMeals;
-  const garmin = state.status?.garmin || savedGarmin;
+  
+  const todayKey = getLocalDateKey(new Date());
 
-  const macros = calculateDailyMacrosClient(state.meals, state.settings);
+  // Validar fecha de Garmin: si los datos guardados son de ayer o previos, reiniciar métricas de hoy
+  let garmin = state.status?.garmin || savedGarmin;
+  if (!garmin.date || garmin.date !== todayKey) {
+    const now = new Date();
+    const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
+    const dailyBmr = 2192;
+    const restingSoFar = Math.round((dailyBmr / 24) * elapsedHours);
+    garmin = {
+      date: todayKey,
+      active_calories: 0,
+      step_calories: 0,
+      exercise_calories: 0,
+      exercises: [],
+      steps: 0,
+      resting_hr: garmin.resting_hr || 60,
+      bmr_calories: restingSoFar,
+      daily_bmr: dailyBmr,
+      total_calories: restingSoFar,
+      source: garmin.source || 'Health Connect (Garmin)',
+      timestamp: now.toISOString()
+    };
+    localStorage.setItem('ketotrack_garmin', JSON.stringify(garmin));
+  }
+
+  const macros = calculateDailyMacrosClient(state.meals, state.settings, todayKey);
   const ketosis = calculateKetosisStateClient(state.meals, garmin, state.settings);
 
   state.status = {
@@ -1748,29 +1920,67 @@ function recalculateClientState() {
 }
 
 // Expuesto globalmente para que health-connect.js lo invoque directamente
-window.applyGarminMetrics = function(arg1, arg2, arg3, arg4) {
+window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5) {
   let steps = 0, activeCalories = 0, restingHr = 60, source = 'Health Connect (Garmin)';
+  let exercisesFromSync = null;
+
   if (typeof arg1 === 'object' && arg1 !== null) {
     steps = arg1.steps || 0;
     activeCalories = arg1.activeCalories || arg1.active_calories || 0;
     restingHr = arg1.heartRate || arg1.resting_hr || 60;
     source = arg1.source || 'Health Connect (Garmin)';
+    exercisesFromSync = arg1.exercises || null;
   } else {
     steps = arg1 || 0;
     activeCalories = arg2 || 0;
     restingHr = arg3 || 60;
     source = arg4 || 'Health Connect (Garmin)';
+    exercisesFromSync = Array.isArray(arg5) ? arg5 : null;
   }
 
   const now = new Date();
+  const todayKey = getLocalDateKey(now);
+  const currentGarmin = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
+  
+  // Mantener los ejercicios cargados previamente hoy
+  let todayExercises = (currentGarmin.date === todayKey && Array.isArray(currentGarmin.exercises)) 
+    ? [...currentGarmin.exercises] 
+    : [];
+
+  // Si la sincronización trajo ejercicios de Health Connect, incorporarlos sin duplicar
+  if (Array.isArray(exercisesFromSync)) {
+    for (const ex of exercisesFromSync) {
+      const exists = todayExercises.some(e => 
+        (e.id && e.id === ex.id) || 
+        (e.title === ex.title && Math.abs(new Date(e.time || 0) - new Date(ex.time || 0)) < 30 * 60 * 1000)
+      );
+      if (!exists) todayExercises.push(ex);
+    }
+  }
+
+  // Suma de calorías de entrenamientos / musculación / gimnasio
+  const exerciseCalSum = todayExercises.reduce((sum, e) => sum + (Number(e.calories) || 0), 0);
+  
+  // Calorías estimadas por pasos (~0.03184 kcal/paso)
+  const stepCalEstimated = Math.round((Number(steps) || 0) * 0.03184);
+
+  // Las calorías activas totales deben contemplar AMBOS: pasos + musculación/gimnasio
+  let totalActive = Math.max(Number(activeCalories) || 0, stepCalEstimated + exerciseCalSum);
+  if (totalActive === 0 && (Number(steps) > 0 || exerciseCalSum > 0)) {
+    totalActive = stepCalEstimated + exerciseCalSum;
+  }
+
   const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
   const dailyBmr = 2192; // Calibrado para Garmin Instinct
   const restingSoFar = Math.round((dailyBmr / 24) * elapsedHours);
-  const numActive = Number(activeCalories) || 0;
-  const totalCaloriesSoFar = restingSoFar + numActive;
+  const totalCaloriesSoFar = restingSoFar + totalActive;
 
   const garmin = {
-    active_calories: numActive,
+    date: todayKey,
+    active_calories: totalActive,
+    step_calories: stepCalEstimated,
+    exercise_calories: exerciseCalSum,
+    exercises: todayExercises,
     steps: Number(steps) || 0,
     resting_hr: Number(restingHr) || 60,
     bmr_calories: restingSoFar,
@@ -1792,6 +2002,54 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4) {
 
   const lastSyncGarmin = document.getElementById('garminLastSyncTime');
   if (lastSyncGarmin) lastSyncGarmin.textContent = 'Sincronizado hoy a las ' + syncTimeStr;
+};
+
+// Registrar ejercicio/musculación manualmente desde el reloj Garmin
+window.addGarminExercise = function(exercise) {
+  const now = new Date();
+  const todayKey = getLocalDateKey(now);
+  let garmin = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
+  
+  if (garmin.date !== todayKey) {
+    garmin.date = todayKey;
+    garmin.steps = 0;
+    garmin.step_calories = 0;
+    garmin.exercises = [];
+  }
+  if (!Array.isArray(garmin.exercises)) garmin.exercises = [];
+
+  const calories = Math.round(Number(exercise.calories) || 0);
+  if (calories <= 0) {
+    alert('Por favor ingresa una cantidad válida de calorías.');
+    return;
+  }
+
+  const newExercise = {
+    id: 'ex_' + Date.now(),
+    title: exercise.title || 'Musculación / Gimnasio',
+    calories: calories,
+    duration: Number(exercise.duration) || 0,
+    time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    timestamp: now.toISOString(),
+    source: 'Reloj Garmin (Manual)'
+  };
+
+  garmin.exercises.unshift(newExercise);
+  window.applyGarminMetrics(garmin);
+  syncTodayToDailyHistory();
+  renderChartsView();
+  alert('¡Entrenamiento registrado!\nSe sumaron ' + calories + ' kcal activas de tu reloj a tu gasto total de hoy.');
+};
+
+window.deleteGarminExercise = function(id) {
+  if (!confirm('¿Deseas eliminar este entrenamiento registrado?')) return;
+  const garmin = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
+  if (Array.isArray(garmin.exercises)) {
+    garmin.exercises = garmin.exercises.filter(e => String(e.id) !== String(id));
+    window.applyGarminMetrics(garmin);
+    syncTodayToDailyHistory();
+    renderChartsView();
+  }
 };
 
 
@@ -1979,7 +2237,15 @@ function renderDashboard(data) {
 
   const lblGarmin = document.getElementById('lblGarminBurned');
   if (lblGarmin) {
-    lblGarmin.textContent = '⌚ Garmin: ' + caloriesOut.toLocaleString() + ' kcal quemadas hoy';
+    const act = Number(garmin.active_calories || 0);
+    const exCal = Number(garmin.exercise_calories || 0);
+    let note = '';
+    if (exCal > 0) {
+      note = ` (${act.toLocaleString()} kcal activas: musculación + pasos)`;
+    } else if (act > 0) {
+      note = ` (${act.toLocaleString()} kcal activas)`;
+    }
+    lblGarmin.textContent = '⌚ Garmin: ' + caloriesOut.toLocaleString() + ' kcal quemadas hoy' + note;
   }
 
   const badgeCalFeedback = document.getElementById('badgeCalFeedback');
@@ -2108,15 +2374,75 @@ function renderDashboard(data) {
 // 5. RENDER GARMIN VIEW (LIMPIO, MINIMALISTA Y AUTOMATIZADO)
 // ==========================================================================
 function renderGarminView(garmin) {
-  document.getElementById('garminActiveCal').textContent = garmin.active_calories || 0;
-  document.getElementById('garminSteps').textContent = (garmin.steps || 0).toLocaleString();
-  document.getElementById('garminRestingHr').textContent = (garmin.resting_hr || '--') + ' bpm';
-  document.getElementById('garminTotalCal').textContent = garmin.total_calories || 0;
+  const activeCal = Number(garmin.active_calories || 0);
+  const steps = Number(garmin.steps || 0);
+  const stepCal = Number(garmin.step_calories || Math.round(steps * 0.03184));
+  const exerciseCal = Number(garmin.exercise_calories || 0);
+  const exercises = Array.isArray(garmin.exercises) ? garmin.exercises : [];
+
+  const elActive = document.getElementById('garminActiveCal');
+  if (elActive) elActive.textContent = activeCal.toLocaleString();
+
+  const elSteps = document.getElementById('garminSteps');
+  if (elSteps) elSteps.textContent = steps.toLocaleString();
+
+  const elHr = document.getElementById('garminRestingHr');
+  if (elHr) elHr.textContent = (garmin.resting_hr || '--') + ' bpm';
+
+  const elTotal = document.getElementById('garminTotalCal');
+  if (elTotal) elTotal.textContent = (garmin.total_calories || 0).toLocaleString();
 
   const sourceBadge = document.getElementById('garminSourceBadge');
   if (sourceBadge) {
-    sourceBadge.textContent = 'Health Connect (Garmin) ✓';
+    sourceBadge.textContent = (garmin.source || 'Health Connect (Garmin)') + ' ✓';
     sourceBadge.style.backgroundColor = '#10b981';
+  }
+
+  // Desglose de calorías activas (Pasos vs Musculación)
+  const elBreakdown = document.getElementById('garminActiveBreakdown');
+  if (elBreakdown) {
+    elBreakdown.innerHTML = `
+      <div style="display:flex; justify-content:space-between; font-size:0.83rem; color:#94a3b8; padding: 4px 0;">
+        <span>🚶‍♂️ Marcha / Pasos (${steps.toLocaleString()} pasos):</span>
+        <strong style="color:#e2e8f0;">~${stepCal} kcal</strong>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:0.83rem; color:#94a3b8; padding: 4px 0;">
+        <span>🏋️ Musculación & Entrenamientos (${exercises.length} sesiones):</span>
+        <strong style="color:#38bdf8;">${exerciseCal} kcal</strong>
+      </div>
+    `;
+  }
+
+  // Lista de actividades y entrenamientos de hoy
+  const exList = document.getElementById('garminExercisesList');
+  if (exList) {
+    if (exercises.length === 0) {
+      exList.innerHTML = `
+        <div style="text-align:center; padding: 14px; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.08); border-radius: 10px;">
+          <p class="text-muted" style="margin: 0; font-size: 0.84rem;">
+            Sin sesiones de musculación o gimnasio cargadas hoy.<br>
+            Toca el botón abajo para cargar la actividad registrada en tu reloj.
+          </p>
+        </div>
+      `;
+    } else {
+      exList.innerHTML = exercises.map(ex => `
+        <div class="exercise-item-row" style="display:flex; align-items:center; justify-content:space-between; padding: 10px 14px; background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 10px; margin-bottom: 8px;">
+          <div style="display:flex; align-items:center; gap: 10px;">
+            <span style="font-size: 1.4rem;">🏋️</span>
+            <div>
+              <div style="font-weight: 600; font-size: 0.92rem; color: #f8fafc;">${escapeHtml(ex.title)}</div>
+              <div class="small text-muted" style="font-size: 0.78rem;">
+                ${ex.time || ''} ${ex.duration ? '• ' + ex.duration + ' min' : ''} • <span style="color:#38bdf8">${ex.calories} kcal quemadas</span>
+              </div>
+            </div>
+          </div>
+          <button onclick="window.deleteGarminExercise('${ex.id}')" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size: 1.1rem; padding: 4px;" title="Eliminar entrenamiento">
+            🗑️
+          </button>
+        </div>
+      `).join('');
+    }
   }
 }
 
@@ -2124,6 +2450,7 @@ function renderGarminView(garmin) {
 // 6. HISTORIAL DE COMIDAS CON FECHA, HORA Y BORRADO DIRECTO
 // ==========================================================================
 async function loadMeals() {
+  checkAndPerformDailyRollover();
   const localMeals = JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
   state.meals = localMeals;
   renderMealsList(state.meals);
@@ -2143,33 +2470,100 @@ async function loadMeals() {
 
 function renderMealsList(meals) {
   const container = document.getElementById('mealsList');
-  if (!meals || meals.length === 0) {
-    container.innerHTML = '<p class="text-muted text-center" style="padding:20px 0;">No hay comidas registradas hoy.</p>';
-    return;
-  }
+  if (!container) return;
 
-  container.innerHTML = meals.map(m => {
-    const timeFormatted = formatDateTime(m.timestamp);
-    return `
-      <div class="meal-item-card">
-        <div class="meal-item-left">
-          <div class="meal-header-row">
-            <span class="meal-title-text">${escapeHtml(m.name)}</span>
-            <span class="meal-time-tag">📅 ${timeFormatted}</span>
-          </div>
-          <div class="meal-macros-chips">
-            <span class="macro-chip macro-chip-carb">${m.net_carbs}g carbos</span>
-            <span class="macro-chip macro-chip-fat">${m.fat}g grasa</span>
-            <span class="macro-chip macro-chip-prot">${m.protein}g prot</span>
-            <span class="macro-chip macro-chip-cal">${m.calories} kcal</span>
-          </div>
-        </div>
-        <button class="btn-delete-meal" onclick="window.deleteMeal('${m.id}')" title="Eliminar comida">
-          🗑️
-        </button>
+  const todayKey = getLocalDateKey(new Date());
+  const allMeals = meals || [];
+  const todayMeals = allMeals.filter(m => getLocalDateKey(m.timestamp) === todayKey);
+  const pastMeals = allMeals.filter(m => getLocalDateKey(m.timestamp) !== todayKey);
+
+  // 1. Comidas Registradas HOY
+  if (todayMeals.length === 0) {
+    container.innerHTML = `
+      <div class="empty-meals-box" style="text-align:center; padding:24px 14px; background:rgba(255,255,255,0.03); border:1px dashed rgba(255,255,255,0.12); border-radius:12px;">
+        <span style="font-size: 2rem;">🍽️</span>
+        <p style="margin: 8px 0 4px 0; font-weight: 600; color: #f8fafc;">No hay comidas registradas hoy</p>
+        <p class="text-muted" style="font-size: 0.84rem; margin: 0;">El contador se actualizó a cero para el día de hoy. Usa el formulario arriba para registrar tu comida.</p>
       </div>
     `;
-  }).join('');
+  } else {
+    container.innerHTML = todayMeals.map(m => {
+      const timeFormatted = formatDateTime(m.timestamp);
+      return `
+        <div class="meal-item-card">
+          <div class="meal-item-left">
+            <div class="meal-header-row">
+              <span class="meal-title-text">${escapeHtml(m.name)}</span>
+              <span class="meal-time-tag">📅 ${timeFormatted}</span>
+            </div>
+            <div class="meal-macros-chips">
+              <span class="macro-chip macro-chip-carb">${m.net_carbs}g carbos</span>
+              <span class="macro-chip macro-chip-fat">${m.fat}g grasa</span>
+              <span class="macro-chip macro-chip-prot">${m.protein}g prot</span>
+              <span class="macro-chip macro-chip-cal">${m.calories} kcal</span>
+            </div>
+          </div>
+          <button class="btn-delete-meal" onclick="window.deleteMeal('${m.id}')" title="Eliminar comida">
+            🗑️
+          </button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // 2. Historial de días anteriores (guardado y documentado en memoria)
+  let pastContainer = document.getElementById('pastMealsContainer');
+  if (!pastContainer) {
+    pastContainer = document.createElement('div');
+    pastContainer.id = 'pastMealsContainer';
+    container.parentElement.appendChild(pastContainer);
+  }
+
+  if (pastMeals.length > 0) {
+    const pastByDate = {};
+    for (const m of pastMeals) {
+      const dKey = getLocalDateKey(m.timestamp);
+      if (!pastByDate[dKey]) pastByDate[dKey] = [];
+      pastByDate[dKey].push(m);
+    }
+    const sortedDates = Object.keys(pastByDate).sort().reverse();
+    const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+    pastContainer.innerHTML = `
+      <details class="past-meals-details" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px 14px; margin-top: 18px;">
+        <summary style="cursor: pointer; font-weight: 600; color: #94a3b8; font-size: 0.9rem; user-select: none;">
+          📁 Historial de Días Anteriores (${pastMeals.length} comidas documentadas)
+        </summary>
+        <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 14px;">
+          ${sortedDates.map(dKey => {
+            const dObj = new Date(dKey + 'T12:00:00');
+            const dLabel = daysOfWeek[dObj.getDay()] + ' ' + String(dObj.getDate()).padStart(2, '0') + '/' + String(dObj.getMonth() + 1).padStart(2, '0');
+            const dayList = pastByDate[dKey];
+            const dayCal = dayList.reduce((acc, c) => acc + (Number(c.calories) || 0), 0);
+            const dayCarbs = Math.round(dayList.reduce((acc, c) => acc + (Number(c.net_carbs) || 0), 0) * 10) / 10;
+            return `
+              <div style="border-left: 3px solid #64748b; padding-left: 10px;">
+                <div style="font-size: 0.84rem; font-weight: 700; color: #cbd5e1; margin-bottom: 6px;">
+                  📅 ${dLabel} (${dKey}) — <span style="color:#f59e0b">${dayCarbs}g carbos</span> • <span style="color:#10b981">${dayCal} kcal</span>
+                </div>
+                ${dayList.map(m => `
+                  <div style="font-size: 0.8rem; color: #94a3b8; display:flex; justify-content:space-between; align-items:center; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.04);">
+                    <span>${escapeHtml(m.name)} <small style="color:#64748b">(${formatDateTime(m.timestamp)})</small></span>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span>${m.net_carbs || 0}g C • ${m.calories || 0} kcal</span>
+                      <button onclick="window.deleteMeal('${m.id}')" style="background:none; border:none; color:#ef4444; cursor:pointer; font-size:0.85rem;" title="Eliminar">🗑️</button>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </details>
+    `;
+  } else {
+    pastContainer.innerHTML = '';
+  }
 }
 
 window.deleteMeal = function(id) {
@@ -3335,22 +3729,22 @@ let activeChartMetric = 'steps'; // 'steps' | 'macros' | 'calories'
 // Sincroniza datos de hoy en el historial acumulado
 function syncTodayToDailyHistory() {
   const now = new Date();
-  const todayKey = now.toISOString().slice(0, 10);
+  const todayKey = getLocalDateKey(now);
   let history = JSON.parse(localStorage.getItem('ketotrack_daily_history') || '[]');
 
   // Si hay fecha de inicio del protocolo, descartar días anteriores al inicio
   const sDate = state.settings?.keto_start_date ? new Date(state.settings.keto_start_date) : null;
   if (sDate && !isNaN(sDate.getTime())) {
-    const startDayKey = sDate.toISOString().slice(0, 10);
+    const startDayKey = getLocalDateKey(sDate);
     history = history.filter(h => h.date >= startDayKey);
   }
 
-  // Calcular métricas de hoy
-  const meals = state.meals || [];
+  // Filtrar ÚNICAMENTE las comidas de HOY
+  const todayMeals = (state.meals || []).filter(m => getLocalDateKey(m.timestamp) === todayKey);
   const garmin = state.status?.garmin || JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
   
   let netCarbs = 0, fat = 0, protein = 0, calIn = 0;
-  for (const m of meals) {
+  for (const m of todayMeals) {
     netCarbs += Number(m.net_carbs || 0);
     fat += Number(m.fat || 0);
     protein += Number(m.protein || 0);
@@ -3359,6 +3753,7 @@ function syncTodayToDailyHistory() {
 
   const steps = Number(garmin.steps || 0);
   const calOut = Number(garmin.total_calories || garmin.active_calories || 0);
+  const activeCal = Number(garmin.active_calories || 0);
   const ketones = Number(state.status?.ketosis?.estimatedKetones || 0.2);
 
   const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -3370,11 +3765,13 @@ function syncTodayToDailyHistory() {
     day_label: dayLabel,
     steps,
     calories_out: calOut,
+    active_calories: activeCal,
     calories_in: Math.round(calIn),
     net_carbs: Math.round(netCarbs * 10) / 10,
     fat: Math.round(fat * 10) / 10,
     protein: Math.round(protein * 10) / 10,
-    ketones
+    ketones,
+    exercises: garmin.exercises || []
   };
 
   if (todayIndex !== -1) {
@@ -3781,7 +4178,59 @@ function setupStartProcessModal() {
   });
 }
 
+function setupGarminExerciseModal() {
+  const modal = document.getElementById('modalGarminExercise');
+  const btnOpen = document.getElementById('btnOpenAddExercise');
+  const btnClose = document.getElementById('btnCloseExerciseModal');
+  const form = document.getElementById('formGarminExercise');
+
+  if (btnOpen && modal) {
+    btnOpen.addEventListener('click', () => {
+      modal.classList.add('show');
+    });
+  }
+
+  if (btnClose && modal) {
+    btnClose.addEventListener('click', () => {
+      modal.classList.remove('show');
+    });
+  }
+
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.classList.remove('show');
+    });
+  }
+
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const type = document.getElementById('selectExerciseType')?.value || 'Musculación / Gimnasio';
+      const calInput = document.getElementById('inputExerciseCalories')?.value;
+      const durInput = document.getElementById('inputExerciseDuration')?.value;
+
+      const calories = parseFloat(calInput) || 0;
+      const duration = parseFloat(durInput) || 0;
+
+      if (calories <= 0) {
+        alert('Por favor ingresa una cantidad válida de calorías.');
+        return;
+      }
+
+      window.addGarminExercise({
+        title: type,
+        calories: calories,
+        duration: duration
+      });
+
+      form.reset();
+      modal.classList.remove('show');
+    });
+  }
+}
+
 async function initApp() {
+  checkAndPerformDailyRollover();
   loadSettings();
   loadWeights();
   loadMeals();
@@ -3789,10 +4238,30 @@ async function initApp() {
   setupChartsTabListeners();
   setupWeightChartListeners();
   setupStartProcessModal();
+  setupGarminExerciseModal();
   syncTodayToDailyHistory();
   if (typeof renderWeightComparison === 'function') {
     renderWeightComparison();
   }
+
+  // Intervalo continuo cada 30s y al cambiar visibilidad para detectar medianoche (12 hs / cambio de día)
+  setInterval(() => {
+    if (checkAndPerformDailyRollover()) {
+      recalculateClientState();
+      loadMeals();
+      renderChartsView();
+    }
+  }, 30000);
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      if (checkAndPerformDailyRollover()) {
+        recalculateClientState();
+        loadMeals();
+        renderChartsView();
+      }
+    }
+  });
 }
 
 window.addEventListener('DOMContentLoaded', initApp);

@@ -4,9 +4,12 @@ import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.DistanceRecord
+import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.NutritionRecord
 import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.request.AggregateRequest
@@ -17,6 +20,7 @@ import androidx.health.connect.client.units.Length
 import androidx.health.connect.client.units.Mass
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -231,6 +235,70 @@ class HealthManager {
                     Log.w("HealthManager", "readRecords HeartRateRecord threw: ${e.message}")
                 }
             }
+
+            HealthDataType.TOTAL_CALORIES -> {
+                try {
+                    readRecords(client, TotalCaloriesBurnedRecord::class, startTime, endTime, limit) { record ->
+                        val payload = createSamplePayload(
+                            dataType,
+                            record.startTime,
+                            record.endTime,
+                            record.energy.inKilocalories,
+                            record.metadata
+                        )
+                        samples.add(record.startTime to payload)
+                    }
+                } catch (e: Throwable) {
+                    Log.w("HealthManager", "readRecords TotalCaloriesBurnedRecord threw: ${e.message}")
+                }
+            }
+
+            HealthDataType.EXERCISE -> {
+                try {
+                    readRecords(client, ExerciseSessionRecord::class, startTime, endTime, limit) { record ->
+                        val durationMinutes = Duration.between(record.startTime, record.endTime).toMinutes().toDouble()
+                        val payload = createSamplePayload(
+                            dataType,
+                            record.startTime,
+                            record.endTime,
+                            durationMinutes,
+                            record.metadata
+                        ).apply {
+                            put("title", record.title ?: "Entrenamiento")
+                            put("exerciseType", record.exerciseType)
+                            put("notes", record.notes ?: "")
+                        }
+                        samples.add(record.startTime to payload)
+                    }
+                } catch (e: Throwable) {
+                    Log.w("HealthManager", "readRecords ExerciseSessionRecord threw: ${e.message}")
+                }
+            }
+
+            HealthDataType.NUTRITION -> {
+                try {
+                    readRecords(client, NutritionRecord::class, startTime, endTime, limit) { record ->
+                        val cal = record.energy?.inKilocalories ?: 0.0
+                        val payload = createSamplePayload(
+                            dataType,
+                            record.startTime,
+                            record.endTime,
+                            cal,
+                            record.metadata
+                        ).apply {
+                            put("calories", cal)
+                            put("carbs", record.totalCarbohydrate?.inGrams ?: 0.0)
+                            put("protein", record.protein?.inGrams ?: 0.0)
+                            put("fat", record.totalFat?.inGrams ?: 0.0)
+                            put("fiber", record.dietaryFiber?.inGrams ?: 0.0)
+                            put("name", record.name ?: "Comida")
+                        }
+                        samples.add(record.startTime to payload)
+                    }
+                } catch (e: Throwable) {
+                    Log.w("HealthManager", "readRecords NutritionRecord threw: ${e.message}")
+                }
+            }
         }
 
         val sorted = samples.sortedBy { it.first }
@@ -330,6 +398,7 @@ class HealthManager {
                 )
                 client.insertRecords(listOf(record))
             }
+            else -> {}
         }
     }
 

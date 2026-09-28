@@ -29,8 +29,9 @@ jobs:
 
       - name: Aplicar Parche Nativo a Health Connect (Bypass Error Count < 1)
         run: |
-          echo "Aplicando HealthManager.kt resiliente a @capgo/capacitor-health..."
+          echo "Aplicando HealthManager.kt y HealthDataType.kt resiliente a @capgo/capacitor-health..."
           cp patches/HealthManager.kt node_modules/@capgo/capacitor-health/android/src/main/java/app/capgo/plugin/health/HealthManager.kt
+          cp patches/HealthDataType.kt node_modules/@capgo/capacitor-health/android/src/main/java/app/capgo/plugin/health/HealthDataType.kt
           echo "Verificando aplicacion del parche:"
           head -n 25 node_modules/@capgo/capacitor-health/android/src/main/java/app/capgo/plugin/health/HealthManager.kt
 
@@ -72,6 +73,8 @@ jobs:
                 <uses-permission android:name=\"android.permission.health.READ_STEPS\" />
                 <uses-permission android:name=\"android.permission.health.READ_ACTIVE_CALORIES_BURNED\" />
                 <uses-permission android:name=\"android.permission.health.READ_TOTAL_CALORIES_BURNED\" />
+                <uses-permission android:name=\"android.permission.health.READ_EXERCISE\" />
+                <uses-permission android:name=\"android.permission.health.READ_NUTRITION\" />
                 <uses-permission android:name=\"android.permission.health.READ_HEART_RATE\" />
                 <uses-permission android:name=\"android.permission.health.READ_RESTING_HEART_RATE\" />
                 <uses-permission android:name=\"android.permission.health.READ_WEIGHT\" />

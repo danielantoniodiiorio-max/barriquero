@@ -153,14 +153,14 @@ class HealthConnectManager {
         }
         try {
           await this.plugin.requestAuthorization({
-            read: ['steps', 'calories', 'heartRate', 'weight'],
+            read: ['steps', 'calories', 'exercise', 'nutrition', 'heartRate', 'weight'],
             write: []
           });
         } catch (authErr) {
-          console.warn('Error en requestAuthorization con conjunto completo:', authErr);
+          console.warn('Error en requestAuthorization extendido:', authErr);
           try {
             await this.plugin.requestAuthorization({
-              read: ['steps', 'calories', 'heartRate'],
+              read: ['steps', 'calories', 'heartRate', 'weight'],
               write: []
             });
           } catch (authErr2) {
@@ -230,11 +230,11 @@ class HealthConnectManager {
       const sEnd = s.endDate ? new Date(s.endDate).getTime() : sStart;
       const durationHours = (sEnd - sStart) / (1000 * 60 * 60);
 
-      if (durationHours >= 3) {
-        // Resumen acumulativo del día exportado por la app
+      if (durationHours >= 8) {
+        // Resumen acumulativo del día completo exportado por la app (>= 8h)
         if (val > cumulativeMax) cumulativeMax = val;
       } else {
-        // Intervalo granular (ej. 15 minutos o 1 hora)
+        // Intervalos de actividad o sesiones de entrenamiento
         const key = (s.startDate || '') + '_' + (s.endDate || '');
         if (!seenIntervals.has(key)) {
           seenIntervals.add(key);
@@ -261,6 +261,66 @@ class HealthConnectManager {
       sources: sourcesFound,
       garminFound: isGarmin
     };
+  }
+
+  // Sincronizar ingestas de MyFitnessPal leídas desde Health Connect
+  syncNutritionFromHealthConnect(samples, now = new Date()) {
+    if (!Array.isArray(samples) || samples.length === 0) return;
+    try {
+      const todayKey = (typeof getLocalDateKey === 'function') 
+        ? getLocalDateKey(now) 
+        : now.toISOString().slice(0, 10);
+        
+      const localMeals = JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
+      let changed = false;
+
+      for (const s of samples) {
+        const sStart = s.startDate ? new Date(s.startDate) : now;
+        const sKey = (typeof getLocalDateKey === 'function') 
+          ? getLocalDateKey(sStart) 
+          : sStart.toISOString().slice(0, 10);
+        if (sKey !== todayKey) continue;
+
+        const cal = Math.round(Number(s.calories || s.value || 0));
+        const carbs = Math.round((Number(s.carbs || 0)) * 10) / 10;
+        const protein = Math.round((Number(s.protein || 0)) * 10) / 10;
+        const fat = Math.round((Number(s.fat || 0)) * 10) / 10;
+        const fiber = Math.round((Number(s.fiber || 0)) * 10) / 10;
+        const netCarbs = Math.max(0, Math.round((carbs - fiber) * 10) / 10);
+        const name = s.name || 'Comida (MyFitnessPal)';
+
+        // Evitar duplicados por id o nombre y hora similar
+        const exists = localMeals.some(m => 
+          (m.id && m.id === 'mfp_' + sStart.getTime()) ||
+          (m.name === name && Math.abs(new Date(m.timestamp).getTime() - sStart.getTime()) < 15 * 60 * 1000)
+        );
+
+        if (!exists && cal > 0) {
+          const newMeal = {
+            id: 'mfp_' + sStart.getTime(),
+            timestamp: sStart.toISOString(),
+            name: name,
+            carbs: carbs,
+            fiber: fiber,
+            net_carbs: netCarbs,
+            protein: protein,
+            fat: fat,
+            calories: cal,
+            source: 'MyFitnessPal'
+          };
+          localMeals.unshift(newMeal);
+          changed = true;
+        }
+      }
+
+      if (changed) {
+        localStorage.setItem('ketotrack_meals', JSON.stringify(localMeals));
+        if (typeof loadMeals === 'function') loadMeals();
+        if (typeof recalculateClientState === 'function') recalculateClientState();
+      }
+    } catch (e) {
+      console.warn('Error al procesar nutrición de Health Connect:', e);
+    }
   }
 
   async syncFromHealthConnect() {
@@ -342,10 +402,53 @@ class HealthConnectManager {
         console.warn('Error leyendo calorías activas:', e);
       }
 
-      // Si Garmin no exportó muestras de calorías activas en Health Connect,
-      // calcular con el factor real verificado de Garmin (~31.84 kcal por cada 1.000 pasos: 27.015 pasos = 860 kcal)
-      if (activeCalories === 0 && steps > 0) {
-        activeCalories = Math.round(steps * 0.03184);
+      // 2b. Leer Sesiones de Ejercicio de Hoy (Gimnasio / Musculación / etc.)
+      let detectedExercises = [];
+      try {
+        const exRes = await safeReadSamples('exercise', queryStart, queryEnd, 50);
+        if (exRes && Array.isArray(exRes.samples)) {
+          detectedExercises = exRes.samples.map(s => {
+            const timeStr = s.startDate ? new Date(s.startDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            return {
+              id: 'hc_ex_' + (s.startDate || Date.now()),
+              title: s.title || 'Entrenamiento Garmin',
+              calories: Math.round(Number(s.calories || s.value || 0)),
+              duration: Math.round(Number(s.duration || s.value || 0)),
+              time: timeStr,
+              timestamp: s.startDate || now.toISOString(),
+              source: s.sourceName || 'Garmin Connect'
+            };
+          });
+        }
+      } catch (exErr) {
+        // Ignorar si el tipo exercise no está disponible en la versión nativa instalada
+      }
+
+      // 2c. Leer Nutrición de Health Connect (Sincronización MyFitnessPal)
+      try {
+        const nutRes = await safeReadSamples('nutrition', queryStart, queryEnd, 50);
+        if (nutRes && Array.isArray(nutRes.samples) && nutRes.samples.length > 0) {
+          this.syncNutritionFromHealthConnect(nutRes.samples, now);
+        }
+      } catch (nutErr) {
+        // Ignorar si no está disponible o denegado
+      }
+
+      // Respetar calorías de ejercicios/musculación ya registradas en la app hoy
+      const todayKey = (typeof getLocalDateKey === 'function') ? getLocalDateKey(now) : now.toISOString().slice(0, 10);
+      const currentGarmin = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
+      const existingExCalories = (currentGarmin.date === todayKey) 
+        ? Number(currentGarmin.exercise_calories || 0) 
+        : 0;
+
+      // Si Garmin no exportó muestras directas de calorías activas, o si hay musculación:
+      if (activeCalories === 0) {
+        const stepEst = steps > 0 ? Math.round(steps * 0.03184) : 0;
+        activeCalories = stepEst + existingExCalories;
+        this.lastDiagnostics.caloriesValue = activeCalories;
+      } else if (existingExCalories > 0 && activeCalories < existingExCalories) {
+        // Proteger las calorías de musculación si Health Connect solo registró un fragmento
+        activeCalories = Math.max(activeCalories, existingExCalories);
         this.lastDiagnostics.caloriesValue = activeCalories;
       }
 
@@ -410,7 +513,7 @@ class HealthConnectManager {
             : 'Google Health Connect (Garmin)');
 
       if (window.applyGarminMetrics) {
-        window.applyGarminMetrics(steps, activeCalories, restingHr, sourceLabel);
+        window.applyGarminMetrics(steps, activeCalories, restingHr, sourceLabel, detectedExercises);
       }
 
       const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
