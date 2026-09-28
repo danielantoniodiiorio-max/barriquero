@@ -882,6 +882,15 @@
           </div>
 
           <button type="submit" class="btn btn-primary full-width btn-save-settings">💾 Guardar Ajustes y Recalcular Metas</button>
+
+          <hr class="divider" style="margin: 20px 0 14px 0;">
+          <h3>Copia de Seguridad y Datos</h3>
+          <p class="small text-muted">Exporta o restaura tus comidas, historial y ajustes en un archivo de respaldo seguro.</p>
+          <div style="display: flex; gap: 10px; margin-top: 10px;">
+            <button type="button" id="btnExportData" class="btn btn-outline" style="flex: 1; padding: 10px 8px; font-size: 0.85rem;">📥 Exportar Copia</button>
+            <button type="button" id="btnImportData" class="btn btn-outline" style="flex: 1; padding: 10px 8px; font-size: 0.85rem;">📤 Restaurar Copia</button>
+          </div>
+          <input type="file" id="inputImportBackupFile" accept=".json" style="display: none;">
         </form>
       </div>
     </div>

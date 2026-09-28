@@ -3693,6 +3693,63 @@ document.getElementById('formSettings')?.addEventListener('submit', (e) => {
   alert('¡Ajustes y metas guardados con éxito!');
 });
 
+// Respaldo y Restauración de Datos
+document.getElementById('btnExportData')?.addEventListener('click', () => {
+  try {
+    const backup = {
+      app: 'KetoTrack',
+      version: '1.1.0',
+      exportDate: new Date().toISOString(),
+      meals: JSON.parse(localStorage.getItem('ketotrack_meals') || '[]'),
+      dailyHistory: JSON.parse(localStorage.getItem('ketotrack_daily_history') || '[]'),
+      settings: JSON.parse(localStorage.getItem('ketotrack_settings') || '{}'),
+      weights: JSON.parse(localStorage.getItem('ketotrack_weights') || '[]'),
+      biomarkers: JSON.parse(localStorage.getItem('ketotrack_biomarkers') || '[]'),
+      garminExercises: JSON.parse(localStorage.getItem('ketotrack_garmin_exercises') || '[]')
+    };
+    const jsonStr = JSON.stringify(backup, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ketotrack-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    alert('¡Copia de seguridad generada y descargada exitosamente!');
+  } catch (err) {
+    alert('Error al generar copia de seguridad: ' + err.message);
+  }
+});
+
+document.getElementById('btnImportData')?.addEventListener('click', () => {
+  document.getElementById('inputImportBackupFile')?.click();
+});
+
+document.getElementById('inputImportBackupFile')?.addEventListener('change', (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (evt) => {
+    try {
+      const data = JSON.parse(evt.target.result);
+      if (!data || typeof data !== 'object') throw new Error('Formato no válido');
+      if (data.meals) localStorage.setItem('ketotrack_meals', JSON.stringify(data.meals));
+      if (data.dailyHistory) localStorage.setItem('ketotrack_daily_history', JSON.stringify(data.dailyHistory));
+      if (data.settings) localStorage.setItem('ketotrack_settings', JSON.stringify(data.settings));
+      if (data.weights) localStorage.setItem('ketotrack_weights', JSON.stringify(data.weights));
+      if (data.biomarkers) localStorage.setItem('ketotrack_biomarkers', JSON.stringify(data.biomarkers));
+      if (data.garminExercises) localStorage.setItem('ketotrack_garmin_exercises', JSON.stringify(data.garminExercises));
+      alert('¡Copia de seguridad restaurada con éxito! La aplicación se recargará ahora.');
+      window.location.reload();
+    } catch (err) {
+      alert('Error al restaurar archivo: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+});
+
 // ==========================================================================
 // 9. INICIALIZACIÓN
 // ==========================================================================
