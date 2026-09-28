@@ -2674,12 +2674,28 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
 function renderGarminView(garmin) {
   const activeCal = Number(garmin.active_calories || 0);
   const steps = Number(garmin.steps || 0);
-  const stepCal = Number(garmin.step_calories || Math.round(steps * 0.03184));
-  const exerciseCal = Number(garmin.exercise_calories || 0);
-  const exercises = Array.isArray(garmin.exercises) ? garmin.exercises : [];
+  const totalCal = Number(garmin.total_calories || 0);
+  const hr = garmin.resting_hr || '--';
 
-  const elActive = document.getElementById('garminActiveCal');
-  if (elActive) elActive.textContent = activeCal.toLocaleString();
+  // Hero Card: Gasto Calórico Total
+  const heroTotal = document.getElementById('garminHeroTotalCal');
+  if (heroTotal) heroTotal.textContent = totalCal.toLocaleString();
+
+  const heroSteps = document.getElementById('garminHeroSteps');
+  if (heroSteps) heroSteps.textContent = steps.toLocaleString();
+
+  const heroHr = document.getElementById('garminHeroHr');
+  if (heroHr) heroHr.textContent = hr + (hr !== '--' ? ' bpm' : '');
+
+  const heroSync = document.getElementById('garminHeroSyncStatus');
+  if (heroSync) {
+    heroSync.textContent = garmin.is_official ? 'Garmin Oficial ✓' : (garmin.source || 'Sincronizado ✓');
+    heroSync.style.color = garmin.is_official ? '#38bdf8' : '#34d399';
+  }
+
+  // Grid de Métricas
+  const elTotal = document.getElementById('garminTotalCal');
+  if (elTotal) elTotal.textContent = totalCal.toLocaleString();
 
   const elSteps = document.getElementById('garminSteps');
   if (elSteps) elSteps.textContent = steps.toLocaleString();
@@ -2687,49 +2703,24 @@ function renderGarminView(garmin) {
   const elHr = document.getElementById('garminRestingHr');
   if (elHr) elHr.textContent = (garmin.resting_hr || '--') + ' bpm';
 
-  const elTotal = document.getElementById('garminTotalCal');
-  if (elTotal) elTotal.textContent = (garmin.total_calories || 0).toLocaleString();
+  const elActive = document.getElementById('garminActiveCal');
+  if (elActive) elActive.textContent = activeCal.toLocaleString();
+
+  // Campo de calibración rápida
+  const inFast = document.getElementById('inputFastTotalCal');
+  if (inFast && document.activeElement !== inFast && totalCal > 0) {
+    inFast.value = totalCal;
+  }
 
   const sourceBadge = document.getElementById('garminSourceBadge');
   if (sourceBadge) {
     if (garmin.is_official) {
-      sourceBadge.textContent = 'Oficial Garmin Web ✓';
+      sourceBadge.textContent = 'Garmin Oficial ✓';
       sourceBadge.style.backgroundColor = '#0284c7';
     } else {
       sourceBadge.textContent = (garmin.source || 'Health Connect (Garmin)') + ' ✓';
       sourceBadge.style.backgroundColor = '#10b981';
     }
-  }
-
-  // Pre-cargar valores en los campos de entrada directa de Garmin
-  const inDirectActive = document.getElementById('inputDirectActiveCal');
-  const inDirectResting = document.getElementById('inputDirectRestingCal');
-  const lblDirectTotal = document.getElementById('lblDirectTotalCalPreview');
-  if (inDirectActive && (!inDirectActive.value || inDirectActive.value === '0')) {
-    if (activeCal > 0) inDirectActive.value = activeCal;
-  }
-  if (inDirectResting && (!inDirectResting.value || inDirectResting.value === '0')) {
-    if (garmin.bmr_calories > 0) inDirectResting.value = garmin.bmr_calories;
-  }
-  if (lblDirectTotal) {
-    const act = parseFloat(inDirectActive?.value) || activeCal || 0;
-    const rest = parseFloat(inDirectResting?.value) || garmin.bmr_calories || 0;
-    lblDirectTotal.textContent = (Math.round(act + rest)).toLocaleString() + ' kcal';
-  }
-
-  // Desglose de calorías activas (Pasos vs Musculación)
-  const elBreakdown = document.getElementById('garminActiveBreakdown');
-  if (elBreakdown) {
-    elBreakdown.innerHTML = `
-      <div style="display:flex; justify-content:space-between; font-size:0.83rem; color:#94a3b8; padding: 4px 0;">
-        <span>🚶‍♂️ Marcha / Pasos (${steps.toLocaleString()} pasos):</span>
-        <strong style="color:#e2e8f0;">~${stepCal} kcal</strong>
-      </div>
-      <div style="display:flex; justify-content:space-between; font-size:0.83rem; color:#94a3b8; padding: 4px 0;">
-        <span>🏋️ Musculación & Entrenamientos (${exercises.length} sesiones):</span>
-        <strong style="color:#38bdf8;">${exerciseCal} kcal</strong>
-      </div>
-    `;
   }
 
   // Lista de actividades y entrenamientos de hoy
@@ -4655,9 +4646,13 @@ function setupOfficialGarminSync() {
   const linkWeb = document.getElementById('linkGarminWeb');
 
   // Actualizar enlace con la fecha local de hoy
+  const todayKey = getLocalDateKey(new Date());
   if (linkWeb) {
-    const todayKey = getLocalDateKey(new Date());
     linkWeb.href = `https://connect.garmin.com/app/calories/${todayKey}/0`;
+  }
+  const linkWebCal = document.getElementById('linkGarminWebCal');
+  if (linkWebCal) {
+    linkWebCal.href = `https://connect.garmin.com/app/calories/${todayKey}/0`;
   }
 
   const updatePreview = () => {
