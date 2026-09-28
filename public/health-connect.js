@@ -402,6 +402,32 @@ class HealthConnectManager {
         console.warn('Error leyendo calorías activas:', e);
       }
 
+      // 2a. Leer Calorías Totales Quemadas de Health Connect (TotalCaloriesBurnedRecord de Garmin)
+      let totalCaloriesHC = 0;
+      try {
+        const totRes = await safeReadSamples('totalCalories', queryStart, queryEnd, 3000);
+        if (totRes && Array.isArray(totRes.samples) && totRes.samples.length > 0) {
+          const totDiag = this.extractMetric(totRes.samples, now);
+          totalCaloriesHC = totDiag.value;
+          this.lastDiagnostics.totalCaloriesValue = totalCaloriesHC;
+
+          // Si Health Connect reporta gasto total y no teníamos activas desglosadas:
+          if (activeCalories === 0 && totalCaloriesHC > 0) {
+            const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
+            const dailyBmr = (typeof window.state !== 'undefined' && window.state.settings && window.state.settings.garmin_daily_bmr) 
+              ? Number(window.state.settings.garmin_daily_bmr) 
+              : 1865;
+            const bmrSoFar = Math.round((dailyBmr / 24) * elapsedHours);
+            if (totalCaloriesHC > bmrSoFar) {
+              activeCalories = Math.round(totalCaloriesHC - bmrSoFar);
+              this.lastDiagnostics.caloriesValue = activeCalories;
+            }
+          }
+        }
+      } catch (totErr) {
+        console.warn('TotalCalories no disponible en este dispositivo:', totErr);
+      }
+
       // 2b. Leer Sesiones de Ejercicio de Hoy (Gimnasio / Musculación / etc.)
       let detectedExercises = [];
       try {
@@ -434,15 +460,19 @@ class HealthConnectManager {
         // Ignorar si no está disponible o denegado
       }
 
-      // Respetar calorías de ejercicios/musculación ya registradas en la app hoy
+      // Respetar calorías oficiales de Garmin Web o de ejercicios/musculación ya registradas
       const todayKey = (typeof getLocalDateKey === 'function') ? getLocalDateKey(now) : now.toISOString().slice(0, 10);
       const currentGarmin = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
+      const isOfficialToday = (currentGarmin.date === todayKey && currentGarmin.is_official === true);
       const existingExCalories = (currentGarmin.date === todayKey) 
         ? Number(currentGarmin.exercise_calories || 0) 
         : 0;
 
-      // Si Garmin no exportó muestras directas de calorías activas, o si hay musculación:
-      if (activeCalories === 0) {
+      if (isOfficialToday && Number(currentGarmin.active_calories) > 0) {
+        // Preservar las calorías oficiales cargadas desde Garmin Web
+        activeCalories = Math.max(activeCalories, Number(currentGarmin.active_calories));
+        this.lastDiagnostics.caloriesValue = activeCalories;
+      } else if (activeCalories === 0) {
         const stepEst = steps > 0 ? Math.round(steps * 0.03184) : 0;
         activeCalories = stepEst + existingExCalories;
         this.lastDiagnostics.caloriesValue = activeCalories;

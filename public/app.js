@@ -1971,9 +1971,21 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5) {
   }
 
   const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
-  const dailyBmr = 2192; // Calibrado para Garmin Instinct
-  const restingSoFar = Math.round((dailyBmr / 24) * elapsedHours);
-  const totalCaloriesSoFar = restingSoFar + totalActive;
+  const dailyBmr = Number(state.settings?.garmin_daily_bmr) || 1865; // Calibrado según Garmin Instinct (~1.865 kcal/día)
+  const isOfficial = (currentGarmin.date === todayKey && currentGarmin.is_official === true);
+
+  // Si el usuario ya fijó valores oficiales de Garmin Web hoy, respetarlos con prioridad
+  if (isOfficial && Number(currentGarmin.active_calories) > 0) {
+    totalActive = Math.max(totalActive, Number(currentGarmin.active_calories));
+  }
+
+  const restingSoFar = (isOfficial && Number(currentGarmin.bmr_calories) > 0)
+    ? Number(currentGarmin.bmr_calories)
+    : Math.round((dailyBmr / 24) * elapsedHours);
+
+  const totalCaloriesSoFar = (isOfficial && Number(currentGarmin.total_calories) > 0)
+    ? Number(currentGarmin.total_calories)
+    : (restingSoFar + totalActive);
 
   const garmin = {
     date: todayKey,
@@ -1986,7 +1998,8 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5) {
     bmr_calories: restingSoFar,
     daily_bmr: dailyBmr,
     total_calories: totalCaloriesSoFar,
-    source: source,
+    is_official: isOfficial,
+    source: isOfficial ? 'Garmin Connect Web Oficial' : source,
     timestamp: now.toISOString()
   };
 
@@ -2394,8 +2407,29 @@ function renderGarminView(garmin) {
 
   const sourceBadge = document.getElementById('garminSourceBadge');
   if (sourceBadge) {
-    sourceBadge.textContent = (garmin.source || 'Health Connect (Garmin)') + ' ✓';
-    sourceBadge.style.backgroundColor = '#10b981';
+    if (garmin.is_official) {
+      sourceBadge.textContent = 'Oficial Garmin Web ✓';
+      sourceBadge.style.backgroundColor = '#0284c7';
+    } else {
+      sourceBadge.textContent = (garmin.source || 'Health Connect (Garmin)') + ' ✓';
+      sourceBadge.style.backgroundColor = '#10b981';
+    }
+  }
+
+  // Pre-cargar valores en los campos de entrada directa de Garmin
+  const inDirectActive = document.getElementById('inputDirectActiveCal');
+  const inDirectResting = document.getElementById('inputDirectRestingCal');
+  const lblDirectTotal = document.getElementById('lblDirectTotalCalPreview');
+  if (inDirectActive && (!inDirectActive.value || inDirectActive.value === '0')) {
+    if (activeCal > 0) inDirectActive.value = activeCal;
+  }
+  if (inDirectResting && (!inDirectResting.value || inDirectResting.value === '0')) {
+    if (garmin.bmr_calories > 0) inDirectResting.value = garmin.bmr_calories;
+  }
+  if (lblDirectTotal) {
+    const act = parseFloat(inDirectActive?.value) || activeCal || 0;
+    const rest = parseFloat(inDirectResting?.value) || garmin.bmr_calories || 0;
+    lblDirectTotal.textContent = (Math.round(act + rest)).toLocaleString() + ' kcal';
   }
 
   // Desglose de calorías activas (Pasos vs Musculación)
@@ -4286,6 +4320,130 @@ function setupGarminExerciseModal() {
   }
 }
 
+// Sincronizador Oficial y Calibración Garmin Connect Web
+function setupOfficialGarminSync() {
+  const inPaste = document.getElementById('inputGarminPasteText');
+  const btnExtract = document.getElementById('btnGarminAutoExtract');
+  const inActive = document.getElementById('inputDirectActiveCal');
+  const inResting = document.getElementById('inputDirectRestingCal');
+  const lblTotal = document.getElementById('lblDirectTotalCalPreview');
+  const btnSave = document.getElementById('btnSaveOfficialGarmin');
+  const linkWeb = document.getElementById('linkGarminWeb');
+
+  // Actualizar enlace con la fecha local de hoy
+  if (linkWeb) {
+    const todayKey = getLocalDateKey(new Date());
+    linkWeb.href = `https://connect.garmin.com/app/calories/${todayKey}/0`;
+  }
+
+  const updatePreview = () => {
+    const act = parseFloat(inActive?.value) || 0;
+    const rest = parseFloat(inResting?.value) || 0;
+    const tot = Math.round(act + rest);
+    if (lblTotal) lblTotal.textContent = tot.toLocaleString() + ' kcal';
+  };
+
+  inActive?.addEventListener('input', updatePreview);
+  inResting?.addEventListener('input', updatePreview);
+
+  // Extracción inteligente de texto copiado de Garmin Connect (ej. "779 + 1,058 = 1,837")
+  btnExtract?.addEventListener('click', () => {
+    const text = inPaste?.value || '';
+    if (!text.trim()) {
+      alert('Pega primero el texto copiado de Garmin Connect en el campo.');
+      return;
+    }
+
+    const clean = text.replace(/,/g, '');
+    const matches = clean.match(/\b\d{2,6}\b/g);
+    if (!matches || matches.length < 2) {
+      alert('No se detectaron números. Por favor escribe directamente los valores en los campos.');
+      return;
+    }
+
+    const nums = matches.map(n => parseInt(n, 10)).filter(n => n >= 50 && n <= 25000);
+    let detected = null;
+
+    // Buscar terna A + B ≈ C
+    for (let i = 0; i < nums.length; i++) {
+      for (let j = 0; j < nums.length; j++) {
+        if (i === j) continue;
+        for (let k = 0; k < nums.length; k++) {
+          if (k === i || k === j) continue;
+          if (Math.abs((nums[i] + nums[j]) - nums[k]) <= 3) {
+            detected = {
+              active: Math.min(nums[i], nums[j]),
+              resting: Math.max(nums[i], nums[j]),
+              total: nums[k]
+            };
+            break;
+          }
+        }
+        if (detected) break;
+      }
+      if (detected) break;
+    }
+
+    if (!detected && nums.length >= 2) {
+      detected = {
+        active: nums[0],
+        resting: nums[1],
+        total: nums[0] + nums[1]
+      };
+    }
+
+    if (detected) {
+      if (inActive) inActive.value = detected.active;
+      if (inResting) inResting.value = detected.resting;
+      updatePreview();
+      alert(`¡Valores oficiales extraídos de Garmin!\n\n• Activas: ${detected.active.toLocaleString()} kcal\n• Reposo: ${detected.resting.toLocaleString()} kcal\n• Total: ${detected.total.toLocaleString()} kcal`);
+    } else {
+      alert('No se pudieron extraer los valores con certeza. Ingrésalos manualmente en los campos.');
+    }
+  });
+
+  btnSave?.addEventListener('click', () => {
+    const active = parseFloat(inActive?.value) || 0;
+    const resting = parseFloat(inResting?.value) || 0;
+    const total = active + resting;
+
+    if (total <= 0) {
+      alert('Por favor ingresa al menos las calorías activas o las de reposo.');
+      return;
+    }
+
+    const now = new Date();
+    const todayKey = getLocalDateKey(now);
+    const garmin = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
+
+    // Calibrar BMR diario real de Garmin basado en las horas transcurridas
+    const elapsedHours = Math.max(0.5, now.getHours() + (now.getMinutes() / 60));
+    const estimatedDailyBmr = Math.round((resting / elapsedHours) * 24);
+    if (estimatedDailyBmr >= 1200 && estimatedDailyBmr <= 3500) {
+      state.settings.garmin_daily_bmr = estimatedDailyBmr;
+      localStorage.setItem('ketotrack_settings', JSON.stringify(state.settings));
+    }
+
+    garmin.date = todayKey;
+    garmin.active_calories = Math.round(active);
+    garmin.bmr_calories = Math.round(resting);
+    garmin.total_calories = Math.round(total);
+    garmin.is_official = true;
+    garmin.source = 'Garmin Connect Web Oficial';
+    garmin.timestamp = now.toISOString();
+
+    state.status.garmin = garmin;
+    localStorage.setItem('ketotrack_garmin', JSON.stringify(garmin));
+
+    recalculateClientState();
+    syncTodayToDailyHistory();
+    renderGarminView(garmin);
+    renderChartsView();
+
+    alert(`✅ ¡Métricas oficiales aplicadas con éxito!\n\n• Calorías Activas: ${Math.round(active).toLocaleString()} kcal\n• En Reposo: ${Math.round(resting).toLocaleString()} kcal\n• Gasto Total: ${Math.round(total).toLocaleString()} kcal\n• BMR Diario Calibrado: ~${estimatedDailyBmr} kcal/día\n\nTu balance calórico y cetosis ya coinciden exactamente con tu reloj.`);
+  });
+}
+
 async function initApp() {
   checkAndPerformDailyRollover();
   loadSettings();
@@ -4296,6 +4454,7 @@ async function initApp() {
   setupWeightChartListeners();
   setupStartProcessModal();
   setupGarminExerciseModal();
+  setupOfficialGarminSync();
   syncTodayToDailyHistory();
   if (typeof renderWeightComparison === 'function') {
     renderWeightComparison();

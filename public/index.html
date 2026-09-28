@@ -291,6 +291,52 @@
           Leyendo pasos, calorías activas y ritmo cardíaco directamente de tu reloj Garmin.
         </div>
 
+        <!-- TARJETA: SINCRONIZACIÓN EXACTA GARMIN WEB -->
+        <div class="card" style="margin: 0 0 16px 0; padding: 14px; background: rgba(56, 189, 248, 0.05); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display:flex; align-items:center; gap: 8px;">
+              <span style="font-size: 1.25rem;">🌐</span>
+              <strong style="font-size: 0.95rem; color: #f8fafc;">Sincronización Oficial Garmin Web</strong>
+            </div>
+            <a href="https://connect.garmin.com/app/calories/" id="linkGarminWeb" target="_blank" class="btn btn-sm btn-outline" style="font-size: 0.76rem; padding: 5px 9px; text-decoration: none; border-color: rgba(56,189,248,0.4); color: #38bdf8; display: inline-flex; align-items: center; gap: 4px;">
+              <span>🔗 Abrir Garmin Web</span>
+            </a>
+          </div>
+          <p style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4; margin-bottom: 10px;">
+            Asegura coincidencia 100% idéntica con tu reloj. Pega el texto copiado de Garmin o escribe directamente los valores:
+          </p>
+
+          <!-- Input inteligente de pegado con autocompletar -->
+          <div style="display:flex; gap: 6px; margin-bottom: 10px;">
+            <input type="text" id="inputGarminPasteText" placeholder="Pega texto de Garmin (ej. 779 activas + 1,058 reposo = 1,837)" style="flex:1; padding: 8px 10px; font-size: 0.8rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #f8fafc;">
+            <button type="button" id="btnGarminAutoExtract" class="btn btn-sm btn-outline" style="padding: 8px 10px; font-size: 0.8rem; border-color: #38bdf8; color: #38bdf8; white-space: nowrap;">
+              ✨ Extraer
+            </button>
+          </div>
+
+          <!-- Campos Numéricos Rápidos -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+            <div>
+              <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 2px;">Calorías Activas (kcal)</label>
+              <input type="number" id="inputDirectActiveCal" placeholder="779" style="width: 100%; padding: 8px; font-size: 0.95rem; font-weight: 600; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #38bdf8;">
+            </div>
+            <div>
+              <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 2px;">En Reposo / BMR (kcal)</label>
+              <input type="number" id="inputDirectRestingCal" placeholder="1058" style="width: 100%; padding: 8px; font-size: 0.95rem; font-weight: 600; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #e2e8f0;">
+            </div>
+          </div>
+
+          <!-- Total Previsto y Botón Guardar -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 7px 12px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+            <span style="font-size: 0.82rem; color: #94a3b8;">Gasto Total Oficial:</span>
+            <strong id="lblDirectTotalCalPreview" style="font-size: 1.05rem; color: #10b981;">0 kcal</strong>
+          </div>
+
+          <button type="button" id="btnSaveOfficialGarmin" class="btn btn-primary full-width" style="padding: 10px; font-weight: 600; font-size: 0.9rem; background: linear-gradient(135deg, #0284c7, #0369a1);">
+            💾 Aplicar Métricas Oficiales de Garmin
+          </button>
+        </div>
+
         <!-- Métricas Reales en Tiempo Real -->
         <div class="garmin-stats-grid">
           <div class="stat-card">
