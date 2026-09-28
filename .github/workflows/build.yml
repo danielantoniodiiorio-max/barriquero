@@ -132,48 +132,7 @@ jobs:
 
           # 5. Copiar Keystore permanente y configurar android/app/build.gradle
           cp certs/ketotrack.keystore android/app/ketotrack.keystore
-          node -e "
-            const fs = require('fs');
-            let abg = fs.readFileSync('android/app/build.gradle', 'utf8');
-
-            // Incrementar versionCode a 2 y versionName a 1.1.0
-            abg = abg.replace(/versionCode\s+\d+/, 'versionCode 2');
-            abg = abg.replace(/versionName\s+[\"'].*?[\"']/, 'versionName \"1.1.0\"');
-
-            // Inyectar bloque signingConfigs permanente
-            const signingConfigStr = \`
-    signingConfigs {
-        release {
-            storeFile file('ketotrack.keystore')
-            storePassword 'ketotrack2026'
-            keyAlias 'ketotrack'
-            keyPassword 'ketotrack2026'
-        }
-    }
-\`;
-            abg = abg.replace(/android\s*\{/, 'android {' + signingConfigStr);
-
-            // Asignar signingConfig tanto para debug como para release
-            abg = abg.replace(/buildTypes\s*\{/, \`buildTypes {
-        debug {
-            signingConfig signingConfigs.release
-        }\`);
-            abg = abg.replace(/buildTypes\s*\{[\\s\\S]*?release\s*\\{/, match => {
-              return match + '\\n            signingConfig signingConfigs.release';
-            });
-
-            // Configurar Java 21 y Desugaring
-            if (abg.includes('compileOptions {')) {
-              abg = abg.replace(/compileOptions\s*\{[\s\S]*?\}/, \"compileOptions {\n        sourceCompatibility JavaVersion.VERSION_21\n        targetCompatibility JavaVersion.VERSION_21\n        coreLibraryDesugaringEnabled true\n    }\");
-            } else {
-              abg = abg.replace(/android\s*\{/, \"android {\n    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_21\n        targetCompatibility JavaVersion.VERSION_21\n        coreLibraryDesugaringEnabled true\n    }\");
-            }
-            if (!abg.includes('desugar_jdk_libs')) {
-              abg = abg.replace(/dependencies\s*\{/, \"dependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'\");
-            }
-            fs.writeFileSync('android/app/build.gradle', abg, 'utf8');
-            console.log('android/app/build.gradle configurado exitosamente con firma permanente.');
-          "
+          node scripts/configure-android.js
 
       - name: Compilar APK con Gradle
         run: |
