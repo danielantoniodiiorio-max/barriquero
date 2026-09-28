@@ -1928,6 +1928,9 @@ function recalculateClientState() {
 window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5) {
   let steps = 0, activeCalories = 0, restingHr = 60, source = 'Health Connect (Garmin)';
   let exercisesFromSync = null;
+  let explicitBmr = null;
+  let explicitTotal = null;
+  let isCloudOfficial = false;
 
   if (typeof arg1 === 'object' && arg1 !== null) {
     steps = arg1.steps || 0;
@@ -1935,6 +1938,9 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5) {
     restingHr = arg1.heartRate || arg1.resting_hr || 60;
     source = arg1.source || 'Health Connect (Garmin)';
     exercisesFromSync = arg1.exercises || null;
+    explicitBmr = arg1.bmrCalories || arg1.bmr_calories || null;
+    explicitTotal = arg1.totalCalories || arg1.total_calories || null;
+    isCloudOfficial = arg1.isOfficial === true;
   } else {
     steps = arg1 || 0;
     activeCalories = arg2 || 0;
@@ -1977,20 +1983,26 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5) {
 
   const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
   const dailyBmr = Number(state.settings?.garmin_daily_bmr) || 1865; // Calibrado según Garmin Instinct (~1.865 kcal/día)
-  const isOfficial = (currentGarmin.date === todayKey && currentGarmin.is_official === true);
+  const isOfficial = isCloudOfficial || (currentGarmin.date === todayKey && currentGarmin.is_official === true);
 
-  // Si el usuario ya fijó valores oficiales de Garmin Web hoy, respetarlos con prioridad
-  if (isOfficial && Number(currentGarmin.active_calories) > 0) {
+  // Si el usuario o Garmin Cloud ya fijaron valores oficiales, respetarlos con prioridad
+  if (isOfficial && Number(activeCalories) > 0) {
+    totalActive = Number(activeCalories);
+  } else if (isOfficial && Number(currentGarmin.active_calories) > 0) {
     totalActive = Math.max(totalActive, Number(currentGarmin.active_calories));
   }
 
-  const restingSoFar = (isOfficial && Number(currentGarmin.bmr_calories) > 0)
-    ? Number(currentGarmin.bmr_calories)
-    : Math.round((dailyBmr / 24) * elapsedHours);
+  const restingSoFar = (explicitBmr && Number(explicitBmr) > 0)
+    ? Number(explicitBmr)
+    : ((isOfficial && Number(currentGarmin.bmr_calories) > 0)
+      ? Number(currentGarmin.bmr_calories)
+      : Math.round((dailyBmr / 24) * elapsedHours));
 
-  const totalCaloriesSoFar = (isOfficial && Number(currentGarmin.total_calories) > 0)
-    ? Number(currentGarmin.total_calories)
-    : (restingSoFar + totalActive);
+  const totalCaloriesSoFar = (explicitTotal && Number(explicitTotal) > 0)
+    ? Number(explicitTotal)
+    : ((isOfficial && Number(currentGarmin.total_calories) > 0)
+      ? Number(currentGarmin.total_calories)
+      : (restingSoFar + totalActive));
 
   const garmin = {
     date: todayKey,
@@ -2004,7 +2016,7 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5) {
     daily_bmr: dailyBmr,
     total_calories: totalCaloriesSoFar,
     is_official: isOfficial,
-    source: isOfficial ? 'Garmin Connect Web Oficial' : source,
+    source: isCloudOfficial ? 'Garmin Connect Oficial (Nube)' : (isOfficial ? 'Garmin Connect Web Oficial' : source),
     timestamp: now.toISOString()
   };
 

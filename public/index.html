@@ -273,68 +273,92 @@
           <span class="garmin-live-dot" title="Sincronización automática activa"></span>
         </div>
 
-        <!-- Banner de Conexión Automática -->
-        <div class="garmin-auto-banner">
+        <!-- CONEXIÓN DIRECTA OFICIAL GARMIN CONNECT CLOUD -->
+        <div class="card" style="margin: 0 0 16px 0; padding: 16px; background: rgba(56, 189, 248, 0.06); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 14px;">
+          
+          <!-- ESTADO: CONECTADO (Mostrado cuando hay sesión guardada) -->
+          <div id="boxGarminCloudConnected" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 1.5rem;">🟢</span>
+                <div>
+                  <strong style="font-size: 0.98rem; color: #f8fafc; display: block;">Garmin Connect™ Oficial</strong>
+                  <span id="lblGarminCloudUser" style="font-size: 0.8rem; color: #38bdf8;">usuario@...</span>
+                </div>
+              </div>
+              <button type="button" id="btnGarminCloudSyncNow" class="btn btn-sm btn-outline" style="border-color: #38bdf8; color: #38bdf8; font-size: 0.78rem;">
+                🔄 Sincronizar Ahora
+              </button>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(0,0,0,0.25); border-radius: 8px; font-size: 0.8rem; color: #94a3b8;">
+              <span>⚡ Sincronización automática: <strong style="color:#10b981;">Activa</strong></span>
+              <span id="lblGarminCloudLastSync">Sincronizado recientemente</span>
+            </div>
+
+            <div style="margin-top: 10px; text-align: right;">
+              <button type="button" id="btnGarminCloudDisconnect" style="background: none; border: none; color: #ef4444; font-size: 0.75rem; text-decoration: underline; cursor: pointer;">
+                Desconectar cuenta Garmin
+              </button>
+            </div>
+          </div>
+
+          <!-- ESTADO: FORMULARIO DE INICIO DE SESIÓN DIRECTO -->
+          <div id="boxGarminCloudAuth">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+              <span style="font-size: 1.3rem;">☁️</span>
+              <strong style="font-size: 1rem; color: #f8fafc;">Conectar con Garmin Connect™</strong>
+            </div>
+            <p style="font-size: 0.82rem; color: #94a3b8; line-height: 1.45; margin-bottom: 12px;">
+              Sincronización directa en la nube. Descarga calorías y pasos oficiales automáticamente en tiempo real sin apps intermedias.
+            </p>
+
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
+              <div>
+                <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 2px;">Email de Garmin Connect</label>
+                <input type="email" id="inputGarminCloudEmail" placeholder="tu_correo@ejemplo.com" style="width: 100%; padding: 9px 12px; font-size: 0.9rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #f8fafc;">
+              </div>
+              <div>
+                <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 2px;">Contraseña</label>
+                <input type="password" id="inputGarminCloudPassword" placeholder="••••••••••••" style="width: 100%; padding: 9px 12px; font-size: 0.9rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #f8fafc;">
+              </div>
+            </div>
+
+            <button type="button" id="btnGarminCloudConnect" class="btn btn-primary full-width" style="padding: 10px; font-weight: 600; font-size: 0.9rem; background: linear-gradient(135deg, #0284c7, #0369a1);">
+              ⚡ Conectar y Sincronizar Automáticamente
+            </button>
+
+            <!-- Sección MFA si Garmin pide 2FA -->
+            <div id="boxGarminCloudMfa" style="display: none; margin-top: 12px; padding: 12px; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px;">
+              <label style="font-size: 0.8rem; color: #f59e0b; display: block; margin-bottom: 4px;">Código de Verificación (MFA enviado a tu email):</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="inputGarminMfaCode" placeholder="123456" maxlength="8" style="flex: 1; padding: 8px; font-size: 1rem; font-weight: bold; text-align: center; background: rgba(0,0,0,0.4); border: 1px solid #f59e0b; border-radius: 6px; color: #fff;">
+                <button type="button" id="btnGarminMfaSubmit" class="btn btn-sm btn-primary" style="background: #f59e0b; border: none; color: #000; font-weight: bold;">
+                  Verificar
+                </button>
+              </div>
+            </div>
+
+            <div id="txtGarminCloudStatus" style="display: none; margin-top: 10px; font-size: 0.82rem; text-align: center;"></div>
+          </div>
+        </div>
+
+        <!-- Respaldo Local Android: Google Health Connect -->
+        <div class="garmin-auto-banner" style="margin-bottom: 14px; opacity: 0.85;">
           <div class="auto-banner-left">
             <span class="sync-icon-pulsing">🟢</span>
             <div>
-              <strong>Google Health Connect</strong>
+              <strong style="font-size: 0.88rem;">Respaldo Local Android (Health Connect)</strong>
               <div class="small text-muted" id="garminLastSyncTime">Sincronizado en tiempo real</div>
             </div>
           </div>
-          <button id="btnConnectHealthConnect" class="btn btn-sm btn-outline">
-            🔄 Sincronizar Ahora
+          <button id="btnConnectHealthConnect" class="btn btn-sm btn-outline" style="font-size: 0.75rem; padding: 4px 8px;">
+            🔄 Sincronizar HC
           </button>
         </div>
 
-        <div id="healthConnectStatusText" class="small text-muted" style="margin: 10px 0 16px 0; text-align: center; padding: 10px 14px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; font-size: 0.84rem; line-height: 1.45;">
-          Leyendo pasos, calorías activas y ritmo cardíaco directamente de tu reloj Garmin.
-        </div>
-
-        <!-- TARJETA: SINCRONIZACIÓN EXACTA GARMIN WEB -->
-        <div class="card" style="margin: 0 0 16px 0; padding: 14px; background: rgba(56, 189, 248, 0.05); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 14px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <div style="display:flex; align-items:center; gap: 8px;">
-              <span style="font-size: 1.25rem;">🌐</span>
-              <strong style="font-size: 0.95rem; color: #f8fafc;">Sincronización Oficial Garmin Web</strong>
-            </div>
-            <a href="https://connect.garmin.com/app/calories/" id="linkGarminWeb" target="_blank" class="btn btn-sm btn-outline" style="font-size: 0.76rem; padding: 5px 9px; text-decoration: none; border-color: rgba(56,189,248,0.4); color: #38bdf8; display: inline-flex; align-items: center; gap: 4px;">
-              <span>🔗 Abrir Garmin Web</span>
-            </a>
-          </div>
-          <p style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4; margin-bottom: 10px;">
-            Asegura coincidencia 100% idéntica con tu reloj. Pega el texto copiado de Garmin o escribe directamente los valores:
-          </p>
-
-          <!-- Input inteligente de pegado con autocompletar -->
-          <div style="display:flex; gap: 6px; margin-bottom: 10px;">
-            <input type="text" id="inputGarminPasteText" placeholder="Pega texto de Garmin (ej. 779 activas + 1,058 reposo = 1,837)" style="flex:1; padding: 8px 10px; font-size: 0.8rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #f8fafc;">
-            <button type="button" id="btnGarminAutoExtract" class="btn btn-sm btn-outline" style="padding: 8px 10px; font-size: 0.8rem; border-color: #38bdf8; color: #38bdf8; white-space: nowrap;">
-              ✨ Extraer
-            </button>
-          </div>
-
-          <!-- Campos Numéricos Rápidos -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px;">
-            <div>
-              <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 2px;">Calorías Activas (kcal)</label>
-              <input type="number" id="inputDirectActiveCal" placeholder="779" style="width: 100%; padding: 8px; font-size: 0.95rem; font-weight: 600; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #38bdf8;">
-            </div>
-            <div>
-              <label style="font-size: 0.75rem; color: #94a3b8; display: block; margin-bottom: 2px;">En Reposo / BMR (kcal)</label>
-              <input type="number" id="inputDirectRestingCal" placeholder="1058" style="width: 100%; padding: 8px; font-size: 0.95rem; font-weight: 600; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #e2e8f0;">
-            </div>
-          </div>
-
-          <!-- Total Previsto y Botón Guardar -->
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; padding: 7px 12px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
-            <span style="font-size: 0.82rem; color: #94a3b8;">Gasto Total Oficial:</span>
-            <strong id="lblDirectTotalCalPreview" style="font-size: 1.05rem; color: #10b981;">0 kcal</strong>
-          </div>
-
-          <button type="button" id="btnSaveOfficialGarmin" class="btn btn-primary full-width" style="padding: 10px; font-weight: 600; font-size: 0.9rem; background: linear-gradient(135deg, #0284c7, #0369a1);">
-            💾 Aplicar Métricas Oficiales de Garmin
-          </button>
+        <div id="healthConnectStatusText" class="small text-muted" style="margin: 0 0 16px 0; text-align: center; padding: 8px 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px; font-size: 0.8rem; line-height: 1.4;">
+          Sincronización activa con Garmin Connect.
         </div>
 
         <!-- Métricas Reales en Tiempo Real -->
@@ -464,8 +488,37 @@
           </div>
         </div>
 
+        <!-- CARGA MANUAL DE EMERGENCIA (COLAPSADA) -->
+        <details style="margin-top: 14px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 8px 12px; font-size: 0.8rem;">
+          <summary style="cursor: pointer; color: #64748b; font-weight: 500;">
+            🛠️ Opciones avanzadas / Carga manual de emergencia
+          </summary>
+          <div style="margin-top: 10px;">
+            <p style="font-size: 0.76rem; color: #64748b; margin-bottom: 8px;">
+              Solo necesario si estás sin internet y necesitas forzar valores específicos.
+            </p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+              <div>
+                <label style="font-size: 0.72rem; color: #94a3b8; display: block; margin-bottom: 2px;">Calorías Activas (kcal)</label>
+                <input type="number" id="inputDirectActiveCal" placeholder="779" style="width: 100%; padding: 6px; font-size: 0.85rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #38bdf8;">
+              </div>
+              <div>
+                <label style="font-size: 0.72rem; color: #94a3b8; display: block; margin-bottom: 2px;">En Reposo / BMR (kcal)</label>
+                <input type="number" id="inputDirectRestingCal" placeholder="1411" style="width: 100%; padding: 6px; font-size: 0.85rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #e2e8f0;">
+              </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span style="font-size: 0.75rem; color: #64748b;">Gasto Total Previsto:</span>
+              <strong id="lblDirectTotalCalPreview" style="font-size: 0.88rem; color: #10b981;">0 kcal</strong>
+            </div>
+            <button type="button" id="btnSaveOfficialGarmin" class="btn btn-sm btn-outline full-width" style="padding: 6px; font-size: 0.78rem;">
+              💾 Forzar Valores Manuales
+            </button>
+          </div>
+        </details>
+
         <div class="garmin-privacy-note">
-          🔒 <strong>100% Automático y Privado:</strong> Los datos se leen localmente desde tu reloj Garmin Instinct a través de Android 15. Cero contraseñas y cero servidores intermedios.
+          🔒 <strong>100% Automático y Privado:</strong> Tus métricas se sincronizan directamente entre tus dispositivos y los servidores de Garmin. Cero intermediarios.
         </div>
       </div>
     </main>
@@ -1179,6 +1232,7 @@
   </div>
 
   <script src="health-connect.js"></script>
+  <script src="garmin-cloud.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
