@@ -209,8 +209,8 @@ function checkAndPerformDailyRollover() {
     const savedGarmin = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
     if (savedGarmin.date && savedGarmin.date !== todayKey) {
       const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
-      const dailyBmr = 2192;
-      const restingSoFar = Math.round((dailyBmr / 24) * elapsedHours);
+      const dailyBmr = Number(state.settings?.garmin_daily_bmr) || 1865;
+      const restingElapsed = Math.round((dailyBmr / 24) * elapsedHours);
       const freshGarmin = {
         date: todayKey,
         steps: 0,
@@ -219,9 +219,10 @@ function checkAndPerformDailyRollover() {
         exercise_calories: 0,
         exercises: [],
         resting_hr: savedGarmin.resting_hr || 60,
-        bmr_calories: restingSoFar,
+        bmr_calories: dailyBmr,
+        resting_elapsed: restingElapsed,
         daily_bmr: dailyBmr,
-        total_calories: restingSoFar,
+        total_calories: dailyBmr,
         source: savedGarmin.source || 'Health Connect (Garmin)',
         timestamp: now.toISOString()
       };
@@ -1892,8 +1893,8 @@ function recalculateClientState() {
   if (!garmin.date || garmin.date !== todayKey) {
     const now = new Date();
     const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
-    const dailyBmr = 2192;
-    const restingSoFar = Math.round((dailyBmr / 24) * elapsedHours);
+    const dailyBmr = Number(state.settings?.garmin_daily_bmr) || 1865;
+    const restingElapsed = Math.round((dailyBmr / 24) * elapsedHours);
     garmin = {
       date: todayKey,
       active_calories: 0,
@@ -1902,9 +1903,10 @@ function recalculateClientState() {
       exercises: [],
       steps: 0,
       resting_hr: garmin.resting_hr || 60,
-      bmr_calories: restingSoFar,
+      bmr_calories: dailyBmr,
+      resting_elapsed: restingElapsed,
       daily_bmr: dailyBmr,
-      total_calories: restingSoFar,
+      total_calories: dailyBmr,
       source: garmin.source || 'Health Connect (Garmin)',
       timestamp: now.toISOString()
     };
@@ -1992,17 +1994,18 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5) {
     totalActive = Math.max(totalActive, Number(currentGarmin.active_calories));
   }
 
-  const restingSoFar = (explicitBmr && Number(explicitBmr) > 0)
+  // BMR Basal diario de 24h de Garmin Instinct
+  const restingDayBmr = (explicitBmr && Number(explicitBmr) > 0)
     ? Number(explicitBmr)
-    : ((isOfficial && Number(currentGarmin.bmr_calories) > 0)
-      ? Number(currentGarmin.bmr_calories)
-      : Math.round((dailyBmr / 24) * elapsedHours));
+    : dailyBmr;
 
-  const totalCaloriesSoFar = (explicitTotal && Number(explicitTotal) > 0)
+  const restingElapsed = Math.round((dailyBmr / 24) * elapsedHours);
+
+  // Gasto total diario TDEE completo (BMR 24h + Activas)
+  const fullDayTotalBurn = restingDayBmr + totalActive;
+  const totalCaloriesVal = (explicitTotal && Number(explicitTotal) > 0)
     ? Number(explicitTotal)
-    : ((isOfficial && Number(currentGarmin.total_calories) > 0)
-      ? Number(currentGarmin.total_calories)
-      : (restingSoFar + totalActive));
+    : fullDayTotalBurn;
 
   const garmin = {
     date: todayKey,
@@ -2012,9 +2015,10 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5) {
     exercises: todayExercises,
     steps: Number(steps) || 0,
     resting_hr: Number(restingHr) || 60,
-    bmr_calories: restingSoFar,
+    bmr_calories: restingDayBmr,
+    resting_elapsed: restingElapsed,
     daily_bmr: dailyBmr,
-    total_calories: totalCaloriesSoFar,
+    total_calories: totalCaloriesVal,
     is_official: isOfficial,
     source: isCloudOfficial ? 'Garmin Connect Oficial (Nube)' : (isOfficial ? 'Garmin Connect Web Oficial' : source),
     timestamp: now.toISOString()
@@ -2883,6 +2887,16 @@ function renderMealsList(meals) {
 
 window.deleteMeal = function(id) {
   if (!confirm('¿Deseas eliminar esta comida del registro?')) return;
+  
+  let deletedIds = [];
+  try {
+    deletedIds = JSON.parse(localStorage.getItem('ketotrack_deleted_meal_ids') || '[]');
+  } catch (e) { deletedIds = []; }
+  if (id && !deletedIds.includes(String(id))) {
+    deletedIds.push(String(id));
+    localStorage.setItem('ketotrack_deleted_meal_ids', JSON.stringify(deletedIds));
+  }
+
   const localMeals = JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
   state.meals = localMeals.filter(m => String(m.id) !== String(id));
   localStorage.setItem('ketotrack_meals', JSON.stringify(state.meals));
@@ -2892,6 +2906,35 @@ window.deleteMeal = function(id) {
   try {
     fetch('/api/meals/' + id, { method: 'DELETE' }).catch(() => {});
   } catch (e) {}
+};
+
+window.clearTodayMeals = function() {
+  if (!confirm('¿Deseas reiniciar y vaciar las comidas registradas hoy a 0 kcal?')) return;
+  const now = new Date();
+  const todayKey = getLocalDateKey(now);
+  const localMeals = JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
+  
+  let deletedIds = [];
+  try {
+    deletedIds = JSON.parse(localStorage.getItem('ketotrack_deleted_meal_ids') || '[]');
+  } catch (e) { deletedIds = []; }
+
+  const remaining = [];
+  for (const m of localMeals) {
+    if (getLocalDateKey(m.timestamp) === todayKey) {
+      if (m.id && !deletedIds.includes(String(m.id))) {
+        deletedIds.push(String(m.id));
+      }
+    } else {
+      remaining.push(m);
+    }
+  }
+
+  localStorage.setItem('ketotrack_deleted_meal_ids', JSON.stringify(deletedIds));
+  localStorage.setItem('ketotrack_meals', JSON.stringify(remaining));
+  state.meals = remaining;
+  renderMealsList(state.meals);
+  recalculateClientState();
 };
 
 // Formulario de Ingreso de Comida
