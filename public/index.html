@@ -137,6 +137,31 @@
           </div>
         </div>
 
+        <!-- TIRA DE DÉFICIT REAL DIARIO (GARMIN VS COMIDAS) -->
+        <div class="real-deficit-strip" id="stripRealDeficit">
+          <div class="real-deficit-header">
+            <div class="real-deficit-title-wrap">
+              <span class="real-deficit-icon">⚖️</span>
+              <div>
+                <span class="real-deficit-title">Déficit Real Hoy (Garmin vs Comidas)</span>
+                <span class="real-deficit-sub" id="subRealFatLoss">≈ 0 g de grasa quemada hoy</span>
+              </div>
+            </div>
+            <span class="real-deficit-badge badge-deficit-optimal" id="badgeRealDeficitStatus">Déficit Activo 🔥</span>
+          </div>
+          <div class="real-deficit-value-row">
+            <div class="real-deficit-math">
+              <span class="real-deficit-math-item" id="lblDeficitBurned">🔥 0 kcal gastadas</span>
+              <span class="real-deficit-math-op">−</span>
+              <span class="real-deficit-math-item" id="lblDeficitIntake">🍽️ 0 kcal comidas</span>
+              <span class="real-deficit-math-op">=</span>
+            </div>
+            <div class="real-deficit-val-box">
+              <span class="real-deficit-number" id="valRealNetDeficit">+0 kcal</span>
+            </div>
+          </div>
+        </div>
+
         <!-- BARRAS DE MACRONUTRIENTES -->
         <div class="macro-bars">
           <!-- Carbohidratos Netos -->
@@ -190,6 +215,105 @@
             <span class="ratio-title">Carbos</span>
             <small class="ratio-ideal">Meta: 5-10%</small>
           </div>
+        </div>
+      </section>
+
+      <!-- TARJETA: DÉFICIT ACUMULADO Y PÉRDIDA DE PESO ESTIMADA (DÍA / SEMANA / MES / META) -->
+      <section class="card deficit-accum-card" id="cardDeficitAccumulation">
+        <div class="section-title">
+          <div>
+            <h2>⚖️ Déficit Acumulado y Pérdida de Peso</h2>
+            <span class="sub-personal">Correlación biofisiológica (Garmin vs MyFitnessPal)</span>
+          </div>
+          <span class="badge badge-garmin" id="badgeProtocolAccumDays">Día 1</span>
+        </div>
+
+        <!-- GRID DE 3 PERIODOS: HOY / 7 DÍAS (SEMANA) / 30 DÍAS (MES) -->
+        <div class="deficit-periods-grid">
+          <!-- HOY -->
+          <div class="period-box period-today">
+            <div class="period-header">
+              <span class="period-tag">Hoy</span>
+              <span class="period-badge-mini" id="badgePeriodTodayStatus">En Déficit</span>
+            </div>
+            <div class="period-val-main" id="valPeriodDeficitToday">+0 <small>kcal</small></div>
+            <div class="period-loss-sub">
+              <span class="period-loss-num" id="valPeriodLossToday">0 g</span>
+              <span class="period-loss-lbl">grasa estimada</span>
+            </div>
+          </div>
+
+          <!-- 7 DÍAS / SEMANA -->
+          <div class="period-box period-week">
+            <div class="period-header">
+              <span class="period-tag">7 Días</span>
+              <span class="period-badge-mini pace-badge" id="badgeWeeklyPaceRate">-- kg/sem</span>
+            </div>
+            <div class="period-val-main" id="valPeriodDeficitWeek">+0 <small>kcal</small></div>
+            <div class="period-loss-sub">
+              <span class="period-loss-num" id="valPeriodLossWeek">0.00 kg</span>
+              <span class="period-loss-lbl">grasa acumulada</span>
+            </div>
+          </div>
+
+          <!-- 30 DÍAS / MES -->
+          <div class="period-box period-month">
+            <div class="period-header">
+              <span class="period-tag">30 Días</span>
+              <span class="period-badge-mini" id="badgePeriodMonthStatus">Ritmo mensual</span>
+            </div>
+            <div class="period-val-main" id="valPeriodDeficitMonth">+0 <small>kcal</small></div>
+            <div class="period-loss-sub">
+              <span class="period-loss-num" id="valPeriodLossMonth">0.00 kg</span>
+              <span class="period-loss-lbl">grasa acumulada</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TRAYECTORIA Y PROYECCIÓN HACIA EL OBJETIVO DE PESO -->
+        <div class="goal-trajectory-box" id="boxGoalTrajectory">
+          <div class="goal-traj-header">
+            <div>
+              <span class="goal-traj-lbl">Progreso hacia tu Objetivo</span>
+              <strong class="goal-traj-target" id="lblGoalWeightDiff">Perder 4.0 kg (83 kg → 79 kg)</strong>
+            </div>
+            <div class="goal-traj-percent-pill">
+              <span id="lblGoalProgressPercent">0%</span>
+            </div>
+          </div>
+
+          <!-- Barra de progreso acumulado -->
+          <div class="goal-traj-track">
+            <div class="goal-traj-fill" id="barGoalProgressFill" style="width: 0%;"></div>
+          </div>
+
+          <!-- Métricas de la meta -->
+          <div class="goal-traj-stats">
+            <div class="traj-stat-item">
+              <span class="traj-stat-lbl">Déficit Necesario</span>
+              <strong class="traj-stat-val" id="lblGoalTotalNeeded">30.800 kcal</strong>
+            </div>
+            <div class="traj-stat-item">
+              <span class="traj-stat-lbl">Déficit Acumulado</span>
+              <strong class="traj-stat-val green-val" id="lblGoalTotalAccum">+0 kcal</strong>
+            </div>
+            <div class="traj-stat-item">
+              <span class="traj-stat-lbl">Kilos Restantes</span>
+              <strong class="traj-stat-val amber-val" id="lblGoalKgRemaining">4.0 kg</strong>
+            </div>
+            <div class="traj-stat-item">
+              <span class="traj-stat-lbl">Tiempo Estimado</span>
+              <strong class="traj-stat-val cyan-val" id="lblGoalDaysEstimate">-- días</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- NOTA CIENTÍFICA DE CALIBRACIÓN -->
+        <div class="deficit-science-note">
+          <span class="science-note-icon">📌</span>
+          <span class="science-note-text">
+            <strong>Regla de Wishnofsky & ACSM:</strong> 1 kg de grasa corporal almacenada equivale a un déficit energético neto de <strong>7.700 kcal</strong> (Garmin vs Ingesta real).
+          </span>
         </div>
       </section>
 

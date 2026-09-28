@@ -2381,6 +2381,232 @@ function renderDashboard(data) {
   document.getElementById('ratioFat').textContent = macros.ratios.fat + '%';
   document.getElementById('ratioProtein').textContent = macros.ratios.protein + '%';
   document.getElementById('ratioCarbs').textContent = macros.ratios.carbs + '%';
+
+  // 9. DÉFICIT REAL DIARIO Y ACUMULACIÓN HISTÓRICA CON PÉRDIDA DE PESO
+  renderDeficitAccumulation(caloriesIn, caloriesOut, garmin);
+}
+
+// ==========================================================================
+// 4.1 MOTOR DE DÉFICIT ACUMULADO Y CORRELACIÓN BIOFISIOLÓGICA DE PESO
+// ==========================================================================
+function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
+  const cardAccum = document.getElementById('cardDeficitAccumulation');
+  if (!cardAccum) return;
+
+  const now = new Date();
+  const todayKey = getLocalDateKey(now);
+
+  // 1. Tira de Déficit Real Diario (en macros-card)
+  const netDeficitToday = caloriesOut - caloriesIn;
+  const fatLossTodayGrams = Math.round(netDeficitToday / 7.7);
+
+  const elValRealNet = document.getElementById('valRealNetDeficit');
+  const elSubRealFat = document.getElementById('subRealFatLoss');
+  const elBadgeReal = document.getElementById('badgeRealDeficitStatus');
+  const elBurnedMath = document.getElementById('lblDeficitBurned');
+  const elIntakeMath = document.getElementById('lblDeficitIntake');
+
+  if (elBurnedMath) elBurnedMath.textContent = '🔥 ' + caloriesOut.toLocaleString() + ' kcal gastadas';
+  if (elIntakeMath) elIntakeMath.textContent = '🍽️ ' + caloriesIn.toLocaleString() + ' kcal comidas';
+
+  if (elValRealNet) {
+    if (netDeficitToday >= 0) {
+      elValRealNet.textContent = '+' + netDeficitToday.toLocaleString() + ' kcal';
+      elValRealNet.style.color = '#34d399';
+    } else {
+      elValRealNet.textContent = netDeficitToday.toLocaleString() + ' kcal';
+      elValRealNet.style.color = '#f87171';
+    }
+  }
+
+  if (elSubRealFat) {
+    if (netDeficitToday >= 0) {
+      elSubRealFat.textContent = '≈ -' + fatLossTodayGrams + ' g grasa quemada hoy';
+      elSubRealFat.style.color = '#34d399';
+    } else {
+      elSubRealFat.textContent = '≈ +' + Math.abs(fatLossTodayGrams) + ' g superávit';
+      elSubRealFat.style.color = '#f87171';
+    }
+  }
+
+  if (elBadgeReal) {
+    if (netDeficitToday >= 0) {
+      elBadgeReal.textContent = 'Déficit Activo 🔥';
+      elBadgeReal.className = 'real-deficit-badge badge-deficit-optimal';
+    } else {
+      elBadgeReal.textContent = 'Superávit ⚠️';
+      elBadgeReal.className = 'real-deficit-badge badge-deficit-danger';
+    }
+  }
+
+  // 2. Historial de días y consolidación de acumulación
+  let rawHistory = [];
+  try {
+    rawHistory = JSON.parse(localStorage.getItem('ketotrack_daily_history') || '[]');
+  } catch (e) {
+    rawHistory = [];
+  }
+
+  // Descartar entradas que no sean pasadas estrictas
+  const pastDays = (rawHistory || []).filter(h => h && h.date && h.date < todayKey);
+
+  // Registro de HOY en tiempo real
+  const todayEntry = {
+    date: todayKey,
+    calories_in: caloriesIn,
+    calories_out: caloriesOut
+  };
+
+  const allDays = [...pastDays, todayEntry];
+  allDays.sort((a, b) => a.date.localeCompare(b.date));
+
+  // Determinar inicio del protocolo
+  const sDateStr = state.settings?.keto_start_date;
+  let protocolStartKey = '';
+  if (sDateStr) {
+    const d = new Date(sDateStr);
+    if (!isNaN(d.getTime())) protocolStartKey = getLocalDateKey(d);
+  }
+  if (!protocolStartKey && allDays.length > 0) {
+    protocolStartKey = allDays[0].date;
+  }
+
+  const protocolDays = protocolStartKey ? allDays.filter(d => d.date >= protocolStartKey) : allDays;
+  const protocolCount = Math.max(1, protocolDays.length);
+
+  const elBadgeAccumDays = document.getElementById('badgeProtocolAccumDays');
+  if (elBadgeAccumDays) {
+    elBadgeAccumDays.textContent = 'Día ' + protocolCount + ' Protocolo';
+  }
+
+  // 3. Grid de 3 periodos: Hoy, 7 Días, 30 Días
+  // A. HOY
+  const elPeriodDeficitToday = document.getElementById('valPeriodDeficitToday');
+  const elPeriodLossToday = document.getElementById('valPeriodLossToday');
+  const elBadgePeriodToday = document.getElementById('badgePeriodTodayStatus');
+
+  if (elPeriodDeficitToday) {
+    elPeriodDeficitToday.innerHTML = (netDeficitToday >= 0 ? '+' : '') + netDeficitToday.toLocaleString() + ' <small>kcal</small>';
+    elPeriodDeficitToday.style.color = netDeficitToday >= 0 ? '#34d399' : '#f87171';
+  }
+  if (elPeriodLossToday) {
+    elPeriodLossToday.textContent = (netDeficitToday >= 0 ? '-' : '+') + Math.abs(fatLossTodayGrams) + ' g';
+    elPeriodLossToday.style.color = netDeficitToday >= 0 ? '#34d399' : '#f87171';
+  }
+  if (elBadgePeriodToday) {
+    elBadgePeriodToday.textContent = netDeficitToday >= 0 ? 'En Déficit' : 'Superávit';
+    elBadgePeriodToday.style.color = netDeficitToday >= 0 ? '#34d399' : '#f87171';
+  }
+
+  // B. 7 DÍAS (SEMANA)
+  const d7Ago = new Date(now);
+  d7Ago.setDate(now.getDate() - 6);
+  const d7AgoKey = getLocalDateKey(d7Ago);
+  const weekDays = allDays.filter(d => d.date >= d7AgoKey);
+  const deficitWeek = weekDays.reduce((sum, d) => sum + (Number(d.calories_out || 0) - Number(d.calories_in || 0)), 0);
+  const lossWeekKg = Math.round((deficitWeek / 7700) * 100) / 100;
+  const daysInWeek = Math.max(1, weekDays.length);
+  const projectedWeeklyLossKg = Math.round(((deficitWeek / daysInWeek) * 7 / 7700) * 10) / 10;
+
+  const elPeriodDeficitWeek = document.getElementById('valPeriodDeficitWeek');
+  const elPeriodLossWeek = document.getElementById('valPeriodLossWeek');
+  const elBadgeWeeklyPace = document.getElementById('badgeWeeklyPaceRate');
+
+  if (elPeriodDeficitWeek) {
+    elPeriodDeficitWeek.innerHTML = (deficitWeek >= 0 ? '+' : '') + deficitWeek.toLocaleString() + ' <small>kcal</small>';
+    elPeriodDeficitWeek.style.color = deficitWeek >= 0 ? '#38bdf8' : '#f87171';
+  }
+  if (elPeriodLossWeek) {
+    elPeriodLossWeek.textContent = (lossWeekKg >= 0 ? '-' : '+') + Math.abs(lossWeekKg).toFixed(2) + ' kg';
+    elPeriodLossWeek.style.color = lossWeekKg >= 0 ? '#38bdf8' : '#f87171';
+  }
+  if (elBadgeWeeklyPace) {
+    elBadgeWeeklyPace.textContent = (projectedWeeklyLossKg >= 0 ? '-' : '+') + Math.abs(projectedWeeklyLossKg).toFixed(1) + ' kg/sem';
+  }
+
+  // C. 30 DÍAS (MES)
+  const d30Ago = new Date(now);
+  d30Ago.setDate(now.getDate() - 29);
+  const d30AgoKey = getLocalDateKey(d30Ago);
+  const monthDays = allDays.filter(d => d.date >= d30AgoKey);
+  const deficitMonth = monthDays.reduce((sum, d) => sum + (Number(d.calories_out || 0) - Number(d.calories_in || 0)), 0);
+  const lossMonthKg = Math.round((deficitMonth / 7700) * 100) / 100;
+
+  const elPeriodDeficitMonth = document.getElementById('valPeriodDeficitMonth');
+  const elPeriodLossMonth = document.getElementById('valPeriodLossMonth');
+
+  if (elPeriodDeficitMonth) {
+    elPeriodDeficitMonth.innerHTML = (deficitMonth >= 0 ? '+' : '') + deficitMonth.toLocaleString() + ' <small>kcal</small>';
+    elPeriodDeficitMonth.style.color = deficitMonth >= 0 ? '#c084fc' : '#f87171';
+  }
+  if (elPeriodLossMonth) {
+    elPeriodLossMonth.textContent = (lossMonthKg >= 0 ? '-' : '+') + Math.abs(lossMonthKg).toFixed(2) + ' kg';
+    elPeriodLossMonth.style.color = lossMonthKg >= 0 ? '#c084fc' : '#f87171';
+  }
+
+  // 4. Proyección hacia el Objetivo de Peso
+  const currentWeight = Number(state.settings?.weight || 80);
+  const goalWeight = Number(state.settings?.goal_weight || (currentWeight > 4 ? currentWeight - 4 : currentWeight));
+  const weightToLose = Math.max(0, Math.round((currentWeight - goalWeight) * 10) / 10);
+  const totalKcalNeeded = Math.round(weightToLose * 7700);
+
+  // Déficit total acumulado en todo el protocolo
+  const totalProtocolDeficit = protocolDays.reduce((sum, d) => sum + (Number(d.calories_out || 0) - Number(d.calories_in || 0)), 0);
+  const effectiveAccumDeficit = Math.max(0, totalProtocolDeficit);
+
+  const elGoalWeightDiff = document.getElementById('lblGoalWeightDiff');
+  const elGoalProgressPercent = document.getElementById('lblGoalProgressPercent');
+  const elBarGoalProgress = document.getElementById('barGoalProgressFill');
+  const elGoalTotalNeeded = document.getElementById('lblGoalTotalNeeded');
+  const elGoalTotalAccum = document.getElementById('lblGoalTotalAccum');
+  const elGoalKgRemaining = document.getElementById('lblGoalKgRemaining');
+  const elGoalDaysEstimate = document.getElementById('lblGoalDaysEstimate');
+
+  if (elGoalWeightDiff) {
+    if (weightToLose > 0) {
+      elGoalWeightDiff.textContent = 'Perder ' + weightToLose.toFixed(1) + ' kg (' + currentWeight.toFixed(1) + ' kg → ' + goalWeight.toFixed(1) + ' kg)';
+    } else {
+      elGoalWeightDiff.textContent = 'Mantenimiento (' + currentWeight.toFixed(1) + ' kg)';
+    }
+  }
+
+  if (totalKcalNeeded > 0) {
+    const progressPct = Math.min(100, Math.max(0, Math.round((effectiveAccumDeficit / totalKcalNeeded) * 100)));
+    const remainingKcal = Math.max(0, totalKcalNeeded - effectiveAccumDeficit);
+    const remainingKg = Math.max(0, Math.round((remainingKcal / 7700) * 10) / 10);
+
+    if (elGoalProgressPercent) elGoalProgressPercent.textContent = progressPct + '%';
+    if (elBarGoalProgress) elBarGoalProgress.style.width = progressPct + '%';
+    if (elGoalTotalNeeded) elGoalTotalNeeded.textContent = totalKcalNeeded.toLocaleString() + ' kcal';
+    if (elGoalTotalAccum) {
+      elGoalTotalAccum.textContent = (totalProtocolDeficit >= 0 ? '+' : '') + totalProtocolDeficit.toLocaleString() + ' kcal';
+      elGoalTotalAccum.style.color = totalProtocolDeficit >= 0 ? '#34d399' : '#f87171';
+    }
+    if (elGoalKgRemaining) elGoalKgRemaining.textContent = remainingKg.toFixed(1) + ' kg rest.';
+
+    // Estimación de días restantes según ritmo reciente
+    const avgRecentDailyDeficit = daysInWeek > 0 && (deficitWeek / daysInWeek) > 100 
+      ? (deficitWeek / daysInWeek) 
+      : (netDeficitToday > 100 ? netDeficitToday : 0);
+
+    if (elGoalDaysEstimate) {
+      if (remainingKcal === 0) {
+        elGoalDaysEstimate.textContent = '¡Meta lograda!';
+      } else if (avgRecentDailyDeficit > 100) {
+        const estDays = Math.ceil(remainingKcal / avgRecentDailyDeficit);
+        elGoalDaysEstimate.textContent = '~' + estDays + ' días';
+      } else {
+        elGoalDaysEstimate.textContent = '-- días';
+      }
+    }
+  } else {
+    if (elGoalProgressPercent) elGoalProgressPercent.textContent = '100%';
+    if (elBarGoalProgress) elBarGoalProgress.style.width = '100%';
+    if (elGoalTotalNeeded) elGoalTotalNeeded.textContent = '0 kcal';
+    if (elGoalTotalAccum) elGoalTotalAccum.textContent = (totalProtocolDeficit >= 0 ? '+' : '') + totalProtocolDeficit.toLocaleString() + ' kcal';
+    if (elGoalKgRemaining) elGoalKgRemaining.textContent = '0.0 kg';
+    if (elGoalDaysEstimate) elGoalDaysEstimate.textContent = 'En meta';
+  }
 }
 
 // ==========================================================================
