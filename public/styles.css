@@ -567,8 +567,10 @@ body {
 }
 
 .cal-sum-divider {
-  font-size: 1.2rem;
-  color: rgba(255, 255, 255, 0.15);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.25);
   margin: 0 4px;
 }
 
@@ -1057,6 +1059,95 @@ body {
 .science-note-text strong {
   color: #38bdf8;
 }
+
+/* Historial Día a Día en Pestaña Seguimiento */
+.tracking-history-card {
+  margin-top: 14px;
+}
+
+.tracking-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.tracking-history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  transition: background 0.2s ease;
+}
+
+.tracking-history-row:hover {
+  background: rgba(30, 41, 59, 0.7);
+}
+
+.tracking-day-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.tracking-day-date {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.tracking-day-breakdown {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.tracking-day-breakdown .math-op {
+  color: rgba(255, 255, 255, 0.25);
+  font-weight: 700;
+}
+
+.tracking-day-result {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.tracking-day-badge {
+  font-size: 0.78rem;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.badge-day-deficit {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.badge-day-surplus {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.tracking-day-fat {
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.green-fat { color: #34d399; }
+.red-fat { color: #f87171; }
 
 /* Garmin Grid */
 .garmin-stats-grid {

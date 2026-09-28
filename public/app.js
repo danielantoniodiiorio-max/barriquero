@@ -33,6 +33,11 @@ tabs.forEach(tab => {
     if (tab.dataset.tab === 'tab-charts') {
       if (typeof renderChartsView === 'function') renderChartsView();
     }
+    if (tab.dataset.tab === 'tab-tracking') {
+      const cIn = Math.round(state.status?.macros?.totals?.calories || 0);
+      const cOut = Math.round(state.status?.garmin?.total_calories || ((state.status?.garmin?.bmr_calories || 0) + (state.status?.garmin?.active_calories || 0)) || 0);
+      if (typeof renderDeficitAccumulation === 'function') renderDeficitAccumulation(cIn, cOut, state.status?.garmin || {});
+    }
   });
 });
 
@@ -2201,74 +2206,76 @@ function renderDashboard(data) {
     }
   }
 
-  // 2. BALANCE CALÓRICO Y TERMÓMETRO (LIMPIO, SIN DESBORDES)
+  // 2. BALANCE ENERGÉTICO HERO Y PROGRESO VS GASTO GARMIN (LIMPIO, SIN DESBORDES)
   const caloriesIn = Math.round(macros.totals.calories || 0);
   const caloriesOut = Math.round(garmin.total_calories || (garmin.bmr_calories + garmin.active_calories) || 0);
-  const targetCalories = Math.round(macros.targets.calories || 1800);
-  const calRemaining = targetCalories - caloriesIn;
-  const isOverLimit = caloriesIn > targetCalories;
-  const calPercent = targetCalories > 0 ? Math.round((caloriesIn / targetCalories) * 100) : 0;
+  const netDeficitToday = caloriesOut - caloriesIn;
+  const isDeficit = netDeficitToday >= 0;
+  const fatLossTodayGrams = Math.round(netDeficitToday / 7.7);
+
+  // Progreso Calórico respecto al Gasto del Reloj:
+  // ¿Qué porcentaje de lo que gastó tu cuerpo consumiste hoy?
+  const calPercentOfBurn = caloriesOut > 0 
+    ? Math.round((caloriesIn / caloriesOut) * 100) 
+    : (macros.targets.calories > 0 ? Math.round((caloriesIn / macros.targets.calories) * 100) : 0);
 
   const elCalIn = document.getElementById('valCalIn');
   if (elCalIn) elCalIn.innerHTML = caloriesIn.toLocaleString() + ' <small>kcal</small>';
 
-  const elCalTarget = document.getElementById('valCalTarget');
-  if (elCalTarget) elCalTarget.innerHTML = targetCalories.toLocaleString() + ' <small>kcal</small>';
+  const elCalBurnedHero = document.getElementById('valCalBurnedHero');
+  if (elCalBurnedHero) elCalBurnedHero.innerHTML = caloriesOut.toLocaleString() + ' <small>kcal</small>';
 
   const elCalRemaining = document.getElementById('valCalRemaining');
   const lblCalNet = document.getElementById('lblCalNet');
   const cardCalNet = document.getElementById('cardCalNet');
   if (elCalRemaining) {
-    if (isOverLimit) {
-      elCalRemaining.textContent = '+' + Math.abs(calRemaining).toLocaleString() + ' kcal';
-      if (lblCalNet) lblCalNet.textContent = 'Exceso';
-      if (cardCalNet) cardCalNet.classList.add('over-limit');
-    } else {
-      elCalRemaining.textContent = calRemaining.toLocaleString() + ' kcal';
-      if (lblCalNet) lblCalNet.textContent = 'Restantes';
+    if (isDeficit) {
+      elCalRemaining.textContent = '+' + netDeficitToday.toLocaleString() + ' kcal';
+      if (lblCalNet) lblCalNet.textContent = 'Déficit Hoy';
       if (cardCalNet) cardCalNet.classList.remove('over-limit');
+    } else {
+      elCalRemaining.textContent = netDeficitToday.toLocaleString() + ' kcal';
+      if (lblCalNet) lblCalNet.textContent = 'Superávit';
+      if (cardCalNet) cardCalNet.classList.add('over-limit');
     }
   }
 
-  // Termómetro minimalista
+  // Barra de progreso minimalista teniendo en cuenta el gasto del reloj
   const elThermoPercent = document.getElementById('valThermometerPercent');
   if (elThermoPercent) {
-    if (isOverLimit) {
-      elThermoPercent.textContent = '⚠️ ¡' + calPercent + '%! (Exceso +' + Math.abs(calRemaining) + ' kcal)';
+    if (!isDeficit) {
+      elThermoPercent.textContent = '⚠️ ' + calPercentOfBurn + '% (Superávit +' + Math.abs(netDeficitToday) + ' kcal)';
       elThermoPercent.style.color = '#ef4444';
     } else {
-      elThermoPercent.textContent = calPercent + '%';
-      elThermoPercent.style.color = calPercent >= 80 ? '#f59e0b' : '#38bdf8';
+      elThermoPercent.textContent = calPercentOfBurn + '% consumido del gasto';
+      elThermoPercent.style.color = calPercentOfBurn >= 85 ? '#f59e0b' : '#34d399';
     }
   }
 
   const elThermoFill = document.getElementById('barThermometerFill');
   if (elThermoFill) {
-    elThermoFill.style.width = Math.min(100, Math.max(3, calPercent)) + '%';
-    elThermoFill.className = 'thermometer-minimal-fill ' + (isOverLimit ? 'danger' : (calPercent >= 80 ? 'warning' : 'optimal'));
+    elThermoFill.style.width = Math.min(100, Math.max(3, calPercentOfBurn)) + '%';
+    elThermoFill.className = 'thermometer-minimal-fill ' + (!isDeficit ? 'danger' : (calPercentOfBurn >= 85 ? 'warning' : 'optimal'));
   }
 
   const lblGarmin = document.getElementById('lblGarminBurned');
   if (lblGarmin) {
-    const act = Number(garmin.active_calories || 0);
-    const exCal = Number(garmin.exercise_calories || 0);
-    let note = '';
-    if (exCal > 0) {
-      note = ` (${act.toLocaleString()} kcal activas: musculación + pasos)`;
-    } else if (act > 0) {
-      note = ` (${act.toLocaleString()} kcal activas)`;
+    if (isDeficit) {
+      lblGarmin.textContent = '≈ -' + fatLossTodayGrams + ' g grasa quemada hoy';
+      lblGarmin.style.color = '#34d399';
+    } else {
+      lblGarmin.textContent = '≈ +' + Math.abs(fatLossTodayGrams) + ' g superávit';
+      lblGarmin.style.color = '#f87171';
     }
-    lblGarmin.textContent = '⌚ Garmin: ' + caloriesOut.toLocaleString() + ' kcal quemadas hoy' + note;
   }
 
   const badgeCalFeedback = document.getElementById('badgeCalFeedback');
   if (badgeCalFeedback) {
-    if (isOverLimit) {
-      const extraStepsNeeded = Math.round(Math.abs(calRemaining) / 0.0342);
-      badgeCalFeedback.textContent = '🚨 Exceso: +' + Math.abs(calRemaining) + ' kcal (~' + extraStepsNeeded.toLocaleString() + ' pasos Garmin)';
+    if (!isDeficit) {
+      badgeCalFeedback.textContent = '🚨 Superávit (' + netDeficitToday.toLocaleString() + ' kcal)';
       badgeCalFeedback.className = 'feedback-badge badge-danger';
-    } else if (calPercent >= 80) {
-      badgeCalFeedback.textContent = '⚡ Cerca del Límite (' + calRemaining + ' kcal)';
+    } else if (calPercentOfBurn >= 85) {
+      badgeCalFeedback.textContent = '⚡ Próximo al equilibrio';
       badgeCalFeedback.className = 'feedback-badge badge-warning';
     } else {
       badgeCalFeedback.textContent = '✅ En Déficit Óptimo';
@@ -2390,56 +2397,16 @@ function renderDashboard(data) {
 // 4.1 MOTOR DE DÉFICIT ACUMULADO Y CORRELACIÓN BIOFISIOLÓGICA DE PESO
 // ==========================================================================
 function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
-  const cardAccum = document.getElementById('cardDeficitAccumulation');
-  if (!cardAccum) return;
+  const tabTracking = document.getElementById('tab-tracking');
+  if (!tabTracking) return;
 
   const now = new Date();
   const todayKey = getLocalDateKey(now);
 
-  // 1. Tira de Déficit Real Diario (en macros-card)
   const netDeficitToday = caloriesOut - caloriesIn;
   const fatLossTodayGrams = Math.round(netDeficitToday / 7.7);
 
-  const elValRealNet = document.getElementById('valRealNetDeficit');
-  const elSubRealFat = document.getElementById('subRealFatLoss');
-  const elBadgeReal = document.getElementById('badgeRealDeficitStatus');
-  const elBurnedMath = document.getElementById('lblDeficitBurned');
-  const elIntakeMath = document.getElementById('lblDeficitIntake');
-
-  if (elBurnedMath) elBurnedMath.textContent = '🔥 ' + caloriesOut.toLocaleString() + ' kcal gastadas';
-  if (elIntakeMath) elIntakeMath.textContent = '🍽️ ' + caloriesIn.toLocaleString() + ' kcal comidas';
-
-  if (elValRealNet) {
-    if (netDeficitToday >= 0) {
-      elValRealNet.textContent = '+' + netDeficitToday.toLocaleString() + ' kcal';
-      elValRealNet.style.color = '#34d399';
-    } else {
-      elValRealNet.textContent = netDeficitToday.toLocaleString() + ' kcal';
-      elValRealNet.style.color = '#f87171';
-    }
-  }
-
-  if (elSubRealFat) {
-    if (netDeficitToday >= 0) {
-      elSubRealFat.textContent = '≈ -' + fatLossTodayGrams + ' g grasa quemada hoy';
-      elSubRealFat.style.color = '#34d399';
-    } else {
-      elSubRealFat.textContent = '≈ +' + Math.abs(fatLossTodayGrams) + ' g superávit';
-      elSubRealFat.style.color = '#f87171';
-    }
-  }
-
-  if (elBadgeReal) {
-    if (netDeficitToday >= 0) {
-      elBadgeReal.textContent = 'Déficit Activo 🔥';
-      elBadgeReal.className = 'real-deficit-badge badge-deficit-optimal';
-    } else {
-      elBadgeReal.textContent = 'Superávit ⚠️';
-      elBadgeReal.className = 'real-deficit-badge badge-deficit-danger';
-    }
-  }
-
-  // 2. Historial de días y consolidación de acumulación
+  // 1. Historial de días y consolidación de acumulación
   let rawHistory = [];
   try {
     rawHistory = JSON.parse(localStorage.getItem('ketotrack_daily_history') || '[]');
@@ -2453,6 +2420,7 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
   // Registro de HOY en tiempo real
   const todayEntry = {
     date: todayKey,
+    day_label: 'Hoy (' + ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][now.getDay()] + ' ' + String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + ')',
     calories_in: caloriesIn,
     calories_out: caloriesOut
   };
@@ -2479,7 +2447,7 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
     elBadgeAccumDays.textContent = 'Día ' + protocolCount + ' Protocolo';
   }
 
-  // 3. Grid de 3 periodos: Hoy, 7 Días, 30 Días
+  // 2. Grid de 3 periodos: Hoy, 7 Días, 30 Días
   // A. HOY
   const elPeriodDeficitToday = document.getElementById('valPeriodDeficitToday');
   const elPeriodLossToday = document.getElementById('valPeriodLossToday');
@@ -2544,7 +2512,7 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
     elPeriodLossMonth.style.color = lossMonthKg >= 0 ? '#c084fc' : '#f87171';
   }
 
-  // 4. Proyección hacia el Objetivo de Peso
+  // 3. Proyección hacia el Objetivo de Peso
   const currentWeight = Number(state.settings?.weight || 80);
   const goalWeight = Number(state.settings?.goal_weight || (currentWeight > 4 ? currentWeight - 4 : currentWeight));
   const weightToLose = Math.max(0, Math.round((currentWeight - goalWeight) * 10) / 10);
@@ -2606,6 +2574,58 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
     if (elGoalTotalAccum) elGoalTotalAccum.textContent = (totalProtocolDeficit >= 0 ? '+' : '') + totalProtocolDeficit.toLocaleString() + ' kcal';
     if (elGoalKgRemaining) elGoalKgRemaining.textContent = '0.0 kg';
     if (elGoalDaysEstimate) elGoalDaysEstimate.textContent = 'En meta';
+  }
+
+  // 4. Renderizar Historial Día a Día (#trackingDaysHistoryList)
+  const elHistoryList = document.getElementById('trackingDaysHistoryList');
+  if (elHistoryList) {
+    const reversedDays = [...allDays].reverse();
+    let historyHtml = '';
+
+    for (const d of reversedDays) {
+      const cOut = Math.round(Number(d.calories_out || 0));
+      const cIn = Math.round(Number(d.calories_in || 0));
+      const dDeficit = cOut - cIn;
+      const isDayDeficit = dDeficit >= 0;
+      const dFatGrams = Math.round(Math.abs(dDeficit) / 7.7);
+      const isToday = (d.date === todayKey);
+
+      let label = d.day_label || d.date;
+      if (isToday) {
+        label = 'Hoy (' + ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][now.getDay()] + ' ' + String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + ')';
+      }
+
+      historyHtml += `
+        <div class="tracking-history-row" style="${isToday ? 'border-left: 3px solid #10b981;' : ''}">
+          <div class="tracking-day-info">
+            <strong class="tracking-day-date">${label}${isToday ? ' • En Curso' : ''}</strong>
+            <div class="tracking-day-breakdown">
+              <span>⌚ ${cOut.toLocaleString()} kcal</span>
+              <span class="math-op">−</span>
+              <span>🍽️ ${cIn.toLocaleString()} kcal</span>
+            </div>
+          </div>
+          <div class="tracking-day-result">
+            <span class="tracking-day-badge ${isDayDeficit ? 'badge-day-deficit' : 'badge-day-surplus'}">
+              ${isDayDeficit ? '+' + dDeficit.toLocaleString() : dDeficit.toLocaleString()} kcal
+            </span>
+            <span class="tracking-day-fat ${isDayDeficit ? 'green-fat' : 'red-fat'}">
+              ${isDayDeficit ? '≈ -' + dFatGrams + ' g grasa' : '≈ +' + dFatGrams + ' g superávit'}
+            </span>
+          </div>
+        </div>
+      `;
+    }
+
+    if (allDays.length <= 1) {
+      historyHtml += `
+        <div style="text-align: center; color: var(--text-muted); font-size: 0.72rem; padding: 10px 4px;">
+          ✨ A la medianoche, cada jornada se guardará en tu historial permanente con el balance exacto de Garmin y comidas.
+        </div>
+      `;
+    }
+
+    elHistoryList.innerHTML = historyHtml;
   }
 }
 

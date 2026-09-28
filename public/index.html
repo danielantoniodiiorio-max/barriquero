@@ -105,60 +105,35 @@
           <span class="carb-status" id="badgeCalorieDeficit">Déficit activo</span>
         </div>
 
-        <!-- BALANCE CALÓRICO HERO - NUNCA SE DESBORDA -->
+        <!-- BALANCE ENERGÉTICO HERO (INGESTA VS GASTO GARMIN) -->
         <div class="cal-balance-summary">
           <div class="cal-sum-item">
-            <span class="cal-sum-lbl">Consumidas</span>
+            <span class="cal-sum-lbl">🍽️ Ingesta</span>
             <span class="cal-sum-val" id="valCalIn">0 <small>kcal</small></span>
           </div>
-          <div class="cal-sum-divider">/</div>
+          <div class="cal-sum-divider">vs</div>
           <div class="cal-sum-item">
-            <span class="cal-sum-lbl">Meta Diaria</span>
-            <span class="cal-sum-val" id="valCalTarget">1,800 <small>kcal</small></span>
+            <span class="cal-sum-lbl">⌚ Gasto Garmin</span>
+            <span class="cal-sum-val" id="valCalBurnedHero">0 <small>kcal</small></span>
           </div>
           <div class="cal-sum-pill" id="cardCalNet">
-            <span class="cal-sum-lbl" id="lblCalNet">Restantes</span>
-            <strong id="valCalRemaining">1,800 kcal</strong>
+            <span class="cal-sum-lbl" id="lblCalNet">Déficit Hoy</span>
+            <strong id="valCalRemaining">+0 kcal</strong>
           </div>
         </div>
 
-        <!-- TERMÓMETRO MINIMALISTA -->
+        <!-- BARRA DE BALANCE CALÓRICO Y DÉFICIT DINÁMICO (TENIENDO EN CUENTA EL GASTO) -->
         <div class="thermometer-minimal-wrap">
           <div class="thermometer-minimal-header">
-            <span class="thermometer-label">🌡️ Progreso Calórico</span>
-            <span class="thermometer-percent" id="valThermometerPercent">0%</span>
+            <span class="thermometer-label">⚖️ Progreso vs Gasto del Reloj</span>
+            <span class="thermometer-percent" id="valThermometerPercent">0% consumido</span>
           </div>
           <div class="thermometer-minimal-track">
             <div class="thermometer-minimal-fill optimal" id="barThermometerFill" style="width: 0%;"></div>
           </div>
-          <div class="thermometer-minimal-header" style="margin-top: 3px;">
-            <span class="cal-burn-badge" id="lblGarminBurned">⌚ Garmin: 0 kcal quemadas hoy</span>
-            <span class="feedback-badge badge-optimal" id="badgeCalFeedback">✅ En Rango</span>
-          </div>
-        </div>
-
-        <!-- TIRA DE DÉFICIT REAL DIARIO (GARMIN VS COMIDAS) -->
-        <div class="real-deficit-strip" id="stripRealDeficit">
-          <div class="real-deficit-header">
-            <div class="real-deficit-title-wrap">
-              <span class="real-deficit-icon">⚖️</span>
-              <div>
-                <span class="real-deficit-title">Déficit Real Hoy (Garmin vs Comidas)</span>
-                <span class="real-deficit-sub" id="subRealFatLoss">≈ 0 g de grasa quemada hoy</span>
-              </div>
-            </div>
-            <span class="real-deficit-badge badge-deficit-optimal" id="badgeRealDeficitStatus">Déficit Activo 🔥</span>
-          </div>
-          <div class="real-deficit-value-row">
-            <div class="real-deficit-math">
-              <span class="real-deficit-math-item" id="lblDeficitBurned">🔥 0 kcal gastadas</span>
-              <span class="real-deficit-math-op">−</span>
-              <span class="real-deficit-math-item" id="lblDeficitIntake">🍽️ 0 kcal comidas</span>
-              <span class="real-deficit-math-op">=</span>
-            </div>
-            <div class="real-deficit-val-box">
-              <span class="real-deficit-number" id="valRealNetDeficit">+0 kcal</span>
-            </div>
+          <div class="thermometer-minimal-header" style="margin-top: 4px;">
+            <span class="cal-burn-badge" id="lblGarminBurned">≈ 0 g grasa quemada hoy</span>
+            <span class="feedback-badge badge-optimal" id="badgeCalFeedback">✅ Déficit Óptimo</span>
           </div>
         </div>
 
@@ -215,105 +190,6 @@
             <span class="ratio-title">Carbos</span>
             <small class="ratio-ideal">Meta: 5-10%</small>
           </div>
-        </div>
-      </section>
-
-      <!-- TARJETA: DÉFICIT ACUMULADO Y PÉRDIDA DE PESO ESTIMADA (DÍA / SEMANA / MES / META) -->
-      <section class="card deficit-accum-card" id="cardDeficitAccumulation">
-        <div class="section-title">
-          <div>
-            <h2>⚖️ Déficit Acumulado y Pérdida de Peso</h2>
-            <span class="sub-personal">Correlación biofisiológica (Garmin vs MyFitnessPal)</span>
-          </div>
-          <span class="badge badge-garmin" id="badgeProtocolAccumDays">Día 1</span>
-        </div>
-
-        <!-- GRID DE 3 PERIODOS: HOY / 7 DÍAS (SEMANA) / 30 DÍAS (MES) -->
-        <div class="deficit-periods-grid">
-          <!-- HOY -->
-          <div class="period-box period-today">
-            <div class="period-header">
-              <span class="period-tag">Hoy</span>
-              <span class="period-badge-mini" id="badgePeriodTodayStatus">En Déficit</span>
-            </div>
-            <div class="period-val-main" id="valPeriodDeficitToday">+0 <small>kcal</small></div>
-            <div class="period-loss-sub">
-              <span class="period-loss-num" id="valPeriodLossToday">0 g</span>
-              <span class="period-loss-lbl">grasa estimada</span>
-            </div>
-          </div>
-
-          <!-- 7 DÍAS / SEMANA -->
-          <div class="period-box period-week">
-            <div class="period-header">
-              <span class="period-tag">7 Días</span>
-              <span class="period-badge-mini pace-badge" id="badgeWeeklyPaceRate">-- kg/sem</span>
-            </div>
-            <div class="period-val-main" id="valPeriodDeficitWeek">+0 <small>kcal</small></div>
-            <div class="period-loss-sub">
-              <span class="period-loss-num" id="valPeriodLossWeek">0.00 kg</span>
-              <span class="period-loss-lbl">grasa acumulada</span>
-            </div>
-          </div>
-
-          <!-- 30 DÍAS / MES -->
-          <div class="period-box period-month">
-            <div class="period-header">
-              <span class="period-tag">30 Días</span>
-              <span class="period-badge-mini" id="badgePeriodMonthStatus">Ritmo mensual</span>
-            </div>
-            <div class="period-val-main" id="valPeriodDeficitMonth">+0 <small>kcal</small></div>
-            <div class="period-loss-sub">
-              <span class="period-loss-num" id="valPeriodLossMonth">0.00 kg</span>
-              <span class="period-loss-lbl">grasa acumulada</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- TRAYECTORIA Y PROYECCIÓN HACIA EL OBJETIVO DE PESO -->
-        <div class="goal-trajectory-box" id="boxGoalTrajectory">
-          <div class="goal-traj-header">
-            <div>
-              <span class="goal-traj-lbl">Progreso hacia tu Objetivo</span>
-              <strong class="goal-traj-target" id="lblGoalWeightDiff">Perder 4.0 kg (83 kg → 79 kg)</strong>
-            </div>
-            <div class="goal-traj-percent-pill">
-              <span id="lblGoalProgressPercent">0%</span>
-            </div>
-          </div>
-
-          <!-- Barra de progreso acumulado -->
-          <div class="goal-traj-track">
-            <div class="goal-traj-fill" id="barGoalProgressFill" style="width: 0%;"></div>
-          </div>
-
-          <!-- Métricas de la meta -->
-          <div class="goal-traj-stats">
-            <div class="traj-stat-item">
-              <span class="traj-stat-lbl">Déficit Necesario</span>
-              <strong class="traj-stat-val" id="lblGoalTotalNeeded">30.800 kcal</strong>
-            </div>
-            <div class="traj-stat-item">
-              <span class="traj-stat-lbl">Déficit Acumulado</span>
-              <strong class="traj-stat-val green-val" id="lblGoalTotalAccum">+0 kcal</strong>
-            </div>
-            <div class="traj-stat-item">
-              <span class="traj-stat-lbl">Kilos Restantes</span>
-              <strong class="traj-stat-val amber-val" id="lblGoalKgRemaining">4.0 kg</strong>
-            </div>
-            <div class="traj-stat-item">
-              <span class="traj-stat-lbl">Tiempo Estimado</span>
-              <strong class="traj-stat-val cyan-val" id="lblGoalDaysEstimate">-- días</strong>
-            </div>
-          </div>
-        </div>
-
-        <!-- NOTA CIENTÍFICA DE CALIBRACIÓN -->
-        <div class="deficit-science-note">
-          <span class="science-note-icon">📌</span>
-          <span class="science-note-text">
-            <strong>Regla de Wishnofsky & ACSM:</strong> 1 kg de grasa corporal almacenada equivale a un déficit energético neto de <strong>7.700 kcal</strong> (Garmin vs Ingesta real).
-          </span>
         </div>
       </section>
 
@@ -825,46 +701,124 @@
       </section>
     </main>
 
-    <!-- PESTAÑA 5: CETONAS REALES (BIOMARCADORES) -->
-    <main id="tab-biomarkers" class="tab-pane">
-      <div class="card">
-        <div class="section-title">
-          <h2>Registro de Cetonas Reales</h2>
-        </div>
-        <p class="text-muted">Si mides tus cetonas con tiras reactivas o medidor en sangre (ej. Keto-Mojo), regístralo aquí para contrastar con la estimación algorítmica.</p>
-
-        <form id="formKetoneLog" class="form-grid">
-          <div class="form-group">
-            <label for="selKetoneType">Tipo de Prueba</label>
-            <select id="selKetoneType">
-              <option value="blood">Sangre (mmol/L)</option>
-              <option value="urine">Tira de Orina</option>
-              <option value="breath">Aliento (ppm)</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="inputKetoneValue">Valor Medido</label>
-            <input type="number" step="0.1" id="inputKetoneValue" placeholder="Ej. 1.2" required>
-          </div>
-
-          <div class="form-group full-width">
-            <label for="inputKetoneNotes">Notas (opcional)</label>
-            <input type="text" id="inputKetoneNotes" placeholder="Ej. En ayuno matutino">
-          </div>
-
-          <button type="submit" class="btn btn-primary full-width">Guardar Medición</button>
-        </form>
-      </div>
-
+    <!-- PESTAÑA: SEGUIMIENTO DE DÉFICIT Y PÉRDIDA DE PESO DÍA A DÍA -->
+    <main id="tab-tracking" class="tab-pane">
+      <!-- 1. TRAYECTORIA Y PROYECCIÓN HACIA EL OBJETIVO DE PESO -->
       <section class="card">
         <div class="section-title">
-          <h2>Historial de Mediciones</h2>
+          <div>
+            <h2>⚖️ Seguimiento y Pérdida de Peso</h2>
+            <span class="sub-personal">Correlación biofisiológica (Garmin vs MyFitnessPal)</span>
+          </div>
+          <span class="badge badge-garmin" id="badgeProtocolAccumDays">Día 1 Protocolo</span>
         </div>
-        <div id="ketoneLogsList" class="ketone-logs-list">
-          <p class="text-muted text-center">Aún no hay mediciones registradas.</p>
+
+        <div class="goal-trajectory-box" id="boxGoalTrajectory">
+          <div class="goal-traj-header">
+            <div>
+              <span class="goal-traj-lbl">Progreso hacia tu Objetivo</span>
+              <strong class="goal-traj-target" id="lblGoalWeightDiff">Perder 4.0 kg (83 kg → 79 kg)</strong>
+            </div>
+            <div class="goal-traj-percent-pill">
+              <span id="lblGoalProgressPercent">0%</span>
+            </div>
+          </div>
+
+          <!-- Barra de progreso acumulado -->
+          <div class="goal-traj-track">
+            <div class="goal-traj-fill" id="barGoalProgressFill" style="width: 0%;"></div>
+          </div>
+
+          <!-- Métricas de la meta -->
+          <div class="goal-traj-stats">
+            <div class="traj-stat-item">
+              <span class="traj-stat-lbl">Déficit Necesario</span>
+              <strong class="traj-stat-val" id="lblGoalTotalNeeded">30.800 kcal</strong>
+            </div>
+            <div class="traj-stat-item">
+              <span class="traj-stat-lbl">Déficit Acumulado</span>
+              <strong class="traj-stat-val green-val" id="lblGoalTotalAccum">+0 kcal</strong>
+            </div>
+            <div class="traj-stat-item">
+              <span class="traj-stat-lbl">Kilos Restantes</span>
+              <strong class="traj-stat-val amber-val" id="lblGoalKgRemaining">4.0 kg</strong>
+            </div>
+            <div class="traj-stat-item">
+              <span class="traj-stat-lbl">Tiempo Estimado</span>
+              <strong class="traj-stat-val cyan-val" id="lblGoalDaysEstimate">-- días</strong>
+            </div>
+          </div>
         </div>
       </section>
+
+      <!-- 2. RESUMEN DE PERÍODOS (HOY / 7 DÍAS / 30 DÍAS) -->
+      <section class="card">
+        <div class="section-title">
+          <h2>📊 Resumen por Períodos</h2>
+        </div>
+
+        <div class="deficit-periods-grid">
+          <!-- HOY -->
+          <div class="period-box period-today">
+            <div class="period-header">
+              <span class="period-tag">Hoy</span>
+              <span class="period-badge-mini" id="badgePeriodTodayStatus">En Déficit</span>
+            </div>
+            <div class="period-val-main" id="valPeriodDeficitToday">+0 <small>kcal</small></div>
+            <div class="period-loss-sub">
+              <span class="period-loss-num" id="valPeriodLossToday">0 g</span>
+              <span class="period-loss-lbl">grasa estimada</span>
+            </div>
+          </div>
+
+          <!-- 7 DÍAS / SEMANA -->
+          <div class="period-box period-week">
+            <div class="period-header">
+              <span class="period-tag">7 Días</span>
+              <span class="period-badge-mini pace-badge" id="badgeWeeklyPaceRate">-- kg/sem</span>
+            </div>
+            <div class="period-val-main" id="valPeriodDeficitWeek">+0 <small>kcal</small></div>
+            <div class="period-loss-sub">
+              <span class="period-loss-num" id="valPeriodLossWeek">0.00 kg</span>
+              <span class="period-loss-lbl">grasa acumulada</span>
+            </div>
+          </div>
+
+          <!-- 30 DÍAS / MES -->
+          <div class="period-box period-month">
+            <div class="period-header">
+              <span class="period-tag">30 Días</span>
+              <span class="period-badge-mini" id="badgePeriodMonthStatus">Ritmo mensual</span>
+            </div>
+            <div class="period-val-main" id="valPeriodDeficitMonth">+0 <small>kcal</small></div>
+            <div class="period-loss-sub">
+              <span class="period-loss-num" id="valPeriodLossMonth">0.00 kg</span>
+              <span class="period-loss-lbl">grasa acumulada</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. HISTORIAL DÍA A DÍA (DÍA TRAS DÍA) -->
+      <section class="card tracking-history-card">
+        <div class="section-title">
+          <div>
+            <h2>📅 Historial de Déficit Día a Día</h2>
+            <span class="sub-personal">Gasto Garmin vs Ingesta día tras día</span>
+          </div>
+        </div>
+        <div id="trackingDaysHistoryList" class="tracking-history-list">
+          <p class="text-muted text-center">Calculando historial día a día...</p>
+        </div>
+      </section>
+
+      <!-- 4. NOTA CIENTÍFICA DE CALIBRACIÓN -->
+      <div class="deficit-science-note">
+        <span class="science-note-icon">📌</span>
+        <span class="science-note-text">
+          <strong>Regla de Wishnofsky & ACSM:</strong> 1 kg de grasa corporal almacenada equivale a un déficit energético neto de <strong>7.700 kcal</strong> (Garmin vs Ingesta real).
+        </span>
+      </div>
     </main>
 
     <!-- MODAL DE BASES CIENTÍFICAS Y GUÍAS MÉDICAS INTERNACIONALES (NUEVO) -->
@@ -1211,13 +1165,15 @@
         <span class="nav-tab-label">Peso</span>
       </button>
 
-      <button class="nav-tab" data-tab="tab-biomarkers" title="Cetonas y biomarcadores reales">
+      <button class="nav-tab" data-tab="tab-tracking" title="Seguimiento de déficit y pérdida de peso">
         <span class="nav-tab-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+            <path d="M9 14l2 2 4-4"/>
           </svg>
         </span>
-        <span class="nav-tab-label">Cetonas</span>
+        <span class="nav-tab-label">Seguimiento</span>
       </button>
     </nav>
   </div>
