@@ -105,35 +105,35 @@
           <span class="carb-status" id="badgeCalorieDeficit">Déficit activo</span>
         </div>
 
-        <!-- BALANCE ENERGÉTICO HERO (INGESTA VS GASTO GARMIN) -->
+        <!-- BALANCE CALÓRICO HERO (META AUMENTADA CON GASTO GARMIN) -->
         <div class="cal-balance-summary">
           <div class="cal-sum-item">
-            <span class="cal-sum-lbl">🍽️ Ingesta</span>
+            <span class="cal-sum-lbl">Consumidas</span>
             <span class="cal-sum-val" id="valCalIn">0 <small>kcal</small></span>
           </div>
-          <div class="cal-sum-divider">vs</div>
+          <div class="cal-sum-divider">/</div>
           <div class="cal-sum-item">
-            <span class="cal-sum-lbl">⌚ Gasto Garmin</span>
-            <span class="cal-sum-val" id="valCalBurnedHero">0 <small>kcal</small></span>
+            <span class="cal-sum-lbl" id="lblCalTarget">Meta + Garmin</span>
+            <span class="cal-sum-val" id="valCalTarget">1,800 <small>kcal</small></span>
           </div>
           <div class="cal-sum-pill" id="cardCalNet">
-            <span class="cal-sum-lbl" id="lblCalNet">Déficit Hoy</span>
-            <strong id="valCalRemaining">+0 kcal</strong>
+            <span class="cal-sum-lbl" id="lblCalNet">Restantes</span>
+            <strong id="valCalRemaining">1,800 kcal</strong>
           </div>
         </div>
 
-        <!-- BARRA DE BALANCE CALÓRICO Y DÉFICIT DINÁMICO (TENIENDO EN CUENTA EL GASTO) -->
+        <!-- BARRA DE PROGRESO CALÓRICO DEL PLAN -->
         <div class="thermometer-minimal-wrap">
           <div class="thermometer-minimal-header">
-            <span class="thermometer-label">⚖️ Progreso vs Gasto del Reloj</span>
-            <span class="thermometer-percent" id="valThermometerPercent">0% consumido</span>
+            <span class="thermometer-label">🌡️ Progreso del Plan (con Gasto Garmin)</span>
+            <span class="thermometer-percent" id="valThermometerPercent">0%</span>
           </div>
           <div class="thermometer-minimal-track">
             <div class="thermometer-minimal-fill optimal" id="barThermometerFill" style="width: 0%;"></div>
           </div>
           <div class="thermometer-minimal-header" style="margin-top: 4px;">
-            <span class="cal-burn-badge" id="lblGarminBurned">≈ 0 g grasa quemada hoy</span>
-            <span class="feedback-badge badge-optimal" id="badgeCalFeedback">✅ Déficit Óptimo</span>
+            <span class="cal-burn-badge" id="lblGarminBurned">⌚ Garmin: 0 kcal quemadas</span>
+            <span class="feedback-badge badge-optimal" id="badgeCalFeedback">✅ En Rango</span>
           </div>
         </div>
 

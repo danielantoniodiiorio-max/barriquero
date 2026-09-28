@@ -2206,80 +2206,92 @@ function renderDashboard(data) {
     }
   }
 
-  // 2. BALANCE ENERGÉTICO HERO Y PROGRESO VS GASTO GARMIN (LIMPIO, SIN DESBORDES)
+  // 2. BALANCE CALÓRICO HERO Y PROGRESO DEL PLAN (CON GASTO GARMIN)
   const caloriesIn = Math.round(macros.totals.calories || 0);
-  const caloriesOut = Math.round(garmin.total_calories || (garmin.bmr_calories + garmin.active_calories) || 0);
-  const netDeficitToday = caloriesOut - caloriesIn;
-  const isDeficit = netDeficitToday >= 0;
-  const fatLossTodayGrams = Math.round(netDeficitToday / 7.7);
+  const baseTargetCalories = Math.round(macros.targets.calories || 1800);
+  const activeCalories = Number(garmin.active_calories || 0);
+  const totalBurn = Math.round(garmin.total_calories || ((garmin.bmr_calories || 0) + activeCalories) || 0);
+  const caloriesOut = totalBurn;
 
-  // Progreso Calórico respecto al Gasto del Reloj:
-  // ¿Qué porcentaje de lo que gastó tu cuerpo consumiste hoy?
-  const calPercentOfBurn = caloriesOut > 0 
-    ? Math.round((caloriesIn / caloriesOut) * 100) 
-    : (macros.targets.calories > 0 ? Math.round((caloriesIn / macros.targets.calories) * 100) : 0);
+  // Al agregarle el gasto activo de Garmin a la meta del plan, la meta aumenta (modelo MyFitnessPal / ACSM)
+  const adjustedTargetCalories = baseTargetCalories + activeCalories;
+  const calRemaining = adjustedTargetCalories - caloriesIn;
+  const isOverLimit = caloriesIn > adjustedTargetCalories;
+  const calPercent = adjustedTargetCalories > 0 ? Math.round((caloriesIn / adjustedTargetCalories) * 100) : 0;
+
+  // Déficit real frente al gasto total del reloj:
+  const netDeficitToday = totalBurn - caloriesIn;
+  const isRealDeficit = netDeficitToday >= 0;
+  const fatLossTodayGrams = Math.round(Math.abs(netDeficitToday) / 7.7);
 
   const elCalIn = document.getElementById('valCalIn');
   if (elCalIn) elCalIn.innerHTML = caloriesIn.toLocaleString() + ' <small>kcal</small>';
 
-  const elCalBurnedHero = document.getElementById('valCalBurnedHero');
-  if (elCalBurnedHero) elCalBurnedHero.innerHTML = caloriesOut.toLocaleString() + ' <small>kcal</small>';
+  const elCalTarget = document.getElementById('valCalTarget');
+  const lblCalTarget = document.getElementById('lblCalTarget');
+  if (elCalTarget) {
+    elCalTarget.innerHTML = adjustedTargetCalories.toLocaleString() + ' <small>kcal</small>';
+    if (lblCalTarget) {
+      lblCalTarget.textContent = activeCalories > 0 ? `Meta (+${activeCalories.toLocaleString()} Garmin)` : 'Meta Diaria';
+    }
+  }
 
   const elCalRemaining = document.getElementById('valCalRemaining');
   const lblCalNet = document.getElementById('lblCalNet');
   const cardCalNet = document.getElementById('cardCalNet');
   if (elCalRemaining) {
-    if (isDeficit) {
-      elCalRemaining.textContent = '+' + netDeficitToday.toLocaleString() + ' kcal';
-      if (lblCalNet) lblCalNet.textContent = 'Déficit Hoy';
-      if (cardCalNet) cardCalNet.classList.remove('over-limit');
-    } else {
-      elCalRemaining.textContent = netDeficitToday.toLocaleString() + ' kcal';
-      if (lblCalNet) lblCalNet.textContent = 'Superávit';
+    if (isOverLimit) {
+      elCalRemaining.textContent = '+' + Math.abs(calRemaining).toLocaleString() + ' kcal';
+      if (lblCalNet) lblCalNet.textContent = 'Exceso';
       if (cardCalNet) cardCalNet.classList.add('over-limit');
+    } else {
+      elCalRemaining.textContent = calRemaining.toLocaleString() + ' kcal';
+      if (lblCalNet) lblCalNet.textContent = 'Restantes';
+      if (cardCalNet) cardCalNet.classList.remove('over-limit');
     }
   }
 
-  // Barra de progreso minimalista teniendo en cuenta el gasto del reloj
+  // Barra de progreso del plan ajustado con el gasto de Garmin
   const elThermoPercent = document.getElementById('valThermometerPercent');
   if (elThermoPercent) {
-    if (!isDeficit) {
-      elThermoPercent.textContent = '⚠️ ' + calPercentOfBurn + '% (Superávit +' + Math.abs(netDeficitToday) + ' kcal)';
+    if (isOverLimit) {
+      elThermoPercent.textContent = '⚠️ ¡' + calPercent + '%! (Exceso +' + Math.abs(calRemaining) + ' kcal)';
       elThermoPercent.style.color = '#ef4444';
     } else {
-      elThermoPercent.textContent = calPercentOfBurn + '% consumido del gasto';
-      elThermoPercent.style.color = calPercentOfBurn >= 85 ? '#f59e0b' : '#34d399';
+      elThermoPercent.textContent = calPercent + '% (' + calRemaining.toLocaleString() + ' kcal rest.)';
+      elThermoPercent.style.color = calPercent >= 80 ? '#f59e0b' : '#38bdf8';
     }
   }
 
   const elThermoFill = document.getElementById('barThermometerFill');
   if (elThermoFill) {
-    elThermoFill.style.width = Math.min(100, Math.max(3, calPercentOfBurn)) + '%';
-    elThermoFill.className = 'thermometer-minimal-fill ' + (!isDeficit ? 'danger' : (calPercentOfBurn >= 85 ? 'warning' : 'optimal'));
+    elThermoFill.style.width = Math.min(100, Math.max(3, calPercent)) + '%';
+    elThermoFill.className = 'thermometer-minimal-fill ' + (isOverLimit ? 'danger' : (calPercent >= 80 ? 'warning' : 'optimal'));
   }
 
   const lblGarmin = document.getElementById('lblGarminBurned');
   if (lblGarmin) {
-    if (isDeficit) {
-      lblGarmin.textContent = '≈ -' + fatLossTodayGrams + ' g grasa quemada hoy';
-      lblGarmin.style.color = '#34d399';
+    const actNote = activeCalories > 0 ? ` (${activeCalories.toLocaleString()} activas)` : '';
+    if (isRealDeficit) {
+      lblGarmin.textContent = `⌚ Garmin: ${totalBurn.toLocaleString()} kcal${actNote} • Déficit real: +${netDeficitToday.toLocaleString()} kcal (≈ -${fatLossTodayGrams}g grasa)`;
+      lblGarmin.style.color = 'var(--text-muted)';
     } else {
-      lblGarmin.textContent = '≈ +' + Math.abs(fatLossTodayGrams) + ' g superávit';
+      lblGarmin.textContent = `⌚ Garmin: ${totalBurn.toLocaleString()} kcal${actNote} • Superávit: ${netDeficitToday.toLocaleString()} kcal (≈ +${fatLossTodayGrams}g grasa)`;
       lblGarmin.style.color = '#f87171';
     }
   }
 
   const badgeCalFeedback = document.getElementById('badgeCalFeedback');
   if (badgeCalFeedback) {
-    if (!isDeficit) {
-      badgeCalFeedback.textContent = '🚨 Superávit (' + netDeficitToday.toLocaleString() + ' kcal)';
+    if (isOverLimit) {
+      badgeCalFeedback.textContent = '🚨 Exceso Plan';
       badgeCalFeedback.className = 'feedback-badge badge-danger';
-    } else if (calPercentOfBurn >= 85) {
-      badgeCalFeedback.textContent = '⚡ Próximo al equilibrio';
-      badgeCalFeedback.className = 'feedback-badge badge-warning';
-    } else {
+    } else if (isRealDeficit) {
       badgeCalFeedback.textContent = '✅ En Déficit Óptimo';
       badgeCalFeedback.className = 'feedback-badge badge-optimal';
+    } else {
+      badgeCalFeedback.textContent = '⚡ Equilibrio Calórico';
+      badgeCalFeedback.className = 'feedback-badge badge-warning';
     }
   }
 
@@ -2357,37 +2369,48 @@ function renderDashboard(data) {
 
 
     // 8. BARRAS DE MACRONUTRIENTES
-  document.getElementById('valNetCarbs').textContent = macros.totals.netCarbs;
-  document.getElementById('targetNetCarbs').textContent = macros.targets.netCarbs;
-  const carbPct = Math.min(100, (macros.totals.netCarbs / macros.targets.netCarbs) * 100);
+  const elValNetCarbs = document.getElementById('valNetCarbs');
+  if (elValNetCarbs) elValNetCarbs.textContent = macros.totals.netCarbs;
+  const elTargetCarbs = document.getElementById('targetNetCarbs');
+  if (elTargetCarbs) elTargetCarbs.textContent = macros.targets.netCarbs;
+  const carbPct = Math.min(100, (macros.totals.netCarbs / (macros.targets.netCarbs || 1)) * 100);
   const barNetCarbs = document.getElementById('barNetCarbs');
-  barNetCarbs.style.width = carbPct + '%';
+  if (barNetCarbs) barNetCarbs.style.width = carbPct + '%';
   
   const badgeCarb = document.getElementById('badgeCarbStatus');
   if (badgeCarb) {
     if (macros.status.carbLimitExceeded) {
       badgeCarb.textContent = '¡Límite Superado!';
       badgeCarb.style.color = 'var(--accent-red)';
-      barNetCarbs.style.background = 'var(--accent-red)';
+      if (barNetCarbs) barNetCarbs.style.background = 'var(--accent-red)';
     } else {
       badgeCarb.textContent = macros.status.carbRemaining + 'g restantes';
       badgeCarb.style.color = 'var(--accent-green)';
-      barNetCarbs.style.background = 'var(--accent-amber)';
+      if (barNetCarbs) barNetCarbs.style.background = 'var(--accent-amber)';
     }
   }
 
-  document.getElementById('valFat').textContent = macros.totals.fat;
-  document.getElementById('targetFat').textContent = macros.targets.fat;
-  document.getElementById('barFat').style.width = Math.min(100, (macros.totals.fat / macros.targets.fat) * 100) + '%';
+  const elValFat = document.getElementById('valFat');
+  if (elValFat) elValFat.textContent = macros.totals.fat;
+  const elTargetFat = document.getElementById('targetFat');
+  if (elTargetFat) elTargetFat.textContent = macros.targets.fat;
+  const barFat = document.getElementById('barFat');
+  if (barFat) barFat.style.width = Math.min(100, (macros.totals.fat / (macros.targets.fat || 1)) * 100) + '%';
 
-  document.getElementById('valProtein').textContent = macros.totals.protein;
-  document.getElementById('targetProtein').textContent = macros.targets.protein;
-  document.getElementById('barProtein').style.width = Math.min(100, (macros.totals.protein / macros.targets.protein) * 100) + '%';
+  const elValProtein = document.getElementById('valProtein');
+  if (elValProtein) elValProtein.textContent = macros.totals.protein;
+  const elTargetProtein = document.getElementById('targetProtein');
+  if (elTargetProtein) elTargetProtein.textContent = macros.targets.protein;
+  const barProtein = document.getElementById('barProtein');
+  if (barProtein) barProtein.style.width = Math.min(100, (macros.totals.protein / (macros.targets.protein || 1)) * 100) + '%';
 
   // Ratios calóricos
-  document.getElementById('ratioFat').textContent = macros.ratios.fat + '%';
-  document.getElementById('ratioProtein').textContent = macros.ratios.protein + '%';
-  document.getElementById('ratioCarbs').textContent = macros.ratios.carbs + '%';
+  const elRatioFat = document.getElementById('ratioFat');
+  if (elRatioFat) elRatioFat.textContent = macros.ratios.fat + '%';
+  const elRatioProtein = document.getElementById('ratioProtein');
+  if (elRatioProtein) elRatioProtein.textContent = macros.ratios.protein + '%';
+  const elRatioCarbs = document.getElementById('ratioCarbs');
+  if (elRatioCarbs) elRatioCarbs.textContent = macros.ratios.carbs + '%';
 
   // 9. DÉFICIT REAL DIARIO Y ACUMULACIÓN HISTÓRICA CON PÉRDIDA DE PESO
   renderDeficitAccumulation(caloriesIn, caloriesOut, garmin);
