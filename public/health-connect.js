@@ -123,12 +123,12 @@ class HealthConnectManager {
   async checkPermissions() {
     this.plugin = this.getPlugin();
     if (!this.plugin || typeof this.plugin.checkAuthorization !== 'function') {
-      return { authorized: false, missing: ['steps', 'calories', 'totalCalories', 'heartRate', 'weight'] };
+      return { authorized: false, missing: ['steps', 'calories', 'totalCalories', 'heartRate', 'restingHeartRate', 'weight'] };
     }
 
     try {
       const res = await this.plugin.checkAuthorization({
-        read: ['steps', 'calories', 'totalCalories', 'heartRate', 'weight'],
+        read: ['steps', 'calories', 'totalCalories', 'heartRate', 'restingHeartRate', 'weight'],
         write: []
       });
       const granted = res.readAuthorized || [];
@@ -140,7 +140,7 @@ class HealthConnectManager {
       };
     } catch (e) {
       console.warn('Error al verificar autorización de Health Connect:', e);
-      return { authorized: false, granted: [], denied: ['steps', 'calories', 'totalCalories', 'heartRate', 'weight'], error: e.message };
+      return { authorized: false, granted: [], denied: ['steps', 'calories', 'totalCalories', 'heartRate', 'restingHeartRate', 'weight'], error: e.message };
     }
   }
 
@@ -172,14 +172,14 @@ class HealthConnectManager {
         }
         try {
           await this.plugin.requestAuthorization({
-            read: ['steps', 'calories', 'totalCalories', 'exercise', 'nutrition', 'heartRate', 'weight'],
+            read: ['steps', 'calories', 'totalCalories', 'exercise', 'nutrition', 'heartRate', 'restingHeartRate', 'weight'],
             write: []
           });
         } catch (authErr) {
           console.warn('Error en requestAuthorization extendido:', authErr);
           try {
             await this.plugin.requestAuthorization({
-              read: ['steps', 'calories', 'totalCalories', 'heartRate', 'weight'],
+              read: ['steps', 'calories', 'totalCalories', 'heartRate', 'restingHeartRate', 'weight'],
               write: []
             });
           } catch (authErr2) {
@@ -254,42 +254,23 @@ class HealthConnectManager {
 
     const maxSingle = Math.max(...validSamples.map(s => s.val));
 
-    // 4. Prioridad absoluta: muestra consolidada autoritativa (isAggregate de Health Connect nativo)
     const aggSample = validSamples.find(s => s.raw && s.raw.isAggregate === true);
-    if (aggSample && aggSample.val > 0) {
-      return {
-        value: Math.round(aggSample.val),
-        count: targetList.length,
-        sources: sourcesFound,
-        garminFound: isGarmin,
-        maxSingle: Math.round(aggSample.val)
-      };
-    }
+    const aggVal = (aggSample && aggSample.val > 0) ? Math.round(aggSample.val) : 0;
 
-    // 5. Detectar si hay snapshots acumulativos de rango diario completo:
-    // Solo aplica a muestras que inician en torno a la medianoche (00:00:00) y tienen una duración prolongada (>= 60 min).
-    // Jamás clasifica una sesión de actividad o entrenamiento que inicia a media mañana como snapshot diario.
+    // 5. Detectar si hay snapshots acumulativos de rango diario completo
+    let maxMidnight = 0;
     const midnightSnapshots = validSamples.filter(s => 
       Math.abs(s.start - dayStartMs) <= 45 * 60 * 1000 && s.durationMin >= 60
     );
-
     if (midnightSnapshots.length > 0) {
-      const maxMidnight = Math.max(...midnightSnapshots.map(s => s.val));
-      if (maxMidnight > 0) {
-        return {
-          value: Math.round(maxMidnight),
-          count: targetList.length,
-          sources: sourcesFound,
-          garminFound: isGarmin,
-          maxSingle: Math.round(maxSingle)
-        };
-      }
+      maxMidnight = Math.max(...midnightSnapshots.map(s => s.val));
     }
 
     // 6. Si son intervalos discretos (ej. calorías activas por bloques de ejercicio o pasos por períodos):
     // Deduplicar registros con id o timestamps idénticos de la misma fuente
     const dedupedMap = new Map();
     for (const s of validSamples) {
+      if (s.raw && s.raw.isAggregate) continue; // No sumar la muestra sintética con los intervalos reales
       const uniqueKey = s.raw.id ? String(s.raw.id) : `${s.raw.sourceId || ''}_${s.raw.startDate}_${s.raw.endDate}`;
       const existing = dedupedMap.get(uniqueKey);
       if (!existing || s.val > existing.val) {
@@ -302,7 +283,8 @@ class HealthConnectManager {
       intervalSum += s.val;
     }
 
-    const finalValue = Math.round(Math.max(intervalSum, maxSingle));
+    // El valor final autoritativo es el máximo real entre la suma de intervalos, el snapshot diario y el aggregate
+    const finalValue = Math.round(Math.max(intervalSum, maxSingle, aggVal, maxMidnight));
 
     return {
       value: finalValue,
@@ -557,35 +539,57 @@ class HealthConnectManager {
         this.lastDiagnostics.caloriesValue = activeCalories;
       }
 
-      // 3. Leer Frecuencia Cardíaca en Reposo de Garmin
-      let restingHr = 55;
+      // 3. Leer Frecuencia Cardíaca en Reposo oficial de Garmin (RestingHeartRateRecord)
+      let restingHr = null;
       try {
-        const hrRes = await this.plugin.readSamples({
-          dataType: 'heartRate',
-          startDate: queryStart,
-          endDate: queryEnd,
-          limit: 200,
-          ascending: false
-        });
-        if (hrRes && Array.isArray(hrRes.samples) && hrRes.samples.length > 0) {
-          const gHr = hrRes.samples.filter(s => {
+        const rhrRes = await safeReadSamples('restingHeartRate', queryStart, queryEnd, 50);
+        if (rhrRes && Array.isArray(rhrRes.samples) && rhrRes.samples.length > 0) {
+          const gRhr = rhrRes.samples.filter(s => {
             const src = ((s.sourceId || '') + ' ' + (s.sourceName || '')).toLowerCase();
             return src.includes('garmin') || src.includes('connectmobile');
           });
-          const pool = gHr.length > 0 ? gHr : hrRes.samples;
-          const bpmValues = pool.map(s => Number(s.value)).filter(v => v >= 38 && v <= 180);
-          if (bpmValues.length > 0) {
-            bpmValues.sort((a, b) => a - b);
-            // El RHR (resting heart rate) corresponde a los valores basales en reposo
-            const lowIdx = Math.min(2, bpmValues.length - 1);
-            restingHr = Math.round(bpmValues[lowIdx]);
+          const pool = gRhr.length > 0 ? gRhr : rhrRes.samples;
+          const vals = pool.map(s => Number(s.value)).filter(v => v >= 35 && v <= 120);
+          if (vals.length > 0) {
+            restingHr = Math.round(vals[vals.length - 1]);
             this.lastDiagnostics.restingHr = restingHr;
           }
         }
       } catch (e) {
-        this.lastDiagnostics.errors.heartRate = e.message || String(e);
-        console.warn('Error leyendo ritmo cardíaco:', e);
+        console.warn('Error leyendo restingHeartRate:', e);
       }
+
+      // Si no hubo muestra específica de restingHeartRate, analizar las muestras de frecuencia cardíaca de todo el día
+      if (!restingHr || restingHr <= 0) {
+        try {
+          const hrRes = await this.plugin.readSamples({
+            dataType: 'heartRate',
+            startDate: queryStart,
+            endDate: queryEnd,
+            limit: 5000,
+            ascending: true
+          });
+          if (hrRes && Array.isArray(hrRes.samples) && hrRes.samples.length > 0) {
+            const gHr = hrRes.samples.filter(s => {
+              const src = ((s.sourceId || '') + ' ' + (s.sourceName || '')).toLowerCase();
+              return src.includes('garmin') || src.includes('connectmobile');
+            });
+            const pool = gHr.length > 0 ? gHr : hrRes.samples;
+            const bpmValues = pool.map(s => Number(s.value)).filter(v => v >= 38 && v <= 180);
+            if (bpmValues.length > 0) {
+              bpmValues.sort((a, b) => a - b);
+              // El percentil más bajo representativo del reposo real
+              const lowIdx = Math.min(2, bpmValues.length - 1);
+              restingHr = Math.round(bpmValues[lowIdx]);
+              this.lastDiagnostics.restingHr = restingHr;
+            }
+          }
+        } catch (e) {
+          this.lastDiagnostics.errors.heartRate = e.message || String(e);
+          console.warn('Error leyendo ritmo cardíaco:', e);
+        }
+      }
+      if (!restingHr || restingHr <= 0) restingHr = 55;
 
       // 4. Leer Peso Corporal si está disponible
       try {

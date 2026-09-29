@@ -8,6 +8,7 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.NutritionRecord
 import androidx.health.connect.client.records.Record
+import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.WeightRecord
@@ -112,8 +113,7 @@ class HealthManager {
                     }
                 }
 
-                if (aggregateSteps <= 0L) {
-                    var readSuccess = false
+                if (true) {
                     try {
                         readRecords(client, StepsRecord::class, startTime, endTime, limit) { record ->
                             val payload = createSamplePayload(
@@ -125,13 +125,8 @@ class HealthManager {
                             )
                             samples.add(record.startTime to payload)
                         }
-                        readSuccess = true
                     } catch (e: Throwable) {
                         Log.w("HealthManager", "readRecords StepsRecord threw exception: ${e.message}")
-                    }
-
-                    if (!readSuccess) {
-                        samples.clear()
                     }
                 }
             }
@@ -167,27 +162,19 @@ class HealthManager {
                     }
                 }
 
-                if (aggregateTotal <= 0.0) {
-                    var readSuccess = false
-                    try {
-                        readRecords(client, ActiveCaloriesBurnedRecord::class, startTime, endTime, limit) { record ->
-                            val payload = createSamplePayload(
-                                dataType,
-                                record.startTime,
-                                record.endTime,
-                                record.energy.inKilocalories,
-                                record.metadata
-                            )
-                            samples.add(record.startTime to payload)
-                        }
-                        readSuccess = true
-                    } catch (e: Throwable) {
-                        Log.w("HealthManager", "readRecords ActiveCaloriesBurnedRecord threw: ${e.message}")
+                try {
+                    readRecords(client, ActiveCaloriesBurnedRecord::class, startTime, endTime, limit) { record ->
+                        val payload = createSamplePayload(
+                            dataType,
+                            record.startTime,
+                            record.endTime,
+                            record.energy.inKilocalories,
+                            record.metadata
+                        )
+                        samples.add(record.startTime to payload)
                     }
-
-                    if (!readSuccess) {
-                        samples.clear()
-                    }
+                } catch (e: Throwable) {
+                    Log.w("HealthManager", "readRecords ActiveCaloriesBurnedRecord threw: ${e.message}")
                 }
             }
 
@@ -244,6 +231,23 @@ class HealthManager {
                 }
             }
 
+            HealthDataType.RESTING_HEART_RATE -> {
+                try {
+                    readRecords(client, RestingHeartRateRecord::class, startTime, endTime, limit) { record ->
+                        val payload = createSamplePayload(
+                            dataType,
+                            record.time,
+                            record.time,
+                            record.beatsPerMinute.toDouble(),
+                            record.metadata
+                        )
+                        samples.add(record.time to payload)
+                    }
+                } catch (e: Throwable) {
+                    Log.w("HealthManager", "readRecords RestingHeartRateRecord threw: ${e.message}")
+                }
+            }
+
             HealthDataType.TOTAL_CALORIES -> {
                 val isSingleDay = Duration.between(startTime, endTime).toHours() <= 30
                 var aggregateTotal = 0.0
@@ -275,21 +279,19 @@ class HealthManager {
                     }
                 }
 
-                if (aggregateTotal <= 0.0) {
-                    try {
-                        readRecords(client, TotalCaloriesBurnedRecord::class, startTime, endTime, limit) { record ->
-                            val payload = createSamplePayload(
-                                dataType,
-                                record.startTime,
-                                record.endTime,
-                                record.energy.inKilocalories,
-                                record.metadata
-                            )
-                            samples.add(record.startTime to payload)
-                        }
-                    } catch (e: Throwable) {
-                        Log.w("HealthManager", "readRecords TotalCaloriesBurnedRecord threw: ${e.message}")
+                try {
+                    readRecords(client, TotalCaloriesBurnedRecord::class, startTime, endTime, limit) { record ->
+                        val payload = createSamplePayload(
+                            dataType,
+                            record.startTime,
+                            record.endTime,
+                            record.energy.inKilocalories,
+                            record.metadata
+                        )
+                        samples.add(record.startTime to payload)
                     }
+                } catch (e: Throwable) {
+                    Log.w("HealthManager", "readRecords TotalCaloriesBurnedRecord threw: ${e.message}")
                 }
             }
 
@@ -435,6 +437,14 @@ class HealthManager {
                     endTime = endTime,
                     endZoneOffset = zoneOffset(endTime),
                     samples = samples
+                )
+                client.insertRecords(listOf(record))
+            }
+            HealthDataType.RESTING_HEART_RATE -> {
+                val record = RestingHeartRateRecord(
+                    time = startTime,
+                    zoneOffset = zoneOffset(startTime),
+                    beatsPerMinute = value.toBpmLong()
                 )
                 client.insertRecords(listOf(record))
             }

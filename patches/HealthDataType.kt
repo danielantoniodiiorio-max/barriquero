@@ -7,6 +7,7 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.NutritionRecord
 import androidx.health.connect.client.records.Record
+import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
 import androidx.health.connect.client.records.WeightRecord
@@ -24,6 +25,7 @@ enum class HealthDataType(
     EXERCISE("exercise", ExerciseSessionRecord::class, "session"),
     NUTRITION("nutrition", NutritionRecord::class, "meal"),
     HEART_RATE("heartRate", HeartRateRecord::class, "bpm"),
+    RESTING_HEART_RATE("restingHeartRate", RestingHeartRateRecord::class, "bpm"),
     WEIGHT("weight", WeightRecord::class, "kilogram");
 
     val readPermission: String
