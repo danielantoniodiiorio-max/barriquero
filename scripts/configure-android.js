@@ -69,3 +69,32 @@ if (!content.includes('desugar_jdk_libs')) {
 
 fs.writeFileSync(buildGradlePath, content, 'utf8');
 console.log('android/app/build.gradle actualizado correctamente con firma permanente ketotrack.keystore');
+
+// 5. Configurar MainActivity.java con soporte de botón Atrás seguro
+const mainActivityPath = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'java', 'com', 'ketotrack', 'garmin', 'MainActivity.java');
+if (fs.existsSync(path.dirname(mainActivityPath))) {
+  const mainActivityCode = `package com.ketotrack.garmin;
+
+import android.os.Bundle;
+import android.webkit.WebView;
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {
+    @Override
+    public void onBackPressed() {
+        WebView webView = this.bridge != null ? this.bridge.getWebView() : null;
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack();
+            return;
+        }
+        if (webView != null && webView.getUrl() != null && !webView.getUrl().contains("localhost")) {
+            webView.loadUrl("https://localhost");
+            return;
+        }
+        super.onBackPressed();
+    }
+}
+`;
+  fs.writeFileSync(mainActivityPath, mainActivityCode, 'utf8');
+  console.log('MainActivity.java configurado correctamente con navegación y botón Atrás seguro');
+}

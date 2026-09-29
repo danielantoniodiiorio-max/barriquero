@@ -130,35 +130,6 @@ jobs:
           # 4. Sincronizar assets web compilados hacia Android
           npx cap sync android
 
-          # 4b. Configurar MainActivity con soporte de botón Atrás seguro
-          node -e "
-            const fs = require('fs');
-            const mainActivityPath = 'android/app/src/main/java/com/ketotrack/garmin/MainActivity.java';
-            const code = \`package com.ketotrack.garmin;
-
-import android.os.Bundle;
-import android.webkit.WebView;
-import com.getcapacitor.BridgeActivity;
-
-public class MainActivity extends BridgeActivity {
-    @Override
-    public void onBackPressed() {
-        WebView webView = this.bridge != null ? this.bridge.getWebView() : null;
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
-            return;
-        }
-        if (webView != null && webView.getUrl() != null && !webView.getUrl().contains(\\\"localhost\\\")) {
-            webView.loadUrl(\\\"https://localhost\\\");
-            return;
-        }
-        super.onBackPressed();
-    }
-}
-\`;
-            fs.writeFileSync(mainActivityPath, code, 'utf8');
-          "
-
           # 5. Copiar Keystore permanente y configurar android/app/build.gradle
           cp certs/ketotrack.keystore android/app/ketotrack.keystore
           node scripts/configure-android.js
