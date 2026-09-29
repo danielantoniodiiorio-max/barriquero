@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Barriketo + Garmin</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -297,9 +297,9 @@
         <!-- Formulario con Asistente IA -->
         <form id="formMeal" class="form-grid">
           <div class="form-group full-width">
-            <label for="inputMealName">¿Qué comiste? (Escribe el alimento o elígelo de la lista)</label>
+            <label for="inputMealName">¿Qué comiste? (Escribe el alimento y los gramos)</label>
             <div class="input-with-action">
-              <input type="text" id="inputMealName" list="foodSuggestions" placeholder="Ej. Vacío 300g, bife de chorizo, 2 huevos..." required autocomplete="off">
+              <input type="text" id="inputMealName" placeholder="Ej. Vacío 300g, bife de chorizo, 2 huevos..." required autocomplete="off">
               <button type="button" id="btnAiCalc" class="btn btn-ai-calc" title="Calcular automáticamente nutrientes y calorías con base exacta a 100g">
                 <span>✨</span> Calcular Nutrientes Exactos
               </button>
@@ -328,9 +328,6 @@
                 </button>
               </div>
             </div>
-
-            <!-- Autocompletado nativo con todos los alimentos y cortes argentinos -->
-            <datalist id="foodSuggestions"></datalist>
 
             <div id="aiCalcFeedback" class="ai-feedback-banner" style="display: none; margin-top: 10px;"></div>
           </div>

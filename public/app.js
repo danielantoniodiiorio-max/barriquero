@@ -1658,35 +1658,6 @@ function estimateMealMacrosAI(input, explicitGrams = null) {
   };
 }
 
-// Inicialización de Autocompletado Datalist con todos los alimentos y cortes argentinos
-function initFoodSuggestions() {
-  const datalist = document.getElementById('foodSuggestions');
-  if (!datalist) return;
-  const db = (typeof window !== 'undefined' && window.FOOD_DATABASE_100G) ? window.FOOD_DATABASE_100G : [];
-  if (db.length === 0) return;
-
-  datalist.innerHTML = '';
-  const seen = new Set();
-
-  for (const item of db) {
-    if (!seen.has(item.label.toLowerCase())) {
-      const opt = document.createElement('option');
-      opt.value = `${item.label} (${item.defaultGrams}g)`;
-      datalist.appendChild(opt);
-      seen.add(item.label.toLowerCase());
-    }
-    for (const n of item.names) {
-      const nLower = n.toLowerCase();
-      if (!seen.has(nLower) && n.length > 3) {
-        const opt = document.createElement('option');
-        const cap = n.charAt(0).toUpperCase() + n.slice(1);
-        opt.value = `${cap} ${item.defaultGrams}g`;
-        datalist.appendChild(opt);
-        seen.add(nLower);
-      }
-    }
-  }
-}
 
 // Inicialización de Chips de Gramaje Rápido (50g, 100g, 150g, 200g, 250g, 300g, 400g, 500g)
 function initGramChips() {
@@ -5200,7 +5171,6 @@ async function initApp() {
   setupGarminExerciseModal();
   setupOfficialGarminSync();
   setupKetoneHelpListener();
-  initFoodSuggestions();
   initGramChips();
   syncTodayToDailyHistory();
   if (typeof renderWeightComparison === 'function') {
