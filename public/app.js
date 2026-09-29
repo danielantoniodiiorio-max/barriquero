@@ -209,7 +209,7 @@ function checkAndPerformDailyRollover() {
     const savedGarmin = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
     if (savedGarmin.date && savedGarmin.date !== todayKey) {
       const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
-      const dailyBmr = Number(state.settings?.garmin_daily_bmr) || 1865;
+      const dailyBmr = Number(state.settings?.garmin_daily_bmr) || 2185;
       const restingElapsed = Math.round((dailyBmr / 24) * elapsedHours);
       const freshGarmin = {
         date: todayKey,
@@ -1893,7 +1893,7 @@ function recalculateClientState() {
   if (!garmin.date || garmin.date !== todayKey) {
     const now = new Date();
     const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
-    const dailyBmr = Number(state.settings?.garmin_daily_bmr) || 1865;
+    const dailyBmr = Number(state.settings?.garmin_daily_bmr) || 2185;
     const restingElapsed = Math.round((dailyBmr / 24) * elapsedHours);
     garmin = {
       date: todayKey,
@@ -1927,7 +1927,7 @@ function recalculateClientState() {
 }
 
 // Expuesto globalmente para que health-connect.js lo invoque directamente
-window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5) {
+window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5, arg6) {
   let steps = 0, activeCalories = 0, restingHr = 60, source = 'Health Connect (Garmin)';
   let exercisesFromSync = null;
   let explicitBmr = null;
@@ -1937,7 +1937,7 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5) {
   if (typeof arg1 === 'object' && arg1 !== null) {
     steps = arg1.steps || 0;
     activeCalories = arg1.activeCalories || arg1.active_calories || 0;
-    restingHr = arg1.heartRate || arg1.resting_hr || 60;
+    restingHr = arg1.restingHr || arg1.resting_hr || arg1.heartRate || 60;
     source = arg1.source || 'Health Connect (Garmin)';
     exercisesFromSync = arg1.exercises || null;
     explicitBmr = arg1.bmrCalories || arg1.bmr_calories || null;
@@ -1949,6 +1949,12 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5) {
     restingHr = arg3 || 60;
     source = arg4 || 'Health Connect (Garmin)';
     exercisesFromSync = Array.isArray(arg5) ? arg5 : null;
+    if (typeof arg6 === 'number') {
+      explicitTotal = arg6;
+    } else if (typeof arg6 === 'object' && arg6 !== null) {
+      explicitTotal = arg6.totalCalories || arg6.total_calories || null;
+      if (arg6.bmrCalories) explicitBmr = arg6.bmrCalories;
+    }
   }
 
   const now = new Date();
@@ -1984,7 +1990,7 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5) {
   }
 
   const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
-  const dailyBmr = Number(state.settings?.garmin_daily_bmr) || 1865; // Calibrado según Garmin Instinct (~1.865 kcal/día)
+  let dailyBmr = Number(state.settings?.garmin_daily_bmr) || 2185; // Calibrado según Garmin (~2.185 kcal/día)
   const isOfficial = isCloudOfficial || (currentGarmin.date === todayKey && currentGarmin.is_official === true);
 
   // Si el usuario o Garmin Cloud ya fijaron valores oficiales, respetarlos con prioridad
@@ -1994,21 +2000,36 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5) {
     totalActive = Math.max(totalActive, Number(currentGarmin.active_calories));
   }
 
+  let restingElapsed = Math.round((dailyBmr / 24) * elapsedHours);
+  let totalCaloriesVal = 0;
+
+  if (explicitTotal && Number(explicitTotal) > 0) {
+    totalCaloriesVal = Math.round(Number(explicitTotal));
+    // Calibración automática: si conocemos el gasto total oficial y las calorías activas,
+    // el gasto en reposo transcurrido es exactamente (total - activas)
+    if (totalActive > 0 && totalCaloriesVal > totalActive) {
+      restingElapsed = totalCaloriesVal - totalActive;
+      const calibratedBmr = Math.round((restingElapsed / elapsedHours) * 24);
+      if (calibratedBmr >= 1200 && calibratedBmr <= 3500) {
+        dailyBmr = calibratedBmr;
+        if (!state.settings) state.settings = {};
+        state.settings.garmin_daily_bmr = calibratedBmr;
+        localStorage.setItem('ketotrack_settings', JSON.stringify(state.settings));
+      }
+    } else if (totalCaloriesVal > restingElapsed) {
+      totalActive = Math.max(totalActive, totalCaloriesVal - restingElapsed);
+    }
+  } else {
+    totalCaloriesVal = restingElapsed + totalActive;
+  }
+
   // BMR Basal diario de 24h de Garmin Instinct
   const restingDayBmr = (explicitBmr && Number(explicitBmr) > 0)
     ? Number(explicitBmr)
     : dailyBmr;
 
-  const restingElapsed = Math.round((dailyBmr / 24) * elapsedHours);
-
-  // Gasto real acumulado a la hora actual (coincide con el reloj y Garmin Web)
-  const elapsedTotalBurn = restingElapsed + totalActive;
   // Proyección de gasto a las 24h completas
   const fullDayTotalBurn = restingDayBmr + totalActive;
-
-  const totalCaloriesVal = (explicitTotal && Number(explicitTotal) > 0)
-    ? Number(explicitTotal)
-    : elapsedTotalBurn;
 
   const garmin = {
     date: todayKey,

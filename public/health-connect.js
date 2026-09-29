@@ -104,12 +104,12 @@ class HealthConnectManager {
   async checkPermissions() {
     this.plugin = this.getPlugin();
     if (!this.plugin || typeof this.plugin.checkAuthorization !== 'function') {
-      return { authorized: false, missing: ['steps', 'calories', 'heartRate', 'weight'] };
+      return { authorized: false, missing: ['steps', 'calories', 'totalCalories', 'heartRate', 'weight'] };
     }
 
     try {
       const res = await this.plugin.checkAuthorization({
-        read: ['steps', 'calories', 'heartRate', 'weight'],
+        read: ['steps', 'calories', 'totalCalories', 'heartRate', 'weight'],
         write: []
       });
       const granted = res.readAuthorized || [];
@@ -121,7 +121,7 @@ class HealthConnectManager {
       };
     } catch (e) {
       console.warn('Error al verificar autorización de Health Connect:', e);
-      return { authorized: false, granted: [], denied: ['steps', 'calories', 'heartRate', 'weight'], error: e.message };
+      return { authorized: false, granted: [], denied: ['steps', 'calories', 'totalCalories', 'heartRate', 'weight'], error: e.message };
     }
   }
 
@@ -153,14 +153,14 @@ class HealthConnectManager {
         }
         try {
           await this.plugin.requestAuthorization({
-            read: ['steps', 'calories', 'exercise', 'nutrition', 'heartRate', 'weight'],
+            read: ['steps', 'calories', 'totalCalories', 'exercise', 'nutrition', 'heartRate', 'weight'],
             write: []
           });
         } catch (authErr) {
           console.warn('Error en requestAuthorization extendido:', authErr);
           try {
             await this.plugin.requestAuthorization({
-              read: ['steps', 'calories', 'heartRate', 'weight'],
+              read: ['steps', 'calories', 'totalCalories', 'heartRate', 'weight'],
               write: []
             });
           } catch (authErr2) {
@@ -181,8 +181,9 @@ class HealthConnectManager {
   }
 
   /**
-   * Extrae métricas de Garmin evitando sumar múltiples fuentes duplicadas
-   * y manejando tanto intervalos de tiempo (15 min) como resúmenes diarios acumulativos.
+   * Extrae métricas de Garmin evitando duplicar snapshots del mismo intervalo
+   * y sumando aditivamente las sesiones discretas de ejercicio (ej. musculación/carrera)
+   * con las calorías activas basales (pasos del día).
    */
   extractMetric(samples, now = new Date()) {
     if (!Array.isArray(samples) || samples.length === 0) {
@@ -216,44 +217,47 @@ class HealthConnectManager {
     const isGarmin = garminSamples.length > 0;
     const targetList = isGarmin ? garminSamples : todaySamples;
 
-    // 3. Procesar deduplicación inteligente:
-    //    Distinguir entre intervalos periódicos (< 3h) y resúmenes diarios acumulativos (>= 3h)
-    let cumulativeMax = 0;
-    let intervalSum = 0;
-    const seenIntervals = new Set();
+    // 3. Procesar y ordenar por fecha de inicio
+    const validSamples = targetList
+      .map(s => {
+        const val = Number(s.value) || 0;
+        const start = s.startDate ? new Date(s.startDate).getTime() : 0;
+        const end = s.endDate ? new Date(s.endDate).getTime() : start;
+        return { val, start, end, raw: s };
+      })
+      .filter(s => s.val > 0)
+      .sort((a, b) => a.start - b.start || a.end - b.end);
 
-    for (const s of targetList) {
-      const val = Number(s.value) || 0;
-      if (val <= 0) continue;
+    if (validSamples.length === 0) {
+      return { value: 0, count: 0, sources: sourcesFound, garminFound: isGarmin };
+    }
 
-      const sStart = s.startDate ? new Date(s.startDate).getTime() : 0;
-      const sEnd = s.endDate ? new Date(s.endDate).getTime() : sStart;
-      const durationHours = (sEnd - sStart) / (1000 * 60 * 60);
-
-      if (durationHours >= 8) {
-        // Resumen acumulativo del día completo exportado por la app (>= 8h)
-        if (val > cumulativeMax) cumulativeMax = val;
+    // 4. Deduplicación inteligente:
+    //    Si dos muestras comienzan en la misma ventana de 10 minutos (snapshots del mismo bloque),
+    //    mantener la que tenga mayor valor o mayor cobertura.
+    //    Las muestras con distinto horario de inicio (ej. caminata matutina y entrenamiento)
+    //    se consideran sesiones separadas y se suman aditivamente.
+    const dedupedByStart = new Map();
+    for (const s of validSamples) {
+      const startKey = Math.floor(s.start / (10 * 60 * 1000));
+      const existing = dedupedByStart.get(startKey);
+      if (!existing) {
+        dedupedByStart.set(startKey, s);
       } else {
-        // Intervalos de actividad o sesiones de entrenamiento
-        const key = (s.startDate || '') + '_' + (s.endDate || '');
-        if (!seenIntervals.has(key)) {
-          seenIntervals.add(key);
-          intervalSum += val;
+        if (s.val > existing.val || (s.end > existing.end && s.val >= existing.val)) {
+          dedupedByStart.set(startKey, s);
         }
       }
     }
 
-    // Si no es Garmin y hay múltiples fuentes no-Garmin, agrupar por origen para no triplicar
-    let finalValue = Math.round(Math.max(cumulativeMax, intervalSum));
-    if (!isGarmin && sourcesFound.length > 1) {
-      // Tomar el origen con mayor total
-      const bySource = {};
-      for (const s of targetList) {
-        const src = s.sourceId || s.sourceName || 'default';
-        bySource[src] = (bySource[src] || 0) + (Number(s.value) || 0);
-      }
-      finalValue = Math.round(Math.max(0, ...Object.values(bySource)));
+    let intervalSum = 0;
+    for (const s of dedupedByStart.values()) {
+      intervalSum += s.val;
     }
+
+    // También considerar si hubo una única muestra que ya abarcaba todo el día con un total mayor
+    const maxSingle = Math.max(0, ...validSamples.map(s => s.val));
+    const finalValue = Math.round(Math.max(intervalSum, maxSingle));
 
     return {
       value: finalValue,
@@ -414,6 +418,12 @@ class HealthConnectManager {
 
       // 2a. Leer Calorías Totales Quemadas de Health Connect (TotalCaloriesBurnedRecord de Garmin)
       let totalCaloriesHC = 0;
+      const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
+      const dailyBmr = (typeof window.state !== 'undefined' && window.state.settings && window.state.settings.garmin_daily_bmr) 
+        ? Number(window.state.settings.garmin_daily_bmr) 
+        : 2185;
+      const bmrSoFar = Math.round((dailyBmr / 24) * elapsedHours);
+
       try {
         const totRes = await safeReadSamples('totalCalories', queryStart, queryEnd, 3000);
         if (totRes && Array.isArray(totRes.samples) && totRes.samples.length > 0) {
@@ -421,16 +431,16 @@ class HealthConnectManager {
           totalCaloriesHC = totDiag.value;
           this.lastDiagnostics.totalCaloriesValue = totalCaloriesHC;
 
-          // Si Health Connect reporta gasto total y no teníamos activas desglosadas:
-          if (activeCalories === 0 && totalCaloriesHC > 0) {
-            const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
-            const dailyBmr = (typeof window.state !== 'undefined' && window.state.settings && window.state.settings.garmin_daily_bmr) 
-              ? Number(window.state.settings.garmin_daily_bmr) 
-              : 1865;
-            const bmrSoFar = Math.round((dailyBmr / 24) * elapsedHours);
-            if (totalCaloriesHC > bmrSoFar) {
+          if (totalCaloriesHC > 0) {
+            if (activeCalories === 0 && totalCaloriesHC > bmrSoFar) {
               activeCalories = Math.round(totalCaloriesHC - bmrSoFar);
               this.lastDiagnostics.caloriesValue = activeCalories;
+            } else if (activeCalories > 0 && totalCaloriesHC > activeCalories) {
+              const impliedActive = Math.round(totalCaloriesHC - bmrSoFar);
+              if (impliedActive > activeCalories) {
+                activeCalories = impliedActive;
+                this.lastDiagnostics.caloriesValue = activeCalories;
+              }
             }
           }
         }
@@ -553,7 +563,15 @@ class HealthConnectManager {
             : 'Google Health Connect (Garmin)');
 
       if (window.applyGarminMetrics) {
-        window.applyGarminMetrics(steps, activeCalories, restingHr, sourceLabel, detectedExercises);
+        window.applyGarminMetrics({
+          steps: steps,
+          activeCalories: activeCalories,
+          totalCalories: totalCaloriesHC,
+          restingHr: restingHr,
+          heartRate: restingHr,
+          source: sourceLabel,
+          exercises: detectedExercises
+        });
       }
 
       // 5b. Sincronizar Historial Multi-Día de Garmin (últimos 14 días) para el Déficit Acumulado
@@ -565,9 +583,10 @@ class HealthConnectManager {
       // 6. Mensaje de Estado Claro e Informativo para el Usuario
       if (stepsError) {
         this.updateUIStatus('⚠️ Error al leer pasos: ' + stepsError + ' (Toca para reintentar o ver diagnóstico)');
-      } else if (steps > 0) {
+      } else if (steps > 0 || totalCaloriesHC > 0 || activeCalories > 0) {
         const garminTag = (stepsDiagnostic && stepsDiagnostic.garminFound) ? 'de Garmin' : 'de Health Connect';
-        this.updateUIStatus('Sincronizado: ' + timeStr + ' • ' + steps.toLocaleString() + ' pasos y ' + activeCalories + ' kcal ' + garminTag + ' ✓ (toca para detalles)');
+        const displayTotal = totalCaloriesHC > 0 ? totalCaloriesHC : (activeCalories + bmrSoFar);
+        this.updateUIStatus('Sincronizado: ' + timeStr + ' • ' + steps.toLocaleString() + ' pasos y ' + displayTotal.toLocaleString() + ' kcal totales (' + activeCalories + ' activas) ' + garminTag + ' ✓');
       } else {
         // Pasos = 0: explicar la causa exacta
         const auth = await this.checkPermissions();
@@ -726,26 +745,65 @@ class HealthConnectManager {
       ? Object.entries(diag.errors).map(([k, v]) => k + ': ' + v).join('\n')
       : 'Ninguno ✓';
 
-    const msg = [
-      '🔍 DIAGNÓSTICO DE SINCRONIZACIÓN',
-      '─────────────────────────────',
+    const textContent = [
+      '📊 DIAGNÓSTICO DE SINCRONIZACIÓN GARMIN / HEALTH CONNECT',
+      '────────────────────────────────────────────────────────',
       '• Última sincronización: ' + (diag.timestamp || 'Nunca'),
-      '• Estado de Permisos: ' + permStatus,
+      '• Permisos Health Connect: ' + permStatus,
       '• Pasos detectados: ' + diag.stepsValue.toLocaleString() + ' (de ' + diag.stepsFound + ' muestras)',
       '• Calorías Activas: ' + diag.caloriesValue + ' kcal',
+      '• Calorías Totales Health Connect: ' + (diag.totalCaloriesValue ? diag.totalCaloriesValue + ' kcal' : 'No leídas o 0'),
       '• Ritmo en Reposo: ' + (diag.restingHr ? diag.restingHr + ' bpm' : '--'),
-      '• Peso: ' + (diag.weightValue ? diag.weightValue + ' kg' : '--'),
-      '• Fuentes encontradas: ' + sourcesText,
-      '• Errores: ' + errorsText,
-      '─────────────────────────────',
-      '💡 SI LOS PASOS NO APARECEN:',
+      '• Peso corporal: ' + (diag.weightValue ? diag.weightValue + ' kg' : '--'),
+      '• Fuentes detectadas: ' + sourcesText,
+      '• Errores registrados: ' + errorsText,
+      '────────────────────────────────────────────────────────',
+      '💡 SI LAS MÉTRICAS NO APARECEN:',
       '1. Abre la app Garmin Connect en tu teléfono.',
-      '2. Desliza hacia abajo en la pantalla principal para que el reloj transfiera los pasos al teléfono.',
+      '2. Desliza hacia abajo en la pantalla principal para que el reloj transfiera los datos a Garmin Connect.',
       '3. En Garmin Connect > Ajustes > Health Connect, verifica que esté Activado.',
       '4. Vuelve a KetoTrack y toca "Sincronizar Ahora".'
     ].join('\n');
 
-    alert(msg);
+    let modalEl = document.getElementById('hcDiagnosticsModal');
+    if (!modalEl) {
+      modalEl = document.createElement('div');
+      modalEl.id = 'hcDiagnosticsModal';
+      modalEl.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:999999;display:flex;align-items:center;justify-content:center;padding:16px;';
+      modalEl.innerHTML = `
+        <div style="background:#0f172a;border:1px solid #334155;border-radius:14px;max-width:480px;width:100%;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.6);">
+          <div style="padding:14px 16px;border-bottom:1px solid #334155;display:flex;justify-content:space-between;align-items:center;">
+            <strong style="color:#f8fafc;font-size:0.95rem;">📊 Diagnóstico de Health Connect</strong>
+            <button type="button" id="btnCloseHCDiag" style="background:none;border:none;color:#94a3b8;font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
+          </div>
+          <div style="padding:14px 16px;overflow-y:auto;flex:1;">
+            <textarea id="txtHCDiagContent" readonly style="width:100%;height:230px;background:#020617;border:1px solid #1e293b;border-radius:8px;color:#e2e8f0;font-family:monospace;font-size:0.75rem;padding:10px;resize:none;box-sizing:border-box;line-height:1.4;"></textarea>
+          </div>
+          <div style="padding:12px 16px;border-top:1px solid #334155;display:flex;gap:10px;justify-content:flex-end;">
+            <button type="button" id="btnCopyHCDiag" class="btn btn-sm btn-outline" style="border-color:#38bdf8;color:#38bdf8;">📋 Copiar</button>
+            <button type="button" id="btnDoneHCDiag" class="btn btn-sm btn-primary">Entendido</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modalEl);
+
+      const closeFn = () => { modalEl.style.display = 'none'; };
+      modalEl.querySelector('#btnCloseHCDiag').addEventListener('click', closeFn);
+      modalEl.querySelector('#btnDoneHCDiag').addEventListener('click', closeFn);
+      modalEl.querySelector('#btnCopyHCDiag').addEventListener('click', async () => {
+        try {
+          const txt = modalEl.querySelector('#txtHCDiagContent').value;
+          await navigator.clipboard.writeText(txt);
+          if (typeof showToast === 'function') showToast('📋 Diagnóstico copiado al portapapeles');
+        } catch (e) {
+          console.warn('Clipboard write error:', e);
+        }
+      });
+    }
+
+    const txtBox = modalEl.querySelector('#txtHCDiagContent');
+    if (txtBox) txtBox.value = textContent;
+    modalEl.style.display = 'flex';
   }
 
   updateUIStatus(msg) {

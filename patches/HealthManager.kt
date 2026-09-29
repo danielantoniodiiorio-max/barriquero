@@ -251,6 +251,33 @@ class HealthManager {
                 } catch (e: Throwable) {
                     Log.w("HealthManager", "readRecords TotalCaloriesBurnedRecord threw: ${e.message}")
                 }
+
+                if (samples.isEmpty()) {
+                    try {
+                        val agg = client.aggregate(
+                            AggregateRequest(
+                                metrics = setOf(TotalCaloriesBurnedRecord.ENERGY_TOTAL),
+                                timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
+                            )
+                        )
+                        val energy = agg[TotalCaloriesBurnedRecord.ENERGY_TOTAL]
+                        val totalKcal = energy?.inKilocalories ?: 0.0
+                        if (totalKcal > 0.0) {
+                            val payload = JSObject().apply {
+                                put("dataType", dataType.identifier)
+                                put("value", totalKcal)
+                                put("unit", dataType.unit)
+                                put("startDate", formatter.format(startTime))
+                                put("endDate", formatter.format(endTime))
+                                put("sourceId", "com.garmin.android.apps.connectmobile")
+                                put("sourceName", "Garmin Connect")
+                            }
+                            samples.add(startTime to payload)
+                        }
+                    } catch (aggErr: Throwable) {
+                        Log.e("HealthManager", "TotalCalories aggregate fallback error: ${aggErr.message}")
+                    }
+                }
             }
 
             HealthDataType.EXERCISE -> {

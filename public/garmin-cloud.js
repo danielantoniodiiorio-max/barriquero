@@ -580,7 +580,7 @@ class GarminCloudManager {
 
       if (data) {
         // Extraer Calorías Totales Oficiales de Garmin Connect
-        const totalCalories = Number(data.totalKilocalories || ((data.bmrKilocalories || 1865) + (data.activeKilocalories || 0)));
+        const totalCalories = Number(data.totalKilocalories || ((data.bmrKilocalories || 2185) + (data.activeKilocalories || 0)));
         const steps = Number(data.totalSteps || 0);
         const activeCalories = Number(data.activeKilocalories || data.wellnessActiveKilocalories || 0);
         const restingHr = Number(data.restingHeartRate || 60);
@@ -593,6 +593,8 @@ class GarminCloudManager {
             activeCalories,
             steps,
             restingHr,
+            heartRate: restingHr,
+            bmrCalories: Number(data.bmrKilocalories) || null,
             isOfficial: true,
             source: 'Garmin Connect Oficial (Nube)'
           });
