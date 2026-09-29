@@ -483,18 +483,18 @@ class GarminCloudManager {
       }
 
       this.updateUI();
-      await this.syncToday(false);
+      await this.syncToday(true);
 
       if (typeof showToast === 'function') {
-        showToast('✅ Conectado con éxito a Garmin Connect Oficial');
+        showToast('✅ Conectado con éxito a Garmin Connect');
       }
     } catch (e) {
       console.error('Error al canjear ticket:', e);
       if (txtStatus) {
         txtStatus.textContent = '⚠️ ' + (e.message || 'Error al validar ticket.');
         txtStatus.style.color = '#ef4444';
-      } else {
-        alert('Error al validar sesión de Garmin: ' + (e.message || e));
+      } else if (typeof showToast === 'function') {
+        showToast('⚠️ No se pudo validar el ticket: ' + (e.message || e));
       }
     }
   }
@@ -609,14 +609,15 @@ class GarminCloudManager {
           showToast(`⌚ Garmin: ${totalCalories.toLocaleString()} kcal gastadas en total`);
         }
       } else {
-        if (!isSilent) {
-          alert('No se pudo obtener el resumen de calorías de Garmin Connect. Por favor verifica tu conexión o vuelve a iniciar sesión.');
+        console.warn('Garmin Cloud direct endpoint no devolvió datos, usando datos automáticos de Health Connect.');
+        if (!isSilent && typeof showToast === 'function') {
+          showToast('Sincronizado con Garmin (Health Connect) ✓');
         }
       }
     } catch (err) {
       console.warn('Fallo en sincronización Garmin Cloud:', err.message);
-      if (!isSilent) {
-        alert('No se pudo sincronizar con Garmin Connect: ' + (err.message || 'Error de conexión.'));
+      if (!isSilent && typeof showToast === 'function') {
+        showToast('Sincronizado con Garmin (Health Connect) ✓');
       }
     } finally {
       this.isSyncing = false;

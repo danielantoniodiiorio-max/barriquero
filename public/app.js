@@ -2698,7 +2698,7 @@ function renderGarminView(garmin) {
   if (heroSteps) heroSteps.textContent = steps.toLocaleString();
 
   const heroHr = document.getElementById('garminHeroHr');
-  if (heroHr) heroHr.textContent = hr + (hr !== '--' ? ' bpm' : '');
+  if (heroHr) heroHr.textContent = hr;
 
   const heroSync = document.getElementById('garminHeroSyncStatus');
   if (heroSync) {
