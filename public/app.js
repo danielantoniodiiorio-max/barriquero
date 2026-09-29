@@ -1473,8 +1473,46 @@ function extractFoodQuantityBidirectional(fullText, matchStart, matchEnd) {
 }
 
 // Función Principal de Estimación Inteligente con Procesamiento de Lenguaje Natural
-function estimateMealMacrosAI(input) {
+function estimateMealMacrosAI(input, explicitGrams = null) {
   if (!input || !input.trim()) return null;
+
+  // 1. Delegar al Motor Universal Normalizado a 100g de Barriketo
+  if (typeof window !== 'undefined' && typeof window.calculateMealMacrosExact === 'function') {
+    const exact = window.calculateMealMacrosExact(input, explicitGrams);
+    if (exact) {
+      if (exact.unknown) {
+        return {
+          unknown: true,
+          name: input.trim(),
+          carbs: 0,
+          fiber: 0,
+          net_carbs: 0,
+          protein: 0,
+          fat: 0,
+          calories: 0,
+          detected: 'Alimento no reconocido con certeza',
+          ketoStatus: 'unknown',
+          ketoBadge: '🔍 Alimento No Reconocido',
+          ketoNote: 'Para cuidar tu cetosis no inventamos valores por defecto. Selecciona una sugerencia de la lista o escribe los gramos y corte (ej: "300g vacío", "bife 200g").'
+        };
+      }
+      return {
+        unknown: false,
+        name: input.trim(),
+        carbs: exact.carbs,
+        fiber: exact.fiber,
+        net_carbs: exact.net_carbs,
+        protein: exact.protein,
+        fat: exact.fat,
+        calories: exact.calories,
+        detected: exact.detected,
+        items: exact.items,
+        ketoStatus: exact.ketoStatus,
+        ketoBadge: exact.ketoBadge,
+        ketoNote: exact.ketoNote
+      };
+    }
+  }
   
   let raw = input.toLowerCase().trim();
   let text = raw.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -1562,8 +1600,20 @@ function estimateMealMacrosAI(input) {
       totalCarbs = 2; totalFiber = 0.5; totalProtein = 45; totalFat = 28; totalCalories = 440;
       detectedList.push('Plato proteico / Carne (estimado)');
     } else {
-      totalCarbs = 22; totalFiber = 2; totalProtein = 20; totalFat = 14; totalCalories = 295;
-      detectedList.push('Plato mixto elaborado (estimado)');
+      return {
+        unknown: true,
+        name: input.trim(),
+        carbs: 0,
+        fiber: 0,
+        net_carbs: 0,
+        protein: 0,
+        fat: 0,
+        calories: 0,
+        detected: 'Alimento no reconocido con certeza',
+        ketoStatus: 'unknown',
+        ketoBadge: '🔍 Alimento No Reconocido',
+        ketoNote: 'Para proteger tu cetosis no inventamos números al azar. Elige una opción o ingresa los macros manualmente.'
+      };
     }
   }
 
@@ -1608,23 +1658,120 @@ function estimateMealMacrosAI(input) {
   };
 }
 
-// Botón de Cálculo IA en el Formulario de Comida
-document.getElementById('btnAiCalc')?.addEventListener('click', async () => {
-  const mealName = (document.getElementById('inputMealName')?.value || '').trim();
+// Inicialización de Autocompletado Datalist con todos los alimentos y cortes argentinos
+function initFoodSuggestions() {
+  const datalist = document.getElementById('foodSuggestions');
+  if (!datalist) return;
+  const db = (typeof window !== 'undefined' && window.FOOD_DATABASE_100G) ? window.FOOD_DATABASE_100G : [];
+  if (db.length === 0) return;
+
+  datalist.innerHTML = '';
+  const seen = new Set();
+
+  for (const item of db) {
+    if (!seen.has(item.label.toLowerCase())) {
+      const opt = document.createElement('option');
+      opt.value = `${item.label} (${item.defaultGrams}g)`;
+      datalist.appendChild(opt);
+      seen.add(item.label.toLowerCase());
+    }
+    for (const n of item.names) {
+      const nLower = n.toLowerCase();
+      if (!seen.has(nLower) && n.length > 3) {
+        const opt = document.createElement('option');
+        const cap = n.charAt(0).toUpperCase() + n.slice(1);
+        opt.value = `${cap} ${item.defaultGrams}g`;
+        datalist.appendChild(opt);
+        seen.add(nLower);
+      }
+    }
+  }
+}
+
+// Inicialización de Chips de Gramaje Rápido (50g, 100g, 150g, 200g, 250g, 300g, 400g, 500g)
+function initGramChips() {
+  const chips = document.querySelectorAll('.chip-gram');
+  const inputGrams = document.getElementById('inputMealGrams');
+  const lblSelected = document.getElementById('lblSelectedGrams');
+  const inputMeal = document.getElementById('inputMealName');
+
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      chips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      const g = chip.getAttribute('data-grams');
+      if (inputGrams) inputGrams.value = g;
+      if (lblSelected) lblSelected.textContent = `${g}g seleccionado`;
+
+      const curMeal = (inputMeal?.value || '').trim();
+      if (curMeal) {
+        triggerAiMacroCalc(parseFloat(g));
+      }
+    });
+  });
+
+  const btnApply = document.getElementById('btnApplyGrams');
+  if (btnApply) {
+    btnApply.addEventListener('click', () => {
+      const g = parseFloat(inputGrams?.value);
+      if (g && g > 0) {
+        if (lblSelected) lblSelected.textContent = `${g}g seleccionado`;
+        triggerAiMacroCalc(g);
+      } else {
+        triggerAiMacroCalc();
+      }
+    });
+  }
+
+  inputGrams?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const g = parseFloat(inputGrams.value);
+      triggerAiMacroCalc(g || null);
+    }
+  });
+}
+
+// Disparador principal de cálculo nutricional con base 100g
+function triggerAiMacroCalc(forcedGrams = null) {
+  const inputMeal = document.getElementById('inputMealName');
+  const mealName = (inputMeal?.value || '').trim();
   if (!mealName) {
-    alert('Escribe el plato, postre o bebida que consumiste (ej. 2 empanadas de carne y una cerveza, flan mixto, bife de chorizo con ensalada).');
-    document.getElementById('inputMealName')?.focus();
+    alert('Escribe el alimento o plato que consumiste (ej. Vacío 300g, bife de chorizo, 2 huevos fritos).');
+    inputMeal?.focus();
     return;
   }
 
+  const explicitG = forcedGrams || parseFloat(document.getElementById('inputMealGrams')?.value) || null;
   const feedback = document.getElementById('aiCalcFeedback');
   if (feedback) {
     feedback.style.display = 'block';
-    feedback.innerHTML = '<span>🤖</span> <em>Analizando plato y calculando macronutrientes con IA...</em>';
+    feedback.style.borderLeft = '4px solid #38bdf8';
+    feedback.style.background = 'rgba(56, 189, 248, 0.12)';
+    feedback.innerHTML = '<span>🤖</span> <em>Calculando macronutrientes proporcionales a 100g...</em>';
   }
 
-  const result = estimateMealMacrosAI(mealName);
+  const result = estimateMealMacrosAI(mealName, explicitG);
   if (result) {
+    if (result.unknown) {
+      if (feedback) {
+        feedback.style.borderLeft = '4px solid #f59e0b';
+        feedback.style.background = 'rgba(245, 158, 11, 0.14)';
+        feedback.innerHTML = `
+          <div style="font-size:0.86rem; font-weight:800; color:#f59e0b; margin-bottom:4px;">
+            ${result.ketoBadge}
+          </div>
+          <div style="font-size:0.82rem; color:var(--text-main); margin-bottom:4px;">
+            No reconocimos con certeza <strong>"${escapeHtml(mealName)}"</strong> en la base de datos de 100g.
+          </div>
+          <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:4px;">
+            💡 <em>Para proteger tu cetosis no inventamos números al azar. Elige una opción de la lista o escribe el peso y corte (ej: "300g vacío", "bife 200g").</em>
+          </div>
+        `;
+      }
+      return;
+    }
+
     document.getElementById('inputCarbs').value = result.carbs;
     document.getElementById('inputFiber').value = result.fiber;
     document.getElementById('inputProtein').value = result.protein;
@@ -1640,18 +1787,23 @@ document.getElementById('btnAiCalc')?.addEventListener('click', async () => {
         <div style="font-size:0.86rem; font-weight:800; color:${badgeColor}; margin-bottom:4px;">
           ${result.ketoBadge}
         </div>
-        <div style="font-size:0.82rem; color:var(--text-main); margin-bottom:4px;">
-          <strong>✨ Detectado:</strong> ${result.detected}
+        <div style="font-size:0.84rem; color:var(--text-main); margin-bottom:4px;">
+          <strong>⚖️ Calculado con exactitud:</strong> ${escapeHtml(result.detected)}
         </div>
-        <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:4px;">
-          👉 <strong>${result.net_carbs}g carbos netos</strong> (${result.carbs}g tot / ${result.fiber}g fibra) • <strong>${result.fat}g grasa</strong> • <strong>${result.protein}g prot</strong> • <strong>${result.calories} kcal</strong>
+        <div style="font-size:0.82rem; color:var(--text-muted); margin-bottom:4px;">
+          👉 <strong>${result.net_carbs}g carbos netos</strong> (${result.carbs}g tot / ${result.fiber}g fibra) • <strong>${result.protein}g proteína</strong> • <strong>${result.fat}g grasa</strong> • <strong>${result.calories} kcal</strong>
         </div>
-        <div style="font-size:0.76rem; color:${badgeColor}; font-style:italic;">
+        <div style="font-size:0.78rem; color:${badgeColor}; font-style:italic;">
           💡 ${result.ketoNote}
         </div>
       `;
     }
   }
+}
+
+// Botón de Cálculo en el Formulario de Comida
+document.getElementById('btnAiCalc')?.addEventListener('click', () => {
+  triggerAiMacroCalc();
 });
 
 // ==========================================================================
@@ -3119,10 +3271,11 @@ document.getElementById('formMeal')?.addEventListener('submit', (e) => {
   let fat = parseFloat(document.getElementById('inputFat')?.value) || 0;
   let calories = parseFloat(document.getElementById('inputCalories')?.value);
 
-  // Si los macros están todos en 0 pero el usuario escribió un plato, autocalcular con IA automáticamente
+  // Si los macros están todos en 0 pero el usuario escribió un plato, autocalcular con base 100g automáticamente
   if (carbs === 0 && fiber === 0 && protein === 0 && fat === 0) {
-    const aiAuto = estimateMealMacrosAI(name);
-    if (aiAuto) {
+    const explicitGrams = parseFloat(document.getElementById('inputMealGrams')?.value) || null;
+    const aiAuto = estimateMealMacrosAI(name, explicitGrams);
+    if (aiAuto && !aiAuto.unknown) {
       carbs = aiAuto.carbs;
       fiber = aiAuto.fiber;
       protein = aiAuto.protein;
@@ -5047,6 +5200,8 @@ async function initApp() {
   setupGarminExerciseModal();
   setupOfficialGarminSync();
   setupKetoneHelpListener();
+  initFoodSuggestions();
+  initGramChips();
   syncTodayToDailyHistory();
   if (typeof renderWeightComparison === 'function') {
     renderWeightComparison();

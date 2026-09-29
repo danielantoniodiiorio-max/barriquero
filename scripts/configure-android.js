@@ -11,9 +11,9 @@ if (!fs.existsSync(buildGradlePath)) {
 
 let content = fs.readFileSync(buildGradlePath, 'utf8');
 
-// 1. Incrementar versionCode a 21 y versionName a 1.20.0
-content = content.replace(/versionCode\s+\d+/, 'versionCode 21');
-content = content.replace(/versionName\s+["'][^"']*["']/, 'versionName "1.20.0"');
+// 1. Incrementar versionCode a 22 y versionName a 1.21.0
+content = content.replace(/versionCode\s+\d+/, 'versionCode 22');
+content = content.replace(/versionName\s+["'][^"']*["']/, 'versionName "1.21.0"');
 
 // 2. Inyectar bloque signingConfigs permanente
 const signingConfigsBlock = `

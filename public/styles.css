@@ -3720,5 +3720,51 @@ button[type="submit"].full-width,
   display: block !important;
 }
 
+/* 9. Selector rápido de gramajes y porciones exactas */
+.gram-selector-wrap {
+  background: rgba(30, 41, 59, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-top: 10px;
+}
+
+.gram-chips-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 0 6px 0;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chip-gram {
+  background: rgba(51, 65, 85, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  border-radius: 20px;
+  padding: 6px 13px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.chip-gram:hover, .chip-gram:focus {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #f8fafc;
+}
+
+.chip-gram.active {
+  background: #38bdf8 !important;
+  border-color: #38bdf8 !important;
+  color: #0f172a !important;
+  font-weight: 800 !important;
+  box-shadow: 0 2px 10px rgba(56, 189, 248, 0.4) !important;
+}
+
 
 
