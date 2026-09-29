@@ -186,15 +186,18 @@ function consolidatePastDaysIntoHistory(todayKey) {
     const existingIdx = history.findIndex(h => h.date === dKey);
     const pastRecord = existingIdx !== -1 ? history[existingIdx] : null;
 
-    let steps = pastRecord?.steps || 0;
-    let caloriesOut = pastRecord?.calories_out || 0;
-    let activeCal = pastRecord?.active_calories || 0;
+    let steps = (pastRecord?.steps > 0 && pastRecord?.steps < 45000) ? pastRecord.steps : 0;
+    let caloriesOut = (pastRecord?.calories_out > 0 && pastRecord?.calories_out < 4500) ? pastRecord.calories_out : 0;
+    let activeCal = (pastRecord?.active_calories > 0 && pastRecord?.active_calories < 2500) ? pastRecord.active_calories : 0;
     let exercises = pastRecord?.exercises || [];
 
     if (savedGarmin.date === dKey) {
-      steps = Number(savedGarmin.steps || steps);
-      caloriesOut = Number(savedGarmin.total_calories || caloriesOut);
-      activeCal = Number(savedGarmin.active_calories || activeCal);
+      const gSteps = Number(savedGarmin.steps || 0);
+      const gTot = Number(savedGarmin.total_calories || 0);
+      const gAct = Number(savedGarmin.active_calories || 0);
+      if (gSteps > 0 && gSteps < 45000) steps = gSteps;
+      if (gTot > 0 && gTot < 4500) caloriesOut = gTot;
+      if (gAct > 0 && gAct < 2500) activeCal = gAct;
       if (Array.isArray(savedGarmin.exercises)) exercises = savedGarmin.exercises;
     }
 
@@ -4209,9 +4212,11 @@ function syncTodayToDailyHistory() {
   const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   const dailyBmr = Number(state.settings?.garmin_daily_bmr) || 2185;
 
-  // 1. Reconciliar macros de todos los días pasados ya presentes en history
+  // 1. Reconciliar macros de todos los días pasados ya presentes en history y sanear valores anómalos
   for (const h of history) {
     if (h.date === todayKey) continue;
+    if (h.steps > 45000) h.steps = 0;
+    if (h.calories_out > 4500) h.calories_out = dailyBmr + Number(h.active_calories || 0);
     const dayMeals = allMeals.filter(m => getLocalDateKey(m.timestamp) === h.date);
     if (dayMeals.length > 0) {
       let dayNetCarbs = 0, dayFat = 0, dayProtein = 0, dayCalIn = 0;

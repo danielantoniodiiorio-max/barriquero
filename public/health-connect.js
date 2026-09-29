@@ -200,41 +200,41 @@ class HealthConnectManager {
   }
 
   /**
-   * Extrae métricas de Garmin evitando duplicar snapshots del mismo intervalo
-   * y sumando aditivamente las sesiones discretas de ejercicio (ej. musculación/carrera)
-   * con las calorías activas basales (pasos del día).
+   * Extrae y agrega métricas para una fecha local específica (hoy o día pasado).
+   * Maneja tanto snapshots acumulativos de Garmin (de 00:00 a X hora)
+   * como intervalos discretos de ejercicio sin duplicar ni multiplicar.
    */
-  extractMetric(samples, now = new Date()) {
+  extractMetricForDate(samples, targetDate = new Date()) {
     if (!Array.isArray(samples) || samples.length === 0) {
-      return { value: 0, count: 0, sources: [], garminFound: false };
+      return { value: 0, count: 0, sources: [], garminFound: false, maxSingle: 0 };
     }
 
-    // Delimitar el día local de hoy (00:00:00 a 23:59:59.999 hora del teléfono)
-    const startOfTodayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
-    const endOfTodayMs = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).getTime();
+    const t = (targetDate instanceof Date) ? targetDate : new Date(targetDate);
+    const dayStartMs = new Date(t.getFullYear(), t.getMonth(), t.getDate(), 0, 0, 0, 0).getTime();
+    const dayEndMs = new Date(t.getFullYear(), t.getMonth(), t.getDate(), 23, 59, 59, 999).getTime();
 
-    // 1. Filtrar registros que pertenezcan a la jornada de hoy
-    const todaySamples = samples.filter(s => {
+    // 1. Filtrar registros que pertenezcan a este día
+    const daySamples = samples.filter(s => {
       const sStart = s.startDate ? new Date(s.startDate).getTime() : 0;
       const sEnd = s.endDate ? new Date(s.endDate).getTime() : sStart;
-      return sStart <= endOfTodayMs && sEnd >= startOfTodayMs;
+      return sStart <= dayEndMs && sEnd >= dayStartMs;
     });
 
-    if (todaySamples.length === 0) {
-      return { value: 0, count: 0, sources: [], garminFound: false };
+    if (daySamples.length === 0) {
+      return { value: 0, count: 0, sources: [], garminFound: false, maxSingle: 0 };
     }
 
     // Registrar todas las fuentes presentes
-    const sourcesFound = [...new Set(todaySamples.map(s => s.sourceName || s.sourceId || 'desconocido'))];
+    const sourcesFound = [...new Set(daySamples.map(s => s.sourceName || s.sourceId || 'desconocido'))];
 
-    // 2. Filtrar por Garmin Connect (paquete com.garmin.android.apps.connectmobile o dispositivo Garmin)
-    const garminSamples = todaySamples.filter(s => {
+    // 2. Filtrar por Garmin Connect con prioridad absoluta si existe
+    const garminSamples = daySamples.filter(s => {
       const src = ((s.sourceId || '') + ' ' + (s.sourceName || '')).toLowerCase();
       return src.includes('garmin') || src.includes('connectmobile');
     });
 
     const isGarmin = garminSamples.length > 0;
-    const targetList = isGarmin ? garminSamples : todaySamples;
+    const targetList = isGarmin ? garminSamples : daySamples;
 
     // 3. Procesar y ordenar por fecha de inicio
     const validSamples = targetList
@@ -242,19 +242,36 @@ class HealthConnectManager {
         const val = Number(s.value !== undefined ? s.value : (s.count !== undefined ? s.count : (s.energy !== undefined ? s.energy : (s.calories !== undefined ? s.calories : 0)))) || 0;
         const start = s.startDate ? new Date(s.startDate).getTime() : 0;
         const end = s.endDate ? new Date(s.endDate).getTime() : start;
-        return { val, start, end, raw: s };
+        const durationMin = Math.max(0, (end - start) / (60 * 1000));
+        return { val, start, end, durationMin, raw: s };
       })
       .filter(s => s.val > 0)
       .sort((a, b) => a.start - b.start || a.end - b.end);
 
     if (validSamples.length === 0) {
-      return { value: 0, count: 0, sources: sourcesFound, garminFound: isGarmin };
+      return { value: 0, count: 0, sources: sourcesFound, garminFound: isGarmin, maxSingle: 0 };
     }
 
-    // 4. Deduplicación exacta de intervalos sin agrupar por bloques arbitrarios:
-    //    En Health Connect, Garmin registra muestras discretas (ej. cada 1 a 2 minutos).
-    //    Identificamos cada intervalo por su ID nativo o por la combinación exacta de timestamps.
-    //    Si existe una reescritura del mismo intervalo, nos quedamos con el valor mayor.
+    const maxSingle = Math.max(...validSamples.map(s => s.val));
+
+    // 4. Detectar si hay snapshots acumulativos de rango amplio:
+    //    En Garmin Connect, los sincronismos diarios envían el acumulado del día (inician a medianoche o duran >= 30 min).
+    //    Si existen snapshots acumulativos, el valor máximo representa el total real acumulado del día.
+    const wideSamples = validSamples.filter(s => s.durationMin >= 40 || (Math.abs(s.start - dayStartMs) <= 30 * 60 * 1000 && s.durationMin >= 20));
+
+    if (wideSamples.length > 0) {
+      const maxWide = Math.max(...wideSamples.map(s => s.val));
+      return {
+        value: Math.round(maxWide),
+        count: targetList.length,
+        sources: sourcesFound,
+        garminFound: isGarmin,
+        maxSingle: Math.round(maxSingle)
+      };
+    }
+
+    // 5. Si son intervalos discretos pequeños (ej. 1 a 15 min):
+    //    Deduplicar registros con id o timestamps idénticos
     const dedupedMap = new Map();
     for (const s of validSamples) {
       const uniqueKey = s.raw.id ? String(s.raw.id) : `${s.raw.sourceId || ''}_${s.raw.startDate}_${s.raw.endDate}`;
@@ -264,21 +281,39 @@ class HealthConnectManager {
       }
     }
 
-    let intervalSum = 0;
-    for (const s of dedupedMap.values()) {
-      intervalSum += s.val;
+    // Sumar solo intervalos que no se solapan en el tiempo
+    const sortedDeduped = Array.from(dedupedMap.values()).sort((a, b) => a.start - b.start || a.end - b.end);
+    let nonOverlappingSum = 0;
+    let lastEnd = 0;
+
+    for (const s of sortedDeduped) {
+      if (s.start >= lastEnd) {
+        nonOverlappingSum += s.val;
+        lastEnd = s.end;
+      } else if (s.end > lastEnd) {
+        const overlap = lastEnd - s.start;
+        const totalLen = Math.max(1, s.end - s.start);
+        if (overlap / totalLen < 0.5) {
+          nonOverlappingSum += Math.round(s.val * (1 - (overlap / totalLen)));
+          lastEnd = s.end;
+        }
+      }
     }
 
-    // Si además existe un registro consolidado acumulativo de todo el día que sea mayor, lo respetamos
-    const maxSingle = Math.max(0, ...validSamples.map(s => s.val));
-    const finalValue = Math.round(Math.max(intervalSum, maxSingle));
+    const finalValue = Math.round(Math.max(nonOverlappingSum, maxSingle));
 
     return {
       value: finalValue,
       count: targetList.length,
       sources: sourcesFound,
-      garminFound: isGarmin
+      garminFound: isGarmin,
+      maxSingle: Math.round(maxSingle)
     };
+  }
+
+  // Alias para mantener compatibilidad con llamadas existentes
+  extractMetric(samples, now = new Date()) {
+    return this.extractMetricForDate(samples, now);
   }
 
   // Sincronizar ingestas de MyFitnessPal leídas desde Health Connect
@@ -666,8 +701,22 @@ class HealthConnectManager {
         history = JSON.parse(localStorage.getItem('ketotrack_daily_history') || '[]');
       } catch (e) { history = []; }
       const cleaned = history.filter(h => h && h.date && h.date >= protocolStartKey);
-      if (cleaned.length !== history.length) {
-        history = cleaned;
+      let modified = (cleaned.length !== history.length);
+      history = cleaned.map(h => {
+        let changed = false;
+        let copy = { ...h };
+        if (copy.steps > 45000) {
+          copy.steps = 0;
+          changed = true;
+        }
+        if (copy.calories_out > 4500) {
+          copy.calories_out = dailyBmr + Number(copy.active_calories || 0);
+          changed = true;
+        }
+        if (changed) modified = true;
+        return copy;
+      });
+      if (modified) {
         localStorage.setItem('ketotrack_daily_history', JSON.stringify(history));
       }
 
@@ -716,11 +765,7 @@ class HealthConnectManager {
         return (typeof getLocalDateKey === 'function') ? getLocalDateKey(d) : d.toISOString().slice(0, 10);
       };
 
-      const dayStepsMap = {};
-      const dayCalMap = {};
-      const dayTotalCalMap = {};
       const daysNutritionMap = {};
-
       for (const s of histNutrition) {
         const dKey = getSampleDateKey(s);
         if (!dKey || dKey < protocolStartKey || dKey >= todayKey) continue;
@@ -728,48 +773,19 @@ class HealthConnectManager {
         if (cal > 0) daysNutritionMap[dKey] = (daysNutritionMap[dKey] || 0) + cal;
       }
 
-      for (const s of histSteps) {
+      // Recolectar todas las fechas pasadas dentro del protocolo
+      const allPastKeys = new Set();
+      const collectDateKey = (s) => {
         const dKey = getSampleDateKey(s);
-        if (!dKey || dKey < protocolStartKey || dKey >= todayKey) continue;
-        const key = s.id ? String(s.id) : `${s.sourceId || ''}_${s.startDate}_${s.endDate}`;
-        const val = Number(s.value !== undefined ? s.value : (s.count !== undefined ? s.count : 0)) || 0;
-        if (val > 0) {
-          if (!dayStepsMap[dKey]) dayStepsMap[dKey] = new Map();
-          const cur = dayStepsMap[dKey].get(key) || 0;
-          if (val > cur) dayStepsMap[dKey].set(key, val);
+        if (dKey && dKey >= protocolStartKey && dKey < todayKey) {
+          allPastKeys.add(dKey);
         }
-      }
+      };
 
-      for (const s of histCal) {
-        const dKey = getSampleDateKey(s);
-        if (!dKey || dKey < protocolStartKey || dKey >= todayKey) continue;
-        const key = s.id ? String(s.id) : `${s.sourceId || ''}_${s.startDate}_${s.endDate}`;
-        const val = Number(s.value !== undefined ? s.value : (s.energy !== undefined ? s.energy : (s.calories !== undefined ? s.calories : 0))) || 0;
-        if (val > 0) {
-          if (!dayCalMap[dKey]) dayCalMap[dKey] = new Map();
-          const cur = dayCalMap[dKey].get(key) || 0;
-          if (val > cur) dayCalMap[dKey].set(key, val);
-        }
-      }
-
-      for (const s of histTotalCal) {
-        const dKey = getSampleDateKey(s);
-        if (!dKey || dKey < protocolStartKey || dKey >= todayKey) continue;
-        const key = s.id ? String(s.id) : `${s.sourceId || ''}_${s.startDate}_${s.endDate}`;
-        const val = Number(s.value !== undefined ? s.value : (s.energy !== undefined ? s.energy : (s.calories !== undefined ? s.calories : 0))) || 0;
-        if (val > 0) {
-          if (!dayTotalCalMap[dKey]) dayTotalCalMap[dKey] = new Map();
-          const cur = dayTotalCalMap[dKey].get(key) || 0;
-          if (val > cur) dayTotalCalMap[dKey].set(key, val);
-        }
-      }
-
-      const allPastKeys = new Set([
-        ...Object.keys(dayStepsMap),
-        ...Object.keys(dayCalMap),
-        ...Object.keys(dayTotalCalMap),
-        ...Object.keys(daysNutritionMap)
-      ]);
+      histSteps.forEach(collectDateKey);
+      histCal.forEach(collectDateKey);
+      histTotalCal.forEach(collectDateKey);
+      histNutrition.forEach(collectDateKey);
 
       const localMeals = JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
       for (const m of localMeals) {
@@ -779,26 +795,34 @@ class HealthConnectManager {
         }
       }
 
+      for (const h of history) {
+        if (h && h.date && h.date >= protocolStartKey && h.date < todayKey) {
+          allPastKeys.add(h.date);
+        }
+      }
+
       const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
       const dailyBmr = (typeof window.state !== 'undefined' && window.state.settings && window.state.settings.garmin_daily_bmr) 
         ? Number(window.state.settings.garmin_daily_bmr) 
         : 2185;
 
       for (const dKey of allPastKeys) {
-        let totalSteps = 0;
-        if (dayStepsMap[dKey]) {
-          for (const v of dayStepsMap[dKey].values()) totalSteps += v;
-        }
-        let totalActiveCal = 0;
-        if (dayCalMap[dKey]) {
-          for (const v of dayCalMap[dKey].values()) totalActiveCal += v;
-        }
-        let totalBurnFromHc = 0;
-        if (dayTotalCalMap[dKey]) {
-          for (const v of dayTotalCalMap[dKey].values()) totalBurnFromHc += v;
-        }
+        const dObj = new Date(dKey + 'T12:00:00');
+        const stepsDiag = this.extractMetricForDate(histSteps, dObj);
+        const calDiag = this.extractMetricForDate(histCal, dObj);
+        const totDiag = this.extractMetricForDate(histTotalCal, dObj);
 
-        const totalBurn = totalBurnFromHc > 0 ? Math.round(totalBurnFromHc) : Math.round(dailyBmr + totalActiveCal);
+        let totalSteps = stepsDiag.value;
+        let totalActiveCal = calDiag.value;
+        let totalBurn = totDiag.value > 0 ? totDiag.value : (dailyBmr + totalActiveCal);
+
+        // Sanity guards fisiológicos contra multiplicaciones de snapshots corruptos
+        if (totalBurn > 4500 && totalActiveCal < 2000) {
+          totalBurn = dailyBmr + totalActiveCal;
+        }
+        if (totalSteps > 50000 && stepsDiag.maxSingle > 0 && stepsDiag.maxSingle < 50000) {
+          totalSteps = stepsDiag.maxSingle;
+        }
 
         const dayMeals = localMeals.filter(m => {
           const mKey = (typeof getLocalDateKey === 'function') ? getLocalDateKey(m.timestamp) : (m.timestamp ? m.timestamp.slice(0, 10) : '');
@@ -814,18 +838,26 @@ class HealthConnectManager {
         }
 
         const calIn = Math.max(calInFromMeals, Number(daysNutritionMap[dKey] || 0));
-        const dObj = new Date(dKey + 'T12:00:00');
         const dayLabel = daysOfWeek[dObj.getDay()] + ' ' + String(dObj.getDate()).padStart(2, '0') + '/' + String(dObj.getMonth() + 1).padStart(2, '0');
 
         const existingIdx = history.findIndex(h => h.date === dKey);
         const prev = existingIdx !== -1 ? history[existingIdx] : null;
 
+        // Limpiar outliers previos si prev tenía valores multiplicados (> 50.000 pasos o > 5.000 kcal)
+        const prevCleanSteps = (prev && prev.steps > 0 && prev.steps < 45000) ? prev.steps : 0;
+        const prevCleanActiveCal = (prev && prev.active_calories > 0 && prev.active_calories < 2500) ? prev.active_calories : 0;
+        const prevCleanBurn = (prev && prev.calories_out > 0 && prev.calories_out < 4500) ? prev.calories_out : dailyBmr;
+
+        const finalSteps = Math.round(totalSteps > 0 ? totalSteps : prevCleanSteps);
+        const finalActiveCal = Math.round(totalActiveCal > 0 ? totalActiveCal : prevCleanActiveCal);
+        const finalBurn = Math.round(totalBurn > 0 ? totalBurn : prevCleanBurn);
+
         const entry = {
           date: dKey,
           day_label: dayLabel,
-          steps: Math.round(totalSteps || (prev ? prev.steps : 0)),
-          active_calories: Math.round(totalActiveCal || (prev ? prev.active_calories : 0)),
-          calories_out: totalBurn || (prev ? prev.calories_out : dailyBmr),
+          steps: finalSteps,
+          active_calories: finalActiveCal,
+          calories_out: finalBurn,
           calories_in: Math.round(calIn || (prev ? prev.calories_in : 0)),
           net_carbs: Math.round(dayNetCarbs * 10) / 10 || (prev ? prev.net_carbs : 0) || 0,
           fat: Math.round(dayFat * 10) / 10 || (prev ? prev.fat : 0) || 0,
