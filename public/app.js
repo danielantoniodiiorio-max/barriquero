@@ -1847,8 +1847,7 @@ function calculateKetosisStateClient(meals, garmin, settings) {
     isKetosisActive = false;
     const gramsToDrop = Math.max(5, remainingGlycogen - 10);
     timeToThresholdHours = Math.round((gramsToDrop / currentBurnRatePerHour) * 10) / 10;
-    targetKetoDate = new Date(now.getTime() + (timeToThresholdHours * 3600 * 1000));
-  } else if (currentProtocolDay === 2 && totalGarminGlycogenBurn < 45 && steps < 12000) {
+  } else if (currentProtocolDay === 2 && remainingGlycogen > 3 && totalGarminGlycogenBurn < 45 && steps < 12000) {
     // FASE 2: DÍA 2 - CETOSIS INICIAL (Inducción hepática estándar)
     // Glucógeno casi agotado, CPT-1 activada, beta-oxidación acelerándose hacia el umbral de 0.5 mmol/L
     phase = 2;
@@ -1858,22 +1857,22 @@ function calculateKetosisStateClient(meals, garmin, settings) {
     estimatedKetones = Math.min(0.48, estimatedKetones); // Sub-umbral clínico (< 0.5)
     statusColor = '#f59e0b';
     isKetosisActive = false;
-    const gramsToDrop = Math.max(2, remainingGlycogen);
-    timeToThresholdHours = Math.round((gramsToDrop / currentBurnRatePerHour) * 10) / 10;
+    timeToThresholdHours = Math.round((remainingGlycogen / currentBurnRatePerHour) * 10) / 10;
     targetKetoDate = new Date(now.getTime() + (timeToThresholdHours * 3600 * 1000));
-  } else if (currentProtocolDay < 5) {
-    // FASE 3: DÍAS 3 A 4 (o Día 2 acelerado con Garmin) - CETOSIS INTERMEDIA (Umbral 0.5+ mmol/L Superado)
+  } else if (currentProtocolDay < 5 || remainingGlycogen <= 3) {
+    // FASE 3: DÍAS 3 A 4 (o Día 2 cuando el glucógeno se agota a 0) - CETOSIS INTERMEDIA / ÓPTIMA (Umbral 0.5+ mmol/L Superado)
     phase = 3;
     const isAccelerated = currentProtocolDay === 2;
     phaseName = isAccelerated 
-      ? 'Día 2: Cetosis Intermedia (Acelerada por Garmin)' 
-      : 'Día ' + currentProtocolDay + ': Cetosis Intermedia (Umbral Clínico)';
+      ? 'Día 2: ¡Cetosis Nutricional Cruzada! (Acelerada por Garmin)' 
+      : 'Día ' + currentProtocolDay + ': Cetosis Nutricional Activa';
     phaseDesc = '¡Umbral clínico de 0.5 mmol/L superado! Glucógeno agotado. Tu cerebro y músculos queman cetonas de alta pureza (Phinney & Volek).';
     estimatedKetones = Math.round((0.65 + Math.min(0.7, (totalProtocolHours - 36) * 0.02) + (garminStepGlycogenBurn > 30 ? 0.2 : 0)) * 10) / 10;
     estimatedKetones = Math.max(0.5, Math.min(1.4, estimatedKetones));
     statusColor = '#10b981';
     isKetosisActive = true;
     timeToThresholdHours = 0;
+    targetKetoDate = null;
   } else {
     // FASE 4: DÍA 5+ - CETOSIS AVANZADA / CETO-ADAPTADA (Phinney & Volek, AJCN)
     phase = 4;
@@ -1888,6 +1887,14 @@ function calculateKetosisStateClient(meals, garmin, settings) {
 
   // Horas ahorradas gracias al Garmin
   const hoursSavedByGarmin = Math.round((totalGarminGlycogenBurn / 3.8) * 10) / 10;
+
+  let clockHours = 0;
+  let clockMinutes = 0;
+  if (targetKetoDate && !isKetosisActive) {
+    const diffMs = Math.max(0, targetKetoDate.getTime() - now.getTime());
+    clockHours = Math.floor(diffMs / (3600 * 1000));
+    clockMinutes = Math.floor((diffMs % (3600 * 1000)) / (60 * 1000));
+  }
 
   return {
     protocolDay: currentProtocolDay,
@@ -1904,6 +1911,8 @@ function calculateKetosisStateClient(meals, garmin, settings) {
     timeToThresholdHours,
     targetKetoDate,
     targetKetoDateFormatted: targetKetoDate ? formatPredictionTarget(targetKetoDate) : null,
+    clockHours,
+    clockMinutes,
     statusColor,
     garminImpact: {
       steps,
@@ -2269,15 +2278,15 @@ function renderDashboard(data) {
     gaugeCircle.style.boxShadow = '0 0 16px ' + ketosis.statusColor + '44';
   }
 
-  // Lógica de Fuego vs Pronóstico
+  // Lógica de Fuego vs Pronóstico y Reloj Metabólico
   const forecastBox = document.getElementById('boxKetoForecast');
 
   if (ketosis.isKetosisActive) {
     if (flameBox) flameBox.style.display = 'flex';
     if (forecastBox) forecastBox.style.display = 'none';
     if (cardKetosis) {
-      cardKetosis.style.border = '1px solid rgba(245, 158, 11, 0.6)';
-      cardKetosis.style.boxShadow = '0 0 20px rgba(245, 158, 11, 0.15)';
+      cardKetosis.style.border = '1px solid rgba(16, 185, 129, 0.6)';
+      cardKetosis.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.2)';
     }
   } else {
     if (flameBox) flameBox.style.display = 'none';
@@ -2287,9 +2296,97 @@ function renderDashboard(data) {
       cardKetosis.style.boxShadow = 'none';
     }
 
+    // 1. Dígitos del Reloj Digital
+    const elClockHours = document.getElementById('valClockHours');
+    const elClockMinutes = document.getElementById('valClockMinutes');
+    if (elClockHours && elClockMinutes) {
+      elClockHours.textContent = String(ketosis.clockHours != null ? ketosis.clockHours : 0).padStart(2, '0');
+      elClockMinutes.textContent = String(ketosis.clockMinutes != null ? ketosis.clockMinutes : 0).padStart(2, '0');
+    }
+
+    // 2. Fecha y hora objetivo
     const valTargetDate = document.getElementById('valKetoTargetDate');
     if (valTargetDate) {
       valTargetDate.textContent = ketosis.targetKetoDateFormatted || 'Calculando pronóstico...';
+    }
+
+    // 3. Nota de depletación y depósito hepático
+    const txtClockDepletion = document.getElementById('txtClockDepletionNote');
+    if (txtClockDepletion) {
+      txtClockDepletion.textContent = ketosis.phase === 2
+        ? `Vaciando últimas ~${ketosis.glycogenRemainingGrams}g de glucógeno hepático con Garmin`
+        : 'Glucógeno hepático descendiendo paulatinamente';
+    }
+
+    const lblGlycogen = document.getElementById('lblGlycogenGrams');
+    if (lblGlycogen) {
+      lblGlycogen.textContent = `~${ketosis.glycogenRemainingGrams}g restantes`;
+    }
+
+    const depletedPct = Math.min(100, Math.max(0, 100 - (ketosis.glycogenPercentage || 0)));
+    const lblDepletionPct = document.getElementById('lblDepletionPercent');
+    if (lblDepletionPct) {
+      lblDepletionPct.textContent = `${depletedPct}% vaciado`;
+    }
+
+    const barDepletion = document.getElementById('barDepletionFill');
+    if (barDepletion) {
+      barDepletion.style.width = Math.min(100, Math.max(4, depletedPct)) + '%';
+    }
+  }
+
+  // Chip de fase en el velocímetro
+  const chipGauge = document.getElementById('chipGaugeStage');
+  if (chipGauge) {
+    if (ketosis.phase >= 3) {
+      chipGauge.textContent = '🟢 FASE 3 • CETOSIS ACTIVA';
+      chipGauge.style.color = '#10b981';
+      chipGauge.style.background = 'rgba(16, 185, 129, 0.12)';
+      chipGauge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+    } else if (ketosis.phase === 2) {
+      chipGauge.textContent = '🟡 FASE 2 • INDUCCIÓN';
+      chipGauge.style.color = '#f59e0b';
+      chipGauge.style.background = 'rgba(245, 158, 11, 0.12)';
+      chipGauge.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+    } else {
+      chipGauge.textContent = '🔵 FASE 1 • INICIAL';
+      chipGauge.style.color = '#38bdf8';
+      chipGauge.style.background = 'rgba(56, 189, 248, 0.12)';
+      chipGauge.style.borderColor = 'rgba(56, 189, 248, 0.3)';
+    }
+  }
+
+  // Espectro metabólico de 4 segmentos
+  const segGlucose = document.getElementById('segGlucose');
+  const segInduction = document.getElementById('segInduction');
+  const segOptimal = document.getElementById('segOptimal');
+  const segDeep = document.getElementById('segDeep');
+  const segPin = document.getElementById('segPin');
+
+  if (segGlucose && segInduction && segOptimal && segDeep) {
+    segGlucose.classList.remove('active');
+    segInduction.classList.remove('active');
+    segOptimal.classList.remove('active');
+    segDeep.classList.remove('active');
+
+    let activeSeg = segInduction;
+    if (ketosis.estimatedKetones < 0.2) {
+      segGlucose.classList.add('active');
+      activeSeg = segGlucose;
+    } else if (ketosis.estimatedKetones < 0.5) {
+      segInduction.classList.add('active');
+      activeSeg = segInduction;
+    } else if (ketosis.estimatedKetones < 1.5) {
+      segOptimal.classList.add('active');
+      activeSeg = segOptimal;
+    } else {
+      segDeep.classList.add('active');
+      activeSeg = segDeep;
+    }
+
+    if (segPin) {
+      segPin.textContent = `▲ Tú: ${ketosis.estimatedKetones.toFixed(1)}`;
+      activeSeg.appendChild(segPin);
     }
   }
 
@@ -4120,8 +4217,8 @@ document.getElementById('formSettings')?.addEventListener('submit', (e) => {
 document.getElementById('btnExportData')?.addEventListener('click', () => {
   try {
     const backup = {
-      app: 'KetoTrack',
-      version: '1.1.0',
+      app: 'Barriketo',
+      version: '1.16.0',
       exportDate: new Date().toISOString(),
       meals: JSON.parse(localStorage.getItem('ketotrack_meals') || '[]'),
       dailyHistory: JSON.parse(localStorage.getItem('ketotrack_daily_history') || '[]'),
@@ -4135,7 +4232,7 @@ document.getElementById('btnExportData')?.addEventListener('click', () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ketotrack-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `barriketo-backup-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -4903,6 +5000,20 @@ function setupOfficialGarminSync() {
   });
 }
 
+function setupKetoneHelpListener() {
+  const btn = document.getElementById('btnToggleKetoHelp');
+  const body = document.getElementById('bodyKetoHelp');
+  const arrow = document.getElementById('arrowKetoHelp');
+  if (btn && body) {
+    btn.onclick = () => {
+      const isCollapsed = body.classList.toggle('collapsed');
+      if (arrow) {
+        arrow.style.transform = isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+      }
+    };
+  }
+}
+
 async function initApp() {
   checkAndPerformDailyRollover();
   loadSettings();
@@ -4914,10 +5025,30 @@ async function initApp() {
   setupStartProcessModal();
   setupGarminExerciseModal();
   setupOfficialGarminSync();
+  setupKetoneHelpListener();
   syncTodayToDailyHistory();
   if (typeof renderWeightComparison === 'function') {
     renderWeightComparison();
   }
+
+  // Reloj de cuenta regresiva metabólica en tiempo real cada 10 segundos
+  setInterval(() => {
+    if (state.status?.ketosis?.targetKetoDate && !state.status.ketosis.isKetosisActive) {
+      const targetDate = new Date(state.status.ketosis.targetKetoDate);
+      const diffMs = targetDate.getTime() - Date.now();
+      if (diffMs > 0) {
+        const h = Math.floor(diffMs / (3600 * 1000));
+        const m = Math.floor((diffMs % (3600 * 1000)) / (60 * 1000));
+        const elH = document.getElementById('valClockHours');
+        const elM = document.getElementById('valClockMinutes');
+        if (elH) elH.textContent = String(h).padStart(2, '0');
+        if (elM) elM.textContent = String(m).padStart(2, '0');
+      } else {
+        // Al llegar a la hora objetivo de depleción, actualizar estado a cetosis activa
+        recalculateClientState();
+      }
+    }
+  }, 10000);
 
   // Intervalo continuo cada 30s y al cambiar visibilidad para detectar medianoche (12 hs / cambio de día)
   setInterval(() => {

@@ -1,6 +1,6 @@
 {
   "appId": "com.ketotrack.garmin",
-  "appName": "KetoTrack",
+  "appName": "Barriketo",
   "webDir": "public",
   "bundledWebRuntime": false,
   "server": {

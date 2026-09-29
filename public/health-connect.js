@@ -927,7 +927,7 @@ class HealthConnectManager {
       '1. Abre la app Garmin Connect en tu teléfono.',
       '2. Desliza hacia abajo en la pantalla principal para que el reloj transfiera los datos a Garmin Connect.',
       '3. En Garmin Connect > Ajustes > Health Connect, verifica que esté Activado.',
-      '4. Vuelve a KetoTrack y toca "Sincronizar Ahora".'
+      '4. Vuelve a Barriketo y toca "Sincronizar Ahora".'
     ].join('\n');
 
     let modalEl = document.getElementById('hcDiagnosticsModal');

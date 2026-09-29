@@ -11,9 +11,9 @@ if (!fs.existsSync(buildGradlePath)) {
 
 let content = fs.readFileSync(buildGradlePath, 'utf8');
 
-// 1. Incrementar versionCode a 16 y versionName a 1.15.0
-content = content.replace(/versionCode\s+\d+/, 'versionCode 16');
-content = content.replace(/versionName\s+["'][^"']*["']/, 'versionName "1.15.0"');
+// 1. Incrementar versionCode a 17 y versionName a 1.16.0
+content = content.replace(/versionCode\s+\d+/, 'versionCode 17');
+content = content.replace(/versionName\s+["'][^"']*["']/, 'versionName "1.16.0"');
 
 // 2. Inyectar bloque signingConfigs permanente
 const signingConfigsBlock = `
@@ -97,4 +97,14 @@ public class MainActivity extends BridgeActivity {
 `;
   fs.writeFileSync(mainActivityPath, mainActivityCode, 'utf8');
   console.log('MainActivity.java configurado correctamente con navegación y botón Atrás seguro');
+}
+
+// 6. Configurar strings.xml con el nombre oficial Barriketo
+const stringsPath = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res', 'values', 'strings.xml');
+if (fs.existsSync(stringsPath)) {
+  let stringsXml = fs.readFileSync(stringsPath, 'utf8');
+  stringsXml = stringsXml.replace(/<string name="app_name">.*?<\/string>/, '<string name="app_name">Barriketo</string>');
+  stringsXml = stringsXml.replace(/<string name="title_activity_main">.*?<\/string>/, '<string name="title_activity_main">Barriketo</string>');
+  fs.writeFileSync(stringsPath, stringsXml, 'utf8');
+  console.log('strings.xml actualizado con nombre Barriketo');
 }

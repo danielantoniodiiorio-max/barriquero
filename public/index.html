@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>KetoTrack + Garmin</title>
+  <title>Barriketo + Garmin</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,7 +14,7 @@
     <!-- Header con Luz Verde y Acceso a Bases Científicas -->
     <header class="app-header">
       <div class="brand">
-        <div class="logo-icon-svg" title="KetoTrack Metabolic Engine">
+        <div class="logo-icon-svg" title="Barriketo Metabolic Engine">
           <svg viewBox="0 0 24 24" width="28" height="28" fill="none">
             <circle cx="12" cy="12" r="10" stroke="#10b981" stroke-width="2" fill="rgba(16, 185, 129, 0.15)"/>
             <path d="M12 6c-2.4 2.8-3.8 5.6-2 8.4 1.4 2.1 4.2 2.1 5.6 0 1.8-2.8.4-5.6-2-8.4z" fill="#10b981"/>
@@ -22,7 +22,7 @@
           </svg>
         </div>
         <div>
-          <h1>KetoTrack</h1>
+          <h1>Barriketo</h1>
           <div class="header-sync-pill" id="headerSyncPill">
             <span class="pulse-dot"></span>
             <span id="txtHeaderSync">Garmin Sincronizado</span>
@@ -69,28 +69,113 @@
           </div>
         </div>
 
-        <!-- Pronóstico Limpio de Entrada a Cetosis -->
-        <div id="boxKetoForecast" class="clean-forecast-box">
-          <div class="clean-forecast-row">
-            <span class="clean-forecast-icon">⏳</span>
-            <div class="clean-forecast-texts">
-              <span class="clean-forecast-label">Entrada estimada a cetosis (≥ 0.5 mmol/L):</span>
-              <strong class="clean-forecast-time" id="valKetoTargetDate">Calculando pronóstico...</strong>
+        <!-- RELOJ METABÓLICO MODERNO (CUENTA REGRESIVA Y DEPLETACIÓN) -->
+        <div id="boxKetoForecast" class="modern-clock-widget">
+          <div class="clock-widget-top">
+            <div class="clock-badge-live">
+              <span class="clock-ping-dot"></span>
+              <span class="clock-badge-title">CUENTA REGRESIVA A CETOSIS</span>
+            </div>
+            <span class="clock-target-pill">Umbral Meta: ≥ 0.5 mmol/L</span>
+          </div>
+
+          <div class="clock-widget-center">
+            <div class="clock-timer-display">
+              <div class="clock-digit-group">
+                <span class="clock-digit" id="valClockHours">02</span>
+                <span class="clock-sublabel">HORAS</span>
+              </div>
+              <span class="clock-colon">:</span>
+              <div class="clock-digit-group">
+                <span class="clock-digit" id="valClockMinutes">18</span>
+                <span class="clock-sublabel">MIN</span>
+              </div>
+            </div>
+
+            <div class="clock-time-meta">
+              <div class="clock-arrival-row">
+                <span class="clock-arrival-icon">🎯</span>
+                <span class="clock-arrival-text" id="valKetoTargetDate">Hoy a las 03:18 p. m.</span>
+              </div>
+              <div class="clock-glycogen-status" id="txtClockDepletionNote">
+                Vaciando últimas ~10g de glucógeno hepático
+              </div>
+            </div>
+          </div>
+
+          <!-- Barra de vaciado de glucógeno hacia cetosis -->
+          <div class="metabolic-depletion-bar">
+            <div class="depletion-bar-header">
+              <span>Depósito Hepático: <strong id="lblGlycogenGrams">~10g restantes</strong></span>
+              <span id="lblDepletionPercent" class="depletion-pct">89% vaciado</span>
+            </div>
+            <div class="depletion-track">
+              <div class="depletion-fill" id="barDepletionFill" style="width: 89%;"></div>
             </div>
           </div>
         </div>
 
-        <!-- Velocímetro Metabólico Circular -->
+        <!-- VELOCÍMETRO METABÓLICO DE CETONAS -->
         <div class="ketosis-gauge-wrap">
           <div class="gauge-circle" id="gaugeCircle">
             <div class="gauge-inner">
-              <span class="ketone-val" id="valEstimatedKetones">0.2</span>
-              <span class="ketone-unit">mmol/L est.</span>
+              <span class="ketone-val" id="valEstimatedKetones">0.3</span>
+              <span class="ketone-unit">mmol/L</span>
+              <span class="ketone-sublabel">Cetonas Sangre</span>
             </div>
           </div>
           <div class="gauge-details">
-            <h3 id="txtPhaseTitle">En Proceso de Inducción</h3>
-            <p id="txtPhaseDesc" class="text-muted">Avanzando hacia el umbral de cetosis nutricional.</p>
+            <div class="gauge-chip" id="chipGaugeStage">Fase 2 • Inducción</div>
+            <h3 id="txtPhaseTitle">Cetosis Inicial</h3>
+            <p id="txtPhaseDesc" class="text-muted">Vaciando depósitos para cruzar al umbral de quema de grasa.</p>
+          </div>
+        </div>
+
+        <!-- ESCALA VISUAL DE CETOSIS (ESPECTRO METABÓLICO) -->
+        <div class="ketone-spectrum-container">
+          <div class="spectrum-bar">
+            <div class="spectrum-segment seg-glucose" id="segGlucose">
+              <span class="seg-title">Glucosa</span>
+              <span class="seg-range">&lt; 0.2</span>
+            </div>
+            <div class="spectrum-segment seg-induction active" id="segInduction">
+              <span class="seg-title">Inducción</span>
+              <span class="seg-range">0.2 - 0.4</span>
+              <span class="seg-pin" id="segPin">▲ Tú: 0.3</span>
+            </div>
+            <div class="spectrum-segment seg-optimal" id="segOptimal">
+              <span class="seg-title">Óptima</span>
+              <span class="seg-range">0.5 - 1.5</span>
+            </div>
+            <div class="spectrum-segment seg-deep" id="segDeep">
+              <span class="seg-title">Profunda</span>
+              <span class="seg-range">&gt; 1.5</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TARJETA EXPLICATIVA INTUITIVA -->
+        <div class="ketone-explanation-box">
+          <div class="ketone-exp-header" id="btnToggleKetoHelp" role="button" tabindex="0">
+            <div class="ketone-exp-title">
+              <span class="exp-icon">💡</span>
+              <span>¿Qué significa <strong>0.3 mmol/L</strong> y cómo se calcula?</span>
+            </div>
+            <span class="exp-arrow" id="arrowKetoHelp">▾</span>
+          </div>
+          <div class="ketone-exp-body" id="bodyKetoHelp">
+            <div class="exp-item">
+              <strong>• mmol/L (milimoles por litro):</strong> Mide la concentración de beta-hidroxibutirato (cetonas) en sangre.
+            </div>
+            <div class="exp-item">
+              <strong>• 0.3 mmol/L (Inducción):</strong> Tu cuerpo está en transición; el glucógeno del hígado se agotó al 90% y empieza la síntesis acelerada de cetonas.
+            </div>
+            <div class="exp-item">
+              <strong>• Umbral ≥ 0.5 mmol/L:</strong> Al cruzar este valor (hoy a las 3:18 p. m.), tu metabolismo apaga los carbohidratos y quema grasa a pleno.
+            </div>
+            <div class="exp-item">
+              <strong>• El Reloj:</strong> Calcula con exactitud matemática el momento en que tus pasos de Garmin y gasto basal vacían el glucógeno restante.
+            </div>
           </div>
         </div>
       </section>
@@ -852,7 +937,7 @@
         </div>
         <div class="modal-body-scroll">
           <p class="intro-science">
-            Los algoritmos de cálculo metabólico, progresión longitudinal de cetosis, gasto calórico y compensación por pasos de <strong>KetoTrack</strong> están rigurosamente fundamentados en investigaciones clínicas y consensos de los organismos de salud y nutrición líderes mundiales:
+            Los algoritmos de cálculo metabólico, progresión longitudinal de cetosis, gasto calórico y compensación por pasos de <strong>Barriketo</strong> están rigurosamente fundamentados en investigaciones clínicas y consensos de los organismos de salud y nutrición líderes mundiales:
           </p>
 
           <!-- 0. Harvard Medical School & George Cahill (Fisiología Longitudinal Día a Día) -->
