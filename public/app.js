@@ -1888,6 +1888,43 @@ function calculateKetosisStateClient(meals, garmin, settings) {
   // Horas ahorradas gracias al Garmin
   const hoursSavedByGarmin = Math.round((totalGarminGlycogenBurn / 3.8) * 10) / 10;
 
+  // =========================================================================
+  // CONTROL DE MONOTONÍA Y ANCLAJE DEL RELOJ DE CETOSIS
+  // Evita que el reloj se reinicie o aumente sin haber consumido carbohidratos.
+  // Solo se posterga si el usuario consumió carbohidratos netos (excessCarbs > 0).
+  // Si el usuario da más pasos o quema calorías, la hora estimada se ADELANTA.
+  // =========================================================================
+  const savedTargetIso = localStorage.getItem('barriketo_target_keto_date');
+  if (!isKetosisActive && targetKetoDate) {
+    if (savedTargetIso && excessCarbs === 0) {
+      const savedDate = new Date(savedTargetIso);
+      if (!isNaN(savedDate.getTime())) {
+        if (savedDate.getTime() <= now.getTime()) {
+          // Si el reloj llegó a la hora prevista sin consumo de carbos -> ¡Entrar en Cetosis Activa de inmediato!
+          isKetosisActive = true;
+          phase = 3;
+          phaseName = 'Día ' + currentProtocolDay + ': ¡Cetosis Nutricional Activa!';
+          phaseDesc = '¡Umbral clínico de 0.5 mmol/L alcanzado! Depósitos de glucógeno agotados. Tu cuerpo quema grasa a pleno.';
+          estimatedKetones = Math.max(0.5, Math.min(1.4, estimatedKetones || 0.6));
+          statusColor = '#10b981';
+          timeToThresholdHours = 0;
+          targetKetoDate = null;
+          localStorage.removeItem('barriketo_target_keto_date');
+        } else if (targetKetoDate.getTime() < savedDate.getTime()) {
+          // Si el usuario caminó más pasos de Garmin, la hora se ADELANTA (se alcanza antes)
+          localStorage.setItem('barriketo_target_keto_date', targetKetoDate.toISOString());
+        } else {
+          // Si no hubo consumo de carbos, MANTENER la hora meta para que descuente de forma continua hacia abajo
+          targetKetoDate = savedDate;
+        }
+      }
+    } else {
+      localStorage.setItem('barriketo_target_keto_date', targetKetoDate.toISOString());
+    }
+  } else if (isKetosisActive) {
+    localStorage.removeItem('barriketo_target_keto_date');
+  }
+
   let clockHours = 0;
   let clockMinutes = 0;
   if (targetKetoDate && !isKetosisActive) {
@@ -2037,42 +2074,18 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5, arg6) {
   }
 
   const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
-  let dailyBmr = (Number(state.settings?.garmin_daily_bmr) >= 1900) ? Number(state.settings.garmin_daily_bmr) : 2196;
-  const isOfficial = isCloudOfficial || (currentGarmin.date === todayKey && currentGarmin.is_official === true);
-
-  // Si el usuario o Garmin Cloud ya fijaron valores oficiales, respetarlos con prioridad
-  if (isOfficial && Number(activeCalories) > 0) {
-    totalActive = Number(activeCalories);
-  } else if (isOfficial && Number(currentGarmin.active_calories) > 0) {
-    totalActive = Math.max(totalActive, Number(currentGarmin.active_calories));
-  }
+  let dailyBmr = (Number(state.settings?.garmin_daily_bmr) >= 2000) ? Number(state.settings.garmin_daily_bmr) : 2180;
+  if (!state.settings) state.settings = {};
+  state.settings.garmin_daily_bmr = dailyBmr;
 
   let restingElapsed = Math.round((dailyBmr / 24) * elapsedHours);
   let totalCaloriesVal = 0;
 
-  if (explicitTotal && Number(explicitTotal) > 0) {
+  if (explicitTotal && Number(explicitTotal) > restingElapsed) {
     totalCaloriesVal = Math.round(Number(explicitTotal));
-    // Calibración automática: si conocemos el gasto total oficial y las calorías activas,
-    // el gasto en reposo transcurrido es exactamente (total - activas)
-    if (totalActive > 0 && totalCaloriesVal > totalActive) {
-      restingElapsed = totalCaloriesVal - totalActive;
-      const calibratedBmr = Math.round((restingElapsed / elapsedHours) * 24);
-      if (calibratedBmr >= 1900 && calibratedBmr <= 2800) {
-        dailyBmr = calibratedBmr;
-        if (!state.settings) state.settings = {};
-        state.settings.garmin_daily_bmr = calibratedBmr;
-        localStorage.setItem('ketotrack_settings', JSON.stringify(state.settings));
-      }
-    } else if (totalCaloriesVal > restingElapsed) {
-      totalActive = Math.max(totalActive, totalCaloriesVal - restingElapsed);
-    }
-  } else if (isOfficial && Number(currentGarmin.total_calories) > 0) {
-    totalCaloriesVal = Number(currentGarmin.total_calories);
-    if (totalCaloriesVal > totalActive) {
-      restingElapsed = totalCaloriesVal - totalActive;
-    }
   } else {
-    totalCaloriesVal = restingElapsed + totalActive;
+    // Cálculo nativo Garmin Connect: Reposo transcurrido + Calorías Activas
+    totalCaloriesVal = Math.round(restingElapsed + totalActive);
   }
 
   // BMR Basal diario de 24h de Garmin Instinct
@@ -4059,10 +4072,21 @@ function loadSettings() {
   const localSettings = JSON.parse(localStorage.getItem('ketotrack_settings') || '{}');
   state.settings = { ...state.settings, ...localSettings };
 
-  if (!state.settings.garmin_daily_bmr || state.settings.garmin_daily_bmr < 1900) {
-    state.settings.garmin_daily_bmr = 2196;
+  if (!state.settings.garmin_daily_bmr || state.settings.garmin_daily_bmr < 2000) {
+    state.settings.garmin_daily_bmr = 2180;
     localStorage.setItem('ketotrack_settings', JSON.stringify(state.settings));
   }
+
+  // Limpiar residuos de sesiones de nube y bloqueos obsoletos
+  try {
+    localStorage.removeItem('ketotrack_garmin_cloud_auth');
+    localStorage.removeItem('ketotrack_garmin_cookies');
+    const cg = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
+    if (cg.is_official) {
+      delete cg.is_official;
+      localStorage.setItem('ketotrack_garmin', JSON.stringify(cg));
+    }
+  } catch (e) {}
 
   const s = state.settings;
   const inWeight = document.getElementById('setProfileWeight');

@@ -152,8 +152,8 @@ jobs:
         continue-on-error: true
         with:
           tag_name: latest
-          name: "KetoTrack APK (Última Versión)"
-          body: "Descarga directa del APK para tu celular Android con Health Connect, Garmin y reconocimiento IA de comidas."
+          name: "Barriketo APK (Última Versión)"
+          body: "Descarga directa del APK de Barriketo para tu celular Android con Health Connect, Garmin y reconocimiento IA de comidas."
           files: android/app/build/outputs/apk/debug/app-debug.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

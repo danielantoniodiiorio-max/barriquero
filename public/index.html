@@ -380,76 +380,29 @@
           </div>
         </div>
 
-        <!-- CONEXIÓN DIRECTA GARMIN CONNECT CLOUD (OFICIAL - OPCIÓN 2) -->
-        <div class="card" style="margin: 0 0 16px 0; padding: 16px; background: rgba(56, 189, 248, 0.06); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 14px;">
-          <!-- ESTADO: CONECTADO -->
-          <div id="boxGarminCloudConnected" style="display: none;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 1.4rem;">🟢</span>
-                <div>
-                  <strong style="font-size: 0.95rem; color: #f8fafc; display: block;">Garmin Connect™ Oficial</strong>
-                  <span id="lblGarminCloudUser" style="font-size: 0.78rem; color: #38bdf8;">Conectado a la nube</span>
-                </div>
-              </div>
-              <button type="button" id="btnGarminCloudSyncNow" class="btn btn-sm btn-outline" style="border-color: #38bdf8; color: #38bdf8; font-size: 0.78rem; padding: 5px 12px;">
-                🔄 Sincronizar Ahora
-              </button>
-            </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: #94a3b8; background: rgba(0,0,0,0.25); padding: 8px 12px; border-radius: 8px;">
-              <span>⚡ Auto-sincronización: <strong style="color: #10b981;">Activa</strong></span>
-              <span id="lblGarminCloudLastSync">Sincronizado recientemente</span>
-            </div>
-            <div style="margin-top: 8px; text-align: right;">
-              <button type="button" id="btnGarminCloudDisconnect" style="background: none; border: none; color: #ef4444; font-size: 0.75rem; text-decoration: underline; cursor: pointer;">
-                Desconectar cuenta
-              </button>
-            </div>
-          </div>
-
-          <!-- ESTADO: INICIAR SESIÓN -->
-          <div id="boxGarminCloudAuth">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 1.3rem;">⌚</span>
-                <div>
-                  <strong style="font-size: 0.96rem; color: #f8fafc; display: block;">Sincronización Garmin Connect</strong>
-                  <span style="font-size: 0.78rem; color: #94a3b8;">Lectura instantánea de pasos y calorías totales</span>
-                </div>
+        <!-- CONEXIÓN ÚNICA Y AUTOMÁTICA CON GOOGLE HEALTH CONNECT (GARMIN) -->
+        <div class="card" style="margin: 0 0 16px 0; padding: 18px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(6, 182, 212, 0.06)); border: 1px solid rgba(16, 185, 129, 0.28); border-radius: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 1.5rem;">💚</span>
+              <div>
+                <strong style="font-size: 1rem; color: #f8fafc; display: block;">Google Health Connect (Garmin)</strong>
+                <span id="lblHealthConnectSub" style="font-size: 0.78rem; color: #34d399;">Sincronización Nativa Directa del Teléfono</span>
               </div>
             </div>
-            <p style="font-size: 0.82rem; color: #94a3b8; line-height: 1.45; margin: 8px 0 12px 0;">
-              Sincroniza automáticamente tus pasos y calorías desde tu reloj Garmin mediante Google Health Connect o conexión oficial en la nube.
-            </p>
-            <button type="button" id="btnSyncHealthConnectDirect" class="btn btn-primary full-width" style="padding: 10px; font-weight: 600; font-size: 0.88rem; background: linear-gradient(135deg, #10b981, #059669); margin-bottom: 8px;">
-              🔄 Sincronizar Ahora (Garmin)
-            </button>
-            <button type="button" id="btnOpenGarminLoginModal" class="btn btn-outline full-width" style="padding: 8px; font-size: 0.82rem; border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">
-              ☁️ Conectar Nube Garmin Connect (Opcional)
-            </button>
-            <div id="healthConnectStatusText" style="font-size: 0.76rem; color: #94a3b8; text-align: center; margin-top: 8px; cursor: pointer;">
-              Toca "Sincronizar Ahora" para actualizar desde Garmin Connect
-            </div>
+            <span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.72rem; padding: 3px 8px; border-radius: 20px;">
+              Directo Android
+            </span>
           </div>
-        </div>
-
-        <!-- MÉTODOS DE CONSULTA Y AJUSTE RÁPIDO DE CALORÍAS TOTALES -->
-        <div class="card" style="margin: 0 0 16px 0; padding: 14px 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <strong style="font-size: 0.88rem; color: #f8fafc;">⚡ Fijar Gasto Total de Garmin Web</strong>
-            <a id="linkGarminWebCal" href="https://connect.garmin.com/app/calories" target="_blank" class="btn btn-sm btn-outline" style="border-color: #38bdf8; color: #38bdf8; font-size: 0.74rem; text-decoration: none; padding: 3px 8px;">
-              🌐 Ver en Garmin Web
-            </a>
+          <p style="font-size: 0.82rem; color: #94a3b8; line-height: 1.45; margin: 6px 0 14px 0;">
+            Tus pasos, calorías activas y ritmo cardíaco se leen automáticamente desde la app Garmin Connect mediante el subsistema oficial de Android.
+          </p>
+          <button type="button" id="btnSyncHealthConnectDirect" class="btn btn-primary full-width" style="padding: 12px; font-weight: 700; font-size: 0.95rem; background: linear-gradient(135deg, #10b981, #059669); border-radius: 10px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);">
+            🔄 Sincronizar Ahora (Health Connect)
+          </button>
+          <div id="healthConnectStatusText" style="font-size: 0.78rem; color: #94a3b8; text-align: center; margin-top: 10px; cursor: pointer;">
+            ⚡ Toca para actualizar tus métricas desde Garmin Connect
           </div>
-          <div style="display: flex; gap: 8px; align-items: center; margin-top: 10px;">
-            <input type="number" id="inputFastTotalCal" placeholder="Ej: 2873" style="flex: 1; padding: 8px 12px; font-size: 0.95rem; font-weight: 700; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #f8fafc;">
-            <button type="button" id="btnSaveFastTotalCal" class="btn btn-sm btn-primary" style="padding: 8px 14px; font-weight: 600;">
-              Fijar Total
-            </button>
-          </div>
-          <span style="font-size: 0.74rem; color: #64748b; margin-top: 4px; display: block;">
-            Si consultaste el número total en la web de Garmin, puedes fijarlo aquí al instante.
-          </span>
         </div>
 
         <!-- Métricas Reales en Tiempo Real -->
@@ -1282,68 +1235,7 @@
     </nav>
   </div>
 
-  <!-- MODAL DE VINCULACIÓN GARMIN CONNECT CLOUD -->
-  <div id="garminLoginModal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 99999; align-items: center; justify-content: center; padding: 14px;">
-    <div class="modal-content" style="background: #111827; border: 1px solid rgba(56,189,248,0.35); border-radius: 16px; width: 100%; max-width: 480px; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.85);">
-      <div style="padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.4);">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-size: 1.4rem;">☁️</span>
-          <strong style="color: #f8fafc; font-size: 1rem;">Conectar con Garmin Connect™</strong>
-        </div>
-        <button type="button" id="btnCloseGarminLoginModal" style="background: none; border: none; color: #94a3b8; font-size: 1.6rem; cursor: pointer; line-height: 1;">&times;</button>
-      </div>
-
-      <div style="flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px;">
-        <!-- PASO 1: ABRIR EN NAVEGADOR -->
-        <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; padding: 14px;">
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-            <span style="background: #0284c7; color: #fff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">1</span>
-            <strong style="font-size: 0.9rem; color: #f8fafc;">Inicia sesión en Garmin</strong>
-          </div>
-          <p style="font-size: 0.8rem; color: #94a3b8; margin: 0 0 10px 0; line-height: 1.4;">
-            Se abrirá Chrome para identificarte en Garmin. Al finalizar, verás una línea con <code>serviceTicket: 'ST-...'</code>. Cópiala y vuelve a esta app.
-          </p>
-          <button type="button" id="btnOpenGarminBrowser" class="btn btn-primary full-width" style="text-align: center; padding: 10px; font-weight: 600; font-size: 0.88rem; display: flex; align-items: center; justify-content: center; gap: 8px;">
-            🌐 Abrir Login de Garmin en el Navegador
-          </button>
-        </div>
-
-        <!-- PASO 2: VINCULAR TICKET / CÓDIGO -->
-        <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 14px;">
-          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-            <span style="background: #10b981; color: #fff; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;">2</span>
-            <strong style="font-size: 0.9rem; color: #f8fafc;">Vincular y Activar Sincronización</strong>
-          </div>
-          <p style="font-size: 0.8rem; color: #94a3b8; margin: 0 0 10px 0; line-height: 1.4;">
-            Al iniciar sesión, Garmin muestra en pantalla tu código de ticket (ej: <code>ST-0108120...</code>). Cópialo o toca el botón para pegarlo:
-          </p>
-          <div style="display: flex; flex-direction: column; gap: 8px;">
-            <button type="button" id="btnPasteGarminTicket" class="btn btn-outline" style="border-color: #10b981; color: #34d399; font-weight: 600; font-size: 0.85rem; padding: 9px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-              📋 Pegar Código desde el Portapapeles
-            </button>
-            <textarea id="inputGarminTicketText" placeholder="Pega aquí el código ST-... o el texto completo que te dio Garmin" rows="2" style="width: 100%; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; padding: 8px; font-size: 0.8rem; font-family: monospace; resize: none;"></textarea>
-            <button type="button" id="btnSubmitTicketManual" class="btn btn-primary" style="background: linear-gradient(135deg, #10b981, #059669); font-weight: 700; padding: 10px;">
-              ⚡ Conectar y Sincronizar Ahora
-            </button>
-            <div id="txtTicketStatus" style="font-size: 0.78rem; text-align: center; display: none;"></div>
-          </div>
-        </div>
-
-        <!-- VENTANA EMBEBIDA (OPCIONAL) -->
-        <details style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px 12px;">
-          <summary style="cursor: pointer; color: #94a3b8; font-size: 0.8rem; font-weight: 500;">
-            🖥️ O cargar ventana interna (si tu navegador no abre)
-          </summary>
-          <div style="margin-top: 10px; background: #ffffff; border-radius: 8px; overflow: hidden; min-height: 380px;">
-            <iframe id="iframeGarminSso" style="width: 100%; height: 380px; border: none;" src="about:blank"></iframe>
-          </div>
-        </details>
-      </div>
-    </div>
-  </div>
-
   <script src="health-connect.js"></script>
-  <script src="garmin-cloud.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
