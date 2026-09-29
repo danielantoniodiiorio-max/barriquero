@@ -508,12 +508,6 @@ class HealthConnectManager {
         console.warn('TotalCalories no disponible en este dispositivo:', totErr);
       }
 
-      // Si Health Connect devolvió TotalCaloriesBurnedRecord (> activeCalories), usarlo.
-      // Si no, el gasto total exacto hasta este momento es descanso basal acumulado (bmrSoFar) + activas (activeCalories)
-      const computedTotal = (totalCaloriesHC > 0 && totalCaloriesHC > activeCalories)
-        ? totalCaloriesHC
-        : Math.round(bmrSoFar + activeCalories);
-
       // 2b. Leer Sesiones de Ejercicio de Hoy (Gimnasio / Musculación / etc.)
       let detectedExercises = [];
       try {
@@ -546,19 +540,14 @@ class HealthConnectManager {
         // Ignorar si no está disponible o denegado
       }
 
-      // Respetar calorías oficiales de Garmin Web o de ejercicios/musculación ya registradas
+      // Calorías activas: estimar por pasos (~0.03184 kcal/paso) + musculación/gimnasio si Health Connect no envió muestras
       const todayKey = (typeof getLocalDateKey === 'function') ? getLocalDateKey(now) : now.toISOString().slice(0, 10);
       const currentGarmin = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
-      const isOfficialToday = (currentGarmin.date === todayKey && currentGarmin.is_official === true);
       const existingExCalories = (currentGarmin.date === todayKey) 
         ? Number(currentGarmin.exercise_calories || 0) 
         : 0;
 
-      if (isOfficialToday && Number(currentGarmin.active_calories) > 0) {
-        // Preservar las calorías oficiales cargadas desde Garmin Web
-        activeCalories = Math.max(activeCalories, Number(currentGarmin.active_calories));
-        this.lastDiagnostics.caloriesValue = activeCalories;
-      } else if (activeCalories === 0) {
+      if (activeCalories === 0) {
         const stepEst = steps > 0 ? Math.round(steps * 0.03184) : 0;
         activeCalories = stepEst + existingExCalories;
         this.lastDiagnostics.caloriesValue = activeCalories;
@@ -632,7 +621,7 @@ class HealthConnectManager {
         window.applyGarminMetrics({
           steps: steps,
           activeCalories: activeCalories,
-          totalCalories: computedTotal,
+          totalCalories: (totalCaloriesHC > 0) ? totalCaloriesHC : null,
           restingHr: restingHr,
           heartRate: restingHr,
           source: sourceLabel,

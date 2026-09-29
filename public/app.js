@@ -2012,26 +2012,24 @@ function recalculateClientState() {
 
 // Expuesto globalmente para que health-connect.js lo invoque directamente
 window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5, arg6) {
-  let steps = 0, activeCalories = 0, restingHr = 60, source = 'Health Connect (Garmin)';
+  let steps = 0, activeCalories = 0, restingHr = 60, source = 'Google Health Connect (Garmin)';
   let exercisesFromSync = null;
   let explicitBmr = null;
   let explicitTotal = null;
-  let isCloudOfficial = false;
 
   if (typeof arg1 === 'object' && arg1 !== null) {
     steps = arg1.steps || 0;
     activeCalories = arg1.activeCalories || arg1.active_calories || 0;
     restingHr = arg1.restingHr || arg1.resting_hr || arg1.heartRate || 60;
-    source = arg1.source || 'Health Connect (Garmin)';
+    source = arg1.source || 'Google Health Connect (Garmin)';
     exercisesFromSync = arg1.exercises || null;
     explicitBmr = arg1.bmrCalories || arg1.bmr_calories || null;
     explicitTotal = arg1.totalCalories || arg1.total_calories || null;
-    isCloudOfficial = arg1.isOfficial === true;
   } else {
     steps = arg1 || 0;
     activeCalories = arg2 || 0;
     restingHr = arg3 || 60;
-    source = arg4 || 'Health Connect (Garmin)';
+    source = arg4 || 'Google Health Connect (Garmin)';
     exercisesFromSync = Array.isArray(arg5) ? arg5 : null;
     if (typeof arg6 === 'number') {
       explicitTotal = arg6;
@@ -2079,13 +2077,12 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5, arg6) {
   state.settings.garmin_daily_bmr = dailyBmr;
 
   let restingElapsed = Math.round((dailyBmr / 24) * elapsedHours);
-  let totalCaloriesVal = 0;
-
-  if (explicitTotal && Number(explicitTotal) > restingElapsed) {
+  
+  // Cálculo de gasto total del día acumulado a esta hora:
+  // Reposo transcurrido + Calorías Activas
+  let totalCaloriesVal = Math.round(restingElapsed + totalActive);
+  if (explicitTotal && Number(explicitTotal) > totalCaloriesVal) {
     totalCaloriesVal = Math.round(Number(explicitTotal));
-  } else {
-    // Cálculo nativo Garmin Connect: Reposo transcurrido + Calorías Activas
-    totalCaloriesVal = Math.round(restingElapsed + totalActive);
   }
 
   // BMR Basal diario de 24h de Garmin Instinct
@@ -2109,8 +2106,8 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5, arg6) {
     daily_bmr: dailyBmr,
     total_calories: totalCaloriesVal,
     projected_total: fullDayTotalBurn,
-    is_official: isOfficial,
-    source: isCloudOfficial ? 'Garmin Connect Oficial (Nube)' : (isOfficial ? 'Garmin Connect Web Oficial' : source),
+    is_official: false,
+    source: source || 'Google Health Connect (Garmin)',
     timestamp: now.toISOString()
   };
 
