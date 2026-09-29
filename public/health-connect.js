@@ -640,7 +640,8 @@ class HealthConnectManager {
         this.updateUIStatus('⚠️ Error al leer pasos: ' + stepsError + ' (Toca para reintentar o ver diagnóstico)');
       } else if (steps > 0 || totalCaloriesHC > 0 || activeCalories > 0) {
         const garminTag = (stepsDiagnostic && stepsDiagnostic.garminFound) ? 'de Garmin' : 'de Health Connect';
-        const displayTotal = computedTotal;
+        const garminState = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
+        const displayTotal = garminState.total_calories || (activeCalories + Math.round((dailyBmr / 24) * elapsedHours));
         this.updateUIStatus('Sincronizado: ' + timeStr + ' • ' + steps.toLocaleString() + ' pasos y ' + displayTotal.toLocaleString() + ' kcal totales (' + activeCalories + ' activas) ' + garminTag + ' ✓');
       } else {
         // Pasos = 0: explicar la causa exacta
