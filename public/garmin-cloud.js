@@ -147,6 +147,17 @@ class GarminCloudManager {
       }
     });
 
+    // 1b. Verificar si la app se cargó con un ticket en la URL (ej: ?garminTicket=ST-...)
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlTicket = urlParams.get('garminTicket');
+      if (urlTicket) {
+        console.log('🎫 Ticket recibido en URL:', urlTicket);
+        window.history.replaceState({}, document.title, window.location.pathname);
+        setTimeout(() => this.exchangeTicketAndSave(urlTicket), 300);
+      }
+    } catch (e) {}
+
     // 2. Auto-sincronización si ya hay sesión activa
     if (this.session) {
       console.log('☁️ Sesión de Garmin Connect activa. Sincronizando gasto total...');
@@ -224,6 +235,28 @@ class GarminCloudManager {
         btnSyncNow.innerHTML = '🔄 Sincronizar Ahora';
       });
     }
+
+    // 0. Botón para abrir Garmin en el navegador seguro del sistema
+    const btnOpenBrowser = document.getElementById('btnOpenGarminBrowser');
+    if (btnOpenBrowser) {
+      btnOpenBrowser.addEventListener('click', () => {
+        const ssoUrl = 'https://sso.garmin.com/sso/embed?clientId=GarminConnect&locale=es&service=https%3A%2F%2Fconnect.garmin.com%2Fmodern%2F';
+        try {
+          window.open(ssoUrl, '_system');
+        } catch (e) {
+          window.open(ssoUrl, '_blank');
+        }
+      });
+    }
+
+    // Manejar botón atrás de Android en el modal
+    document.addEventListener('backbutton', (e) => {
+      if (modal && modal.style.display !== 'none') {
+        e.preventDefault();
+        modal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+      }
+    });
 
     // 1. Botón para pegar código/ticket copiado del navegador
     const btnPasteTicket = document.getElementById('btnPasteGarminTicket');

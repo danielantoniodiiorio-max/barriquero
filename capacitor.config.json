@@ -4,12 +4,7 @@
   "webDir": "public",
   "bundledWebRuntime": false,
   "server": {
-    "androidScheme": "https",
-    "allowNavigation": [
-      "*.garmin.com",
-      "sso.garmin.com",
-      "connect.garmin.com"
-    ]
+    "androidScheme": "https"
   },
   "android": {
     "allowMixedContent": true
