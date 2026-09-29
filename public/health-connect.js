@@ -72,12 +72,31 @@ class HealthConnectManager {
       });
     }
 
+    const btnDirect = document.getElementById('btnSyncHealthConnectDirect');
+    if (btnDirect) {
+      btnDirect.addEventListener('click', async () => {
+        btnDirect.disabled = true;
+        btnDirect.textContent = '⏳ Sincronizando Garmin...';
+        await this.requestPermissionAndSync(false);
+        btnDirect.disabled = false;
+        btnDirect.innerHTML = '🔄 Sincronizar Ahora (Garmin)';
+      });
+    }
+
     // Permitir ver diagnóstico tocando el texto de estado
     const statusTextEl = document.getElementById('healthConnectStatusText');
     if (statusTextEl) {
       statusTextEl.style.cursor = 'pointer';
       statusTextEl.title = 'Toca para ver el diagnóstico de Health Connect';
       statusTextEl.addEventListener('click', () => {
+        this.showDiagnosticsModal();
+      });
+    }
+
+    const heroSync = document.getElementById('garminHeroSyncStatus');
+    if (heroSync) {
+      heroSync.style.cursor = 'pointer';
+      heroSync.addEventListener('click', () => {
         this.showDiagnosticsModal();
       });
     }
@@ -220,7 +239,7 @@ class HealthConnectManager {
     // 3. Procesar y ordenar por fecha de inicio
     const validSamples = targetList
       .map(s => {
-        const val = Number(s.value) || 0;
+        const val = Number(s.value !== undefined ? s.value : (s.count !== undefined ? s.count : (s.energy !== undefined ? s.energy : (s.calories !== undefined ? s.calories : 0)))) || 0;
         const start = s.startDate ? new Date(s.startDate).getTime() : 0;
         const end = s.endDate ? new Date(s.endDate).getTime() : start;
         return { val, start, end, raw: s };
@@ -232,30 +251,25 @@ class HealthConnectManager {
       return { value: 0, count: 0, sources: sourcesFound, garminFound: isGarmin };
     }
 
-    // 4. Deduplicación inteligente:
-    //    Si dos muestras comienzan en la misma ventana de 10 minutos (snapshots del mismo bloque),
-    //    mantener la que tenga mayor valor o mayor cobertura.
-    //    Las muestras con distinto horario de inicio (ej. caminata matutina y entrenamiento)
-    //    se consideran sesiones separadas y se suman aditivamente.
-    const dedupedByStart = new Map();
+    // 4. Deduplicación exacta de intervalos sin agrupar por bloques arbitrarios:
+    //    En Health Connect, Garmin registra muestras discretas (ej. cada 1 a 2 minutos).
+    //    Identificamos cada intervalo por su ID nativo o por la combinación exacta de timestamps.
+    //    Si existe una reescritura del mismo intervalo, nos quedamos con el valor mayor.
+    const dedupedMap = new Map();
     for (const s of validSamples) {
-      const startKey = Math.floor(s.start / (10 * 60 * 1000));
-      const existing = dedupedByStart.get(startKey);
-      if (!existing) {
-        dedupedByStart.set(startKey, s);
-      } else {
-        if (s.val > existing.val || (s.end > existing.end && s.val >= existing.val)) {
-          dedupedByStart.set(startKey, s);
-        }
+      const uniqueKey = s.raw.id ? String(s.raw.id) : `${s.raw.sourceId || ''}_${s.raw.startDate}_${s.raw.endDate}`;
+      const existing = dedupedMap.get(uniqueKey);
+      if (!existing || s.val > existing.val) {
+        dedupedMap.set(uniqueKey, s);
       }
     }
 
     let intervalSum = 0;
-    for (const s of dedupedByStart.values()) {
+    for (const s of dedupedMap.values()) {
       intervalSum += s.val;
     }
 
-    // También considerar si hubo una única muestra que ya abarcaba todo el día con un total mayor
+    // Si además existe un registro consolidado acumulativo de todo el día que sea mayor, lo respetamos
     const maxSingle = Math.max(0, ...validSamples.map(s => s.val));
     const finalValue = Math.round(Math.max(intervalSum, maxSingle));
 
@@ -280,7 +294,16 @@ class HealthConnectManager {
       try {
         deletedIds = JSON.parse(localStorage.getItem('ketotrack_deleted_meal_ids') || '[]');
       } catch (e) { deletedIds = []; }
-      let changed = false;
+      let protocolStartKey = todayKey;
+      const settings = (typeof window.state !== 'undefined' && window.state.settings) 
+        ? window.state.settings 
+        : JSON.parse(localStorage.getItem('ketotrack_settings') || '{}');
+      if (settings && settings.keto_start_date) {
+        const d = new Date(settings.keto_start_date);
+        if (!isNaN(d.getTime())) {
+          protocolStartKey = (typeof getLocalDateKey === 'function') ? getLocalDateKey(d) : d.toISOString().slice(0, 10);
+        }
+      }
 
       for (const s of samples) {
         const dateVal = s.startDate || s.date || s.time;
@@ -290,7 +313,7 @@ class HealthConnectManager {
         const sKey = (typeof getLocalDateKey === 'function') 
           ? getLocalDateKey(sStart) 
           : sStart.toISOString().slice(0, 10);
-        if (sKey !== todayKey) continue;
+        if (sKey < protocolStartKey || sKey > todayKey) continue;
 
         const mealId = 'mfp_' + sStart.getTime();
         if (deletedIds.includes(mealId)) continue;
@@ -612,12 +635,58 @@ class HealthConnectManager {
     try {
       const now = new Date();
       const todayKey = (typeof getLocalDateKey === 'function') ? getLocalDateKey(now) : now.toISOString().slice(0, 10);
-      const startMs = now.getTime() - (numDays * 24 * 60 * 60 * 1000);
-      const queryStart = new Date(startMs).toISOString();
-      const queryEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0).toISOString();
+
+      // 1. Obtener la fecha de inicio del protocolo
+      let protocolStartKey = todayKey;
+      const settings = (typeof window.state !== 'undefined' && window.state.settings) 
+        ? window.state.settings 
+        : JSON.parse(localStorage.getItem('ketotrack_settings') || '{}');
+      
+      if (settings && settings.keto_start_date) {
+        const d = new Date(settings.keto_start_date);
+        if (!isNaN(d.getTime())) {
+          protocolStartKey = (typeof getLocalDateKey === 'function') ? getLocalDateKey(d) : d.toISOString().slice(0, 10);
+        }
+      } else {
+        const localMeals = JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
+        if (localMeals.length > 0) {
+          const sorted = [...localMeals].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+          if (sorted[0] && sorted[0].timestamp) {
+            const d = new Date(sorted[0].timestamp);
+            if (!isNaN(d.getTime())) {
+              protocolStartKey = (typeof getLocalDateKey === 'function') ? getLocalDateKey(d) : d.toISOString().slice(0, 10);
+            }
+          }
+        }
+      }
+
+      // Limpiar inmediatamente cualquier día previo al protocolo guardado previamente
+      let history = [];
+      try {
+        history = JSON.parse(localStorage.getItem('ketotrack_daily_history') || '[]');
+      } catch (e) { history = []; }
+      const cleaned = history.filter(h => h && h.date && h.date >= protocolStartKey);
+      if (cleaned.length !== history.length) {
+        history = cleaned;
+        localStorage.setItem('ketotrack_daily_history', JSON.stringify(history));
+      }
+
+      // Si el protocolo inició hoy o en el futuro, no consultar días anteriores
+      if (protocolStartKey >= todayKey) {
+        if (typeof recalculateClientState === 'function') recalculateClientState();
+        if (typeof renderChartsView === 'function') renderChartsView();
+        return;
+      }
+
+      // Consultar estrictamente desde las 00:00:00 del día de inicio del protocolo hasta hoy a las 00:00:00
+      const startParts = protocolStartKey.split('-');
+      const queryStartDate = new Date(Number(startParts[0]), Number(startParts[1]) - 1, Number(startParts[2]), 0, 0, 0, 0);
+      const queryStart = queryStartDate.toISOString();
+      const queryEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString();
 
       let histSteps = [];
       let histCal = [];
+      let histTotalCal = [];
       let histNutrition = [];
       try {
         const resS = await this.plugin.readSamples({ dataType: 'steps', startDate: queryStart, endDate: queryEnd, limit: 5000 });
@@ -630,16 +699,14 @@ class HealthConnectManager {
       } catch (e) {}
 
       try {
+        const resT = await this.plugin.readSamples({ dataType: 'totalCalories', startDate: queryStart, endDate: queryEnd, limit: 5000 });
+        if (resT && Array.isArray(resT.samples)) histTotalCal = resT.samples;
+      } catch (e) {}
+
+      try {
         const resN = await this.plugin.readSamples({ dataType: 'nutrition', startDate: queryStart, endDate: queryEnd, limit: 5000 });
         if (resN && Array.isArray(resN.samples)) histNutrition = resN.samples;
       } catch (e) {}
-
-      if (histSteps.length === 0 && histCal.length === 0 && histNutrition.length === 0) return;
-
-      const daysMap = {};
-      const dailyBmr = (typeof window.state !== 'undefined' && window.state.settings && window.state.settings.garmin_daily_bmr) 
-        ? Number(window.state.settings.garmin_daily_bmr) 
-        : 1865;
 
       const getSampleDateKey = (s) => {
         const dVal = s.startDate || s.date || s.time;
@@ -649,68 +716,121 @@ class HealthConnectManager {
         return (typeof getLocalDateKey === 'function') ? getLocalDateKey(d) : d.toISOString().slice(0, 10);
       };
 
-      // Agrupar nutrición pasada (MyFitnessPal)
+      const dayStepsMap = {};
+      const dayCalMap = {};
+      const dayTotalCalMap = {};
+      const daysNutritionMap = {};
+
       for (const s of histNutrition) {
         const dKey = getSampleDateKey(s);
-        if (!dKey || dKey >= todayKey) continue;
-        if (!daysMap[dKey]) daysMap[dKey] = { steps: 0, activeCalories: 0, caloriesIn: 0 };
+        if (!dKey || dKey < protocolStartKey || dKey >= todayKey) continue;
         const cal = Math.round(Number(s.calories || s.value || 0));
-        if (cal > 0) daysMap[dKey].caloriesIn = (daysMap[dKey].caloriesIn || 0) + cal;
+        if (cal > 0) daysNutritionMap[dKey] = (daysNutritionMap[dKey] || 0) + cal;
       }
 
-      // Agrupar calorías activas pasadas
-      for (const s of histCal) {
-        const dKey = getSampleDateKey(s);
-        if (!dKey || dKey >= todayKey) continue;
-        if (!daysMap[dKey]) daysMap[dKey] = { steps: 0, activeCalories: 0 };
-        const val = Number(s.value || 0);
-        if (val > 0) daysMap[dKey].activeCalories += val;
-      }
-
-      // Agrupar pasos pasados
       for (const s of histSteps) {
         const dKey = getSampleDateKey(s);
-        if (!dKey || dKey >= todayKey) continue;
-        if (!daysMap[dKey]) daysMap[dKey] = { steps: 0, activeCalories: 0 };
-        const val = Number(s.value || 0);
-        if (val > 0) daysMap[dKey].steps += val;
+        if (!dKey || dKey < protocolStartKey || dKey >= todayKey) continue;
+        const key = s.id ? String(s.id) : `${s.sourceId || ''}_${s.startDate}_${s.endDate}`;
+        const val = Number(s.value !== undefined ? s.value : (s.count !== undefined ? s.count : 0)) || 0;
+        if (val > 0) {
+          if (!dayStepsMap[dKey]) dayStepsMap[dKey] = new Map();
+          const cur = dayStepsMap[dKey].get(key) || 0;
+          if (val > cur) dayStepsMap[dKey].set(key, val);
+        }
       }
 
-      let history = [];
-      try {
-        history = JSON.parse(localStorage.getItem('ketotrack_daily_history') || '[]');
-      } catch (e) { history = []; }
+      for (const s of histCal) {
+        const dKey = getSampleDateKey(s);
+        if (!dKey || dKey < protocolStartKey || dKey >= todayKey) continue;
+        const key = s.id ? String(s.id) : `${s.sourceId || ''}_${s.startDate}_${s.endDate}`;
+        const val = Number(s.value !== undefined ? s.value : (s.energy !== undefined ? s.energy : (s.calories !== undefined ? s.calories : 0))) || 0;
+        if (val > 0) {
+          if (!dayCalMap[dKey]) dayCalMap[dKey] = new Map();
+          const cur = dayCalMap[dKey].get(key) || 0;
+          if (val > cur) dayCalMap[dKey].set(key, val);
+        }
+      }
+
+      for (const s of histTotalCal) {
+        const dKey = getSampleDateKey(s);
+        if (!dKey || dKey < protocolStartKey || dKey >= todayKey) continue;
+        const key = s.id ? String(s.id) : `${s.sourceId || ''}_${s.startDate}_${s.endDate}`;
+        const val = Number(s.value !== undefined ? s.value : (s.energy !== undefined ? s.energy : (s.calories !== undefined ? s.calories : 0))) || 0;
+        if (val > 0) {
+          if (!dayTotalCalMap[dKey]) dayTotalCalMap[dKey] = new Map();
+          const cur = dayTotalCalMap[dKey].get(key) || 0;
+          if (val > cur) dayTotalCalMap[dKey].set(key, val);
+        }
+      }
+
+      const allPastKeys = new Set([
+        ...Object.keys(dayStepsMap),
+        ...Object.keys(dayCalMap),
+        ...Object.keys(dayTotalCalMap),
+        ...Object.keys(daysNutritionMap)
+      ]);
+
+      const localMeals = JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
+      for (const m of localMeals) {
+        const mKey = (typeof getLocalDateKey === 'function') ? getLocalDateKey(m.timestamp) : (m.timestamp ? m.timestamp.slice(0, 10) : '');
+        if (mKey >= protocolStartKey && mKey < todayKey) {
+          allPastKeys.add(mKey);
+        }
+      }
 
       const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-      const localMeals = JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
+      const dailyBmr = (typeof window.state !== 'undefined' && window.state.settings && window.state.settings.garmin_daily_bmr) 
+        ? Number(window.state.settings.garmin_daily_bmr) 
+        : 2185;
 
-      for (const [dKey, val] of Object.entries(daysMap)) {
-        if (val.steps === 0 && val.activeCalories === 0 && !val.caloriesIn) continue;
+      for (const dKey of allPastKeys) {
+        let totalSteps = 0;
+        if (dayStepsMap[dKey]) {
+          for (const v of dayStepsMap[dKey].values()) totalSteps += v;
+        }
+        let totalActiveCal = 0;
+        if (dayCalMap[dKey]) {
+          for (const v of dayCalMap[dKey].values()) totalActiveCal += v;
+        }
+        let totalBurnFromHc = 0;
+        if (dayTotalCalMap[dKey]) {
+          for (const v of dayTotalCalMap[dKey].values()) totalBurnFromHc += v;
+        }
+
+        const totalBurn = totalBurnFromHc > 0 ? Math.round(totalBurnFromHc) : Math.round(dailyBmr + totalActiveCal);
 
         const dayMeals = localMeals.filter(m => {
-          const mKey = (typeof getLocalDateKey === 'function') ? getLocalDateKey(m.timestamp) : '';
+          const mKey = (typeof getLocalDateKey === 'function') ? getLocalDateKey(m.timestamp) : (m.timestamp ? m.timestamp.slice(0, 10) : '');
           return mKey === dKey;
         });
-        const calInFromMeals = dayMeals.reduce((sum, m) => sum + Number(m.calories || 0), 0);
-        const calIn = Math.max(calInFromMeals, Number(val.caloriesIn || 0));
 
+        let dayNetCarbs = 0, dayFat = 0, dayProtein = 0, calInFromMeals = 0;
+        for (const m of dayMeals) {
+          dayNetCarbs += Number(m.net_carbs || 0);
+          dayFat += Number(m.fat || 0);
+          dayProtein += Number(m.protein || 0);
+          calInFromMeals += Number(m.calories || 0);
+        }
+
+        const calIn = Math.max(calInFromMeals, Number(daysNutritionMap[dKey] || 0));
         const dObj = new Date(dKey + 'T12:00:00');
         const dayLabel = daysOfWeek[dObj.getDay()] + ' ' + String(dObj.getDate()).padStart(2, '0') + '/' + String(dObj.getMonth() + 1).padStart(2, '0');
-        const actCal = Math.round(val.activeCalories || 0);
-        const totalBurn = dailyBmr + actCal;
 
         const existingIdx = history.findIndex(h => h.date === dKey);
+        const prev = existingIdx !== -1 ? history[existingIdx] : null;
+
         const entry = {
           date: dKey,
           day_label: dayLabel,
-          steps: Math.round(val.steps),
-          active_calories: actCal,
-          calories_out: totalBurn,
-          calories_in: Math.round(calIn),
-          net_carbs: 0,
-          fat: 0,
-          protein: 0,
-          ketones: 0.8
+          steps: Math.round(totalSteps || (prev ? prev.steps : 0)),
+          active_calories: Math.round(totalActiveCal || (prev ? prev.active_calories : 0)),
+          calories_out: totalBurn || (prev ? prev.calories_out : dailyBmr),
+          calories_in: Math.round(calIn || (prev ? prev.calories_in : 0)),
+          net_carbs: Math.round(dayNetCarbs * 10) / 10 || (prev ? prev.net_carbs : 0) || 0,
+          fat: Math.round(dayFat * 10) / 10 || (prev ? prev.fat : 0) || 0,
+          protein: Math.round(dayProtein * 10) / 10 || (prev ? prev.protein : 0) || 0,
+          ketones: (prev && prev.ketones) ? prev.ketones : 0.8
         };
 
         if (existingIdx !== -1) {
@@ -720,11 +840,16 @@ class HealthConnectManager {
         }
       }
 
+      // Filtrar estrictamente solo días del protocolo
+      history = history.filter(h => h && h.date && h.date >= protocolStartKey);
       history.sort((a, b) => a.date.localeCompare(b.date));
       localStorage.setItem('ketotrack_daily_history', JSON.stringify(history));
 
       if (typeof recalculateClientState === 'function') {
         recalculateClientState();
+      }
+      if (typeof renderChartsView === 'function') {
+        renderChartsView();
       }
     } catch (err) {
       console.warn('Error en syncHistoricalDays:', err);
@@ -810,6 +935,11 @@ class HealthConnectManager {
     const el = document.getElementById('healthConnectStatusText');
     if (el) {
       el.textContent = msg;
+    }
+    const heroSync = document.getElementById('garminHeroSyncStatus');
+    if (heroSync) {
+      heroSync.textContent = msg.length > 40 ? (msg.slice(0, 37) + '...') : msg;
+      heroSync.title = msg;
     }
   }
 }

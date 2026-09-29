@@ -230,7 +230,18 @@ class GarminCloudManager {
       btnSyncNow.addEventListener('click', async () => {
         btnSyncNow.disabled = true;
         btnSyncNow.innerHTML = '⏳ Sincronizando...';
-        await this.syncToday(false);
+        try {
+          if (this.session) {
+            await this.syncToday(false);
+          }
+        } catch (e) { console.warn('Cloud sync error:', e); }
+
+        try {
+          if (window.healthConnectManager && typeof window.healthConnectManager.syncFromHealthConnect === 'function') {
+            await window.healthConnectManager.syncFromHealthConnect();
+          }
+        } catch (hcErr) { console.warn('Health Connect sync error:', hcErr); }
+
         btnSyncNow.disabled = false;
         btnSyncNow.innerHTML = '🔄 Sincronizar Ahora';
       });

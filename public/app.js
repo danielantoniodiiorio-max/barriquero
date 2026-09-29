@@ -108,31 +108,65 @@ function getLocalDateKey(dateInput = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+// Obtiene la fecha exacta de inicio del protocolo cetogénico (Día 1)
+function getProtocolStartDate() {
+  const sDateStr = state.settings?.keto_start_date;
+  if (sDateStr) {
+    const d = new Date(sDateStr);
+    if (!isNaN(d.getTime())) return d;
+  }
+  const allMeals = (state.meals && state.meals.length > 0) 
+    ? state.meals 
+    : JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
+  if (allMeals.length > 0) {
+    const sorted = [...allMeals].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    if (sorted[0] && sorted[0].timestamp) {
+      const d = new Date(sorted[0].timestamp);
+      if (!isNaN(d.getTime())) {
+        if (!state.settings) state.settings = {};
+        state.settings.keto_start_date = sorted[0].timestamp;
+        try { localStorage.setItem('ketotrack_settings', JSON.stringify(state.settings)); } catch (e) {}
+        return d;
+      }
+    }
+  }
+  return new Date();
+}
+
+function getProtocolStartKey() {
+  const d = getProtocolStartDate();
+  return getLocalDateKey(d);
+}
+
 // Consolida días pasados en el historial permanente (ketotrack_daily_history)
 function consolidatePastDaysIntoHistory(todayKey) {
+  const protocolStartKey = getProtocolStartKey();
   const allMeals = JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
   let history = JSON.parse(localStorage.getItem('ketotrack_daily_history') || '[]');
   const savedGarmin = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
   const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
-  // Agrupar comidas pasadas estrictamente por su fecha local
+  // Agrupar comidas pasadas estrictamente por su fecha local dentro del protocolo
   const mealsByDate = {};
   for (const m of allMeals) {
     const dKey = getLocalDateKey(m.timestamp);
-    if (dKey < todayKey) {
+    if (dKey < todayKey && dKey >= protocolStartKey) {
       if (!mealsByDate[dKey]) mealsByDate[dKey] = [];
       mealsByDate[dKey].push(m);
     }
   }
 
-  // Recolectar todas las fechas pasadas que deben documentarse
+  // Recolectar todas las fechas pasadas que deben documentarse (SOLO >= protocolStartKey)
   const pastDates = new Set(Object.keys(mealsByDate));
-  if (savedGarmin.date && savedGarmin.date < todayKey) {
+  if (savedGarmin.date && savedGarmin.date < todayKey && savedGarmin.date >= protocolStartKey) {
     pastDates.add(savedGarmin.date);
   }
   for (const h of history) {
-    if (h.date < todayKey) pastDates.add(h.date);
+    if (h.date < todayKey && h.date >= protocolStartKey) pastDates.add(h.date);
   }
+
+  // Purgar inmediatamente cualquier día previo al inicio del protocolo
+  history = history.filter(h => h && h.date && h.date >= protocolStartKey);
 
   const sortedPastDates = Array.from(pastDates).sort();
 
@@ -170,10 +204,10 @@ function consolidatePastDaysIntoHistory(todayKey) {
       steps,
       calories_out: caloriesOut,
       active_calories: activeCal,
-      calories_in: Math.round(calIn),
-      net_carbs: Math.round(netCarbs * 10) / 10,
-      fat: Math.round(fat * 10) / 10,
-      protein: Math.round(protein * 10) / 10,
+      calories_in: Math.round(calIn || pastRecord?.calories_in || 0),
+      net_carbs: Math.round(netCarbs * 10) / 10 || pastRecord?.net_carbs || 0,
+      fat: Math.round(fat * 10) / 10 || pastRecord?.fat || 0,
+      protein: Math.round(protein * 10) / 10 || pastRecord?.protein || 0,
       ketones: pastRecord?.ketones || 0.2,
       exercises
     };
@@ -185,6 +219,7 @@ function consolidatePastDaysIntoHistory(todayKey) {
     }
   }
 
+  history = history.filter(h => h && h.date && h.date >= protocolStartKey);
   history.sort((a, b) => a.date.localeCompare(b.date));
   localStorage.setItem('ketotrack_daily_history', JSON.stringify(history));
   return history;
@@ -2478,8 +2513,11 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
     rawHistory = [];
   }
 
-  // Descartar entradas que no sean pasadas estrictas
-  const pastDays = (rawHistory || []).filter(h => h && h.date && h.date < todayKey);
+  // Determinar inicio del protocolo
+  const protocolStartKey = getProtocolStartKey();
+
+  // Descartar entradas que no sean pasadas estrictas o que sean anteriores al protocolo
+  const pastDays = (rawHistory || []).filter(h => h && h.date && h.date < todayKey && h.date >= protocolStartKey);
 
   // Registro de HOY en tiempo real
   const todayEntry = {
@@ -2492,18 +2530,7 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
   const allDays = [...pastDays, todayEntry];
   allDays.sort((a, b) => a.date.localeCompare(b.date));
 
-  // Determinar inicio del protocolo
-  const sDateStr = state.settings?.keto_start_date;
-  let protocolStartKey = '';
-  if (sDateStr) {
-    const d = new Date(sDateStr);
-    if (!isNaN(d.getTime())) protocolStartKey = getLocalDateKey(d);
-  }
-  if (!protocolStartKey && allDays.length > 0) {
-    protocolStartKey = allDays[0].date;
-  }
-
-  const protocolDays = protocolStartKey ? allDays.filter(d => d.date >= protocolStartKey) : allDays;
+  const protocolDays = allDays.filter(d => d.date >= protocolStartKey);
   const protocolCount = Math.max(1, protocolDays.length);
 
   const elBadgeAccumDays = document.getElementById('badgeProtocolAccumDays');
@@ -2534,7 +2561,7 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
   const d7Ago = new Date(now);
   d7Ago.setDate(now.getDate() - 6);
   const d7AgoKey = getLocalDateKey(d7Ago);
-  const weekDays = allDays.filter(d => d.date >= d7AgoKey);
+  const weekDays = allDays.filter(d => d.date >= d7AgoKey && d.date >= protocolStartKey);
   const deficitWeek = weekDays.reduce((sum, d) => sum + (Number(d.calories_out || 0) - Number(d.calories_in || 0)), 0);
   const lossWeekKg = Math.round((deficitWeek / 7700) * 100) / 100;
   const daysInWeek = Math.max(1, weekDays.length);
@@ -2560,7 +2587,7 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
   const d30Ago = new Date(now);
   d30Ago.setDate(now.getDate() - 29);
   const d30AgoKey = getLocalDateKey(d30Ago);
-  const monthDays = allDays.filter(d => d.date >= d30AgoKey);
+  const monthDays = allDays.filter(d => d.date >= d30AgoKey && d.date >= protocolStartKey);
   const deficitMonth = monthDays.reduce((sum, d) => sum + (Number(d.calories_out || 0) - Number(d.calories_in || 0)), 0);
   const lossMonthKg = Math.round((deficitMonth / 7700) * 100) / 100;
 
@@ -2643,7 +2670,7 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
   // 4. Renderizar Historial Día a Día (#trackingDaysHistoryList)
   const elHistoryList = document.getElementById('trackingDaysHistoryList');
   if (elHistoryList) {
-    const reversedDays = [...allDays].reverse();
+    const reversedDays = [...protocolDays].reverse();
     let historyHtml = '';
 
     for (const d of reversedDays) {
@@ -3315,12 +3342,9 @@ function calculateWeightTrajectories(range) {
     horizonDays = 14;
   }
 
-  // Fecha de inicio: la fecha del protocolo o primer día de historial, pero no posterior a hoy
-  let startDate = now;
-  const sDate = settings.keto_start_date ? new Date(settings.keto_start_date) : null;
-  if (sDate && !isNaN(sDate.getTime()) && sDate <= now) {
-    startDate = sDate;
-  }
+  // Fecha de inicio: la fecha del protocolo, pero no posterior a hoy
+  let startDate = getProtocolStartDate();
+  if (startDate > now) startDate = now;
   const startDay = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0);
 
   // Determinar peso inicial
@@ -4166,21 +4190,83 @@ document.getElementById('btnQuickEditProtocol')?.addEventListener('click', () =>
 let activeChartRange = 'week'; // 'week' | 'month'
 let activeChartMetric = 'steps'; // 'steps' | 'macros' | 'calories'
 
-// Sincroniza datos de hoy en el historial acumulado
+// Sincroniza datos de hoy en el historial acumulado y reconcilia macros de días pasados
 function syncTodayToDailyHistory() {
   const now = new Date();
   const todayKey = getLocalDateKey(now);
   let history = JSON.parse(localStorage.getItem('ketotrack_daily_history') || '[]');
 
-  // Si hay fecha de inicio del protocolo, descartar días anteriores al inicio
-  const sDate = state.settings?.keto_start_date ? new Date(state.settings.keto_start_date) : null;
-  if (sDate && !isNaN(sDate.getTime())) {
-    const startDayKey = getLocalDateKey(sDate);
-    history = history.filter(h => h.date >= startDayKey);
+  // Determinar inicio del protocolo
+  const protocolStartKey = getProtocolStartKey();
+
+  // Descartar días anteriores al inicio del protocolo
+  history = history.filter(h => h && h.date && h.date >= protocolStartKey);
+
+  const allMeals = (state.meals && state.meals.length > 0) 
+    ? state.meals 
+    : JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
+
+  const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const dailyBmr = Number(state.settings?.garmin_daily_bmr) || 2185;
+
+  // 1. Reconciliar macros de todos los días pasados ya presentes en history
+  for (const h of history) {
+    if (h.date === todayKey) continue;
+    const dayMeals = allMeals.filter(m => getLocalDateKey(m.timestamp) === h.date);
+    if (dayMeals.length > 0) {
+      let dayNetCarbs = 0, dayFat = 0, dayProtein = 0, dayCalIn = 0;
+      for (const m of dayMeals) {
+        dayNetCarbs += Number(m.net_carbs || 0);
+        dayFat += Number(m.fat || 0);
+        dayProtein += Number(m.protein || 0);
+        dayCalIn += Number(m.calories || 0);
+      }
+      h.net_carbs = Math.round(dayNetCarbs * 10) / 10;
+      h.fat = Math.round(dayFat * 10) / 10;
+      h.protein = Math.round(dayProtein * 10) / 10;
+      h.calories_in = Math.round(Math.max(Number(h.calories_in || 0), dayCalIn));
+    }
   }
 
-  // Filtrar ÚNICAMENTE las comidas de HOY
-  const todayMeals = (state.meals || []).filter(m => getLocalDateKey(m.timestamp) === todayKey);
+  // 2. Si hay fechas pasadas con comidas registradas que faltaban en history, incorporarlas
+  const mealsByDate = {};
+  for (const m of allMeals) {
+    const mKey = getLocalDateKey(m.timestamp);
+    if (mKey >= protocolStartKey && mKey < todayKey) {
+      if (!mealsByDate[mKey]) mealsByDate[mKey] = [];
+      mealsByDate[mKey].push(m);
+    }
+  }
+
+  for (const [dKey, dMeals] of Object.entries(mealsByDate)) {
+    if (!history.some(h => h.date === dKey)) {
+      let dayNetCarbs = 0, dayFat = 0, dayProtein = 0, dayCalIn = 0;
+      for (const m of dMeals) {
+        dayNetCarbs += Number(m.net_carbs || 0);
+        dayFat += Number(m.fat || 0);
+        dayProtein += Number(m.protein || 0);
+        dayCalIn += Number(m.calories || 0);
+      }
+      const dObj = new Date(dKey + 'T12:00:00');
+      const dayLabel = daysOfWeek[dObj.getDay()] + ' ' + String(dObj.getDate()).padStart(2, '0') + '/' + String(dObj.getMonth() + 1).padStart(2, '0');
+      history.push({
+        date: dKey,
+        day_label: dayLabel,
+        steps: 0,
+        active_calories: 0,
+        calories_out: dailyBmr,
+        calories_in: Math.round(dayCalIn),
+        net_carbs: Math.round(dayNetCarbs * 10) / 10,
+        fat: Math.round(dayFat * 10) / 10,
+        protein: Math.round(dayProtein * 10) / 10,
+        ketones: 0.8,
+        exercises: []
+      });
+    }
+  }
+
+  // 3. Procesar las comidas de HOY
+  const todayMeals = allMeals.filter(m => getLocalDateKey(m.timestamp) === todayKey);
   const garmin = state.status?.garmin || JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
   
   let netCarbs = 0, fat = 0, protein = 0, calIn = 0;
@@ -4192,12 +4278,11 @@ function syncTodayToDailyHistory() {
   }
 
   const steps = Number(garmin.steps || 0);
-  const calOut = Number(garmin.total_calories || garmin.active_calories || 0);
+  const calOut = Number(garmin.total_calories || ((garmin.bmr_calories || dailyBmr) + Number(garmin.active_calories || 0)) || 0);
   const activeCal = Number(garmin.active_calories || 0);
   const ketones = Number(state.status?.ketosis?.estimatedKetones || 0.2);
 
-  const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  const dayLabel = 'Hoy (' + days[now.getDay()] + ')';
+  const dayLabel = 'Hoy (' + daysOfWeek[now.getDay()] + ')';
 
   const todayIndex = history.findIndex(h => h.date === todayKey);
   const todayRecord = {
@@ -4221,6 +4306,7 @@ function syncTodayToDailyHistory() {
   }
 
   // Cero datos ficticios. 100% datos reales desde el Día 1.
+  history = history.filter(h => h && h.date && h.date >= protocolStartKey);
   history.sort((a, b) => a.date.localeCompare(b.date));
   localStorage.setItem('ketotrack_daily_history', JSON.stringify(history));
   return history;
@@ -4394,8 +4480,10 @@ function drawSmoothSplineOnCanvas(canvas, seriesList, xLabels, options = {}) {
 // Renderiza la vista de Gráficas completa
 function renderChartsView() {
   const history = syncTodayToDailyHistory();
+  const protocolStartKey = getProtocolStartKey();
+  const protocolHistory = (history || []).filter(h => h && h.date && h.date >= protocolStartKey);
   const count = activeChartRange === 'week' ? 7 : 30;
-  const slice = history.slice(-count);
+  const slice = protocolHistory.slice(-count);
 
   const xLabels = slice.map(h => {
     const parts = h.date.split('-');

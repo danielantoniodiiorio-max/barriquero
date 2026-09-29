@@ -326,19 +326,25 @@
           <div id="boxGarminCloudAuth">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
               <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 1.3rem;">☁️</span>
+                <span style="font-size: 1.3rem;">⌚</span>
                 <div>
-                  <strong style="font-size: 0.96rem; color: #f8fafc; display: block;">Sincronización Garmin Connect (Opción 2)</strong>
-                  <span style="font-size: 0.78rem; color: #94a3b8;">Descarga automática de calorías totales oficiales</span>
+                  <strong style="font-size: 0.96rem; color: #f8fafc; display: block;">Sincronización Garmin Connect</strong>
+                  <span style="font-size: 0.78rem; color: #94a3b8;">Lectura instantánea de pasos y calorías totales</span>
                 </div>
               </div>
             </div>
             <p style="font-size: 0.82rem; color: #94a3b8; line-height: 1.45; margin: 8px 0 12px 0;">
-              Inicia sesión una sola vez en Garmin Connect para que KetoTrack importe automáticamente tus calorías totales en tiempo real cada vez que abras la app.
+              Sincroniza automáticamente tus pasos y calorías desde tu reloj Garmin mediante Google Health Connect o conexión oficial en la nube.
             </p>
-            <button type="button" id="btnOpenGarminLoginModal" class="btn btn-primary full-width" style="padding: 10px; font-weight: 600; font-size: 0.88rem; background: linear-gradient(135deg, #0284c7, #0369a1);">
-              ⚡ Iniciar Sesión en Garmin Connect
+            <button type="button" id="btnSyncHealthConnectDirect" class="btn btn-primary full-width" style="padding: 10px; font-weight: 600; font-size: 0.88rem; background: linear-gradient(135deg, #10b981, #059669); margin-bottom: 8px;">
+              🔄 Sincronizar Ahora (Garmin)
             </button>
+            <button type="button" id="btnOpenGarminLoginModal" class="btn btn-outline full-width" style="padding: 8px; font-size: 0.82rem; border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">
+              ☁️ Conectar Nube Garmin Connect (Opcional)
+            </button>
+            <div id="healthConnectStatusText" style="font-size: 0.76rem; color: #94a3b8; text-align: center; margin-top: 8px; cursor: pointer;">
+              Toca "Sincronizar Ahora" para actualizar desde Garmin Connect
+            </div>
           </div>
         </div>
 
