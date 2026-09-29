@@ -584,6 +584,8 @@ class HealthConnectManager {
       console.error('Fallo general en sincronización con Health Connect:', err);
       this.updateUIStatus('Error al sincronizar datos: ' + (err.message || err));
     }
+  }
+
   async syncHistoricalDays(numDays = 14) {
     this.plugin = this.getPlugin();
     if (!this.plugin || typeof this.plugin.readSamples !== 'function') return;

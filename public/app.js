@@ -2001,11 +2001,14 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5) {
 
   const restingElapsed = Math.round((dailyBmr / 24) * elapsedHours);
 
-  // Gasto total diario TDEE completo (BMR 24h + Activas)
+  // Gasto real acumulado a la hora actual (coincide con el reloj y Garmin Web)
+  const elapsedTotalBurn = restingElapsed + totalActive;
+  // Proyección de gasto a las 24h completas
   const fullDayTotalBurn = restingDayBmr + totalActive;
+
   const totalCaloriesVal = (explicitTotal && Number(explicitTotal) > 0)
     ? Number(explicitTotal)
-    : fullDayTotalBurn;
+    : elapsedTotalBurn;
 
   const garmin = {
     date: todayKey,
@@ -2019,6 +2022,7 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5) {
     resting_elapsed: restingElapsed,
     daily_bmr: dailyBmr,
     total_calories: totalCaloriesVal,
+    projected_total: fullDayTotalBurn,
     is_official: isOfficial,
     source: isCloudOfficial ? 'Garmin Connect Oficial (Nube)' : (isOfficial ? 'Garmin Connect Web Oficial' : source),
     timestamp: now.toISOString()
@@ -2680,6 +2684,15 @@ function renderGarminView(garmin) {
   // Hero Card: Gasto Calórico Total
   const heroTotal = document.getElementById('garminHeroTotalCal');
   if (heroTotal) heroTotal.textContent = totalCal.toLocaleString();
+
+  const heroProj = document.getElementById('garminHeroProjection');
+  if (heroProj) {
+    if (garmin.projected_total && Math.round(garmin.projected_total) !== totalCal) {
+      heroProj.textContent = `Acumulado a la fecha • Proyección día completo: ~${Math.round(garmin.projected_total).toLocaleString()} kcal`;
+    } else {
+      heroProj.textContent = 'Gasto calórico total confirmado';
+    }
+  }
 
   const heroSteps = document.getElementById('garminHeroSteps');
   if (heroSteps) heroSteps.textContent = steps.toLocaleString();

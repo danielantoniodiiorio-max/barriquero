@@ -225,6 +225,86 @@ class GarminCloudManager {
       });
     }
 
+    // 1. Botón para pegar código/ticket copiado del navegador
+    const btnPasteTicket = document.getElementById('btnPasteGarminTicket');
+    const inputTicket = document.getElementById('inputGarminTicketText');
+    const btnSubmitTicket = document.getElementById('btnSubmitTicketManual');
+
+    const handlePasteAndConnect = async (rawText) => {
+      if (!rawText) return;
+      const match = rawText.match(/(ST-[0-9a-zA-Z-]+)/);
+      const ticket = match ? match[1] : rawText.trim();
+      if (inputTicket) inputTicket.value = ticket;
+      
+      const txtStatus = document.getElementById('txtTicketStatus');
+      if (txtStatus) {
+        txtStatus.style.display = 'block';
+        txtStatus.textContent = '⏳ Vinculando con Garmin Connect...';
+        txtStatus.style.color = '#38bdf8';
+      }
+      
+      await this.exchangeTicketAndSave(ticket);
+    };
+
+    if (btnPasteTicket) {
+      btnPasteTicket.addEventListener('click', async () => {
+        try {
+          if (navigator.clipboard && navigator.clipboard.readText) {
+            const clip = await navigator.clipboard.readText();
+            if (clip && (clip.includes('ST-') || clip.includes('serviceTicket'))) {
+              await handlePasteAndConnect(clip);
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('Clipboard read error:', e);
+        }
+        if (inputTicket) {
+          inputTicket.focus();
+          if (typeof showToast === 'function') {
+            showToast('Pega el código ST-... en el recuadro y toca Conectar');
+          }
+        }
+      });
+    }
+
+    if (btnSubmitTicket) {
+      btnSubmitTicket.addEventListener('click', async () => {
+        const val = inputTicket ? inputTicket.value.trim() : '';
+        if (!val) {
+          alert('Por favor pega el código ST-... o el texto que te dio Garmin en el navegador.');
+          return;
+        }
+        await handlePasteAndConnect(val);
+      });
+    }
+
+    // Auto-detección cuando el usuario vuelve a la app con el código en el portapapeles
+    document.addEventListener('visibilitychange', async () => {
+      if (!document.hidden) {
+        const modal = document.getElementById('garminLoginModal');
+        if (modal && modal.style.display !== 'none') {
+          try {
+            if (navigator.clipboard && navigator.clipboard.readText) {
+              const text = await navigator.clipboard.readText();
+              const match = text && text.match(/(ST-[0-9a-zA-Z-]+)/);
+              if (match) {
+                if (inputTicket && !inputTicket.value) {
+                  inputTicket.value = match[1];
+                  const txt = document.getElementById('txtTicketStatus');
+                  if (txt) {
+                    txt.style.display = 'block';
+                    txt.textContent = '🎫 Código detectado: ' + match[1] + '. Tocá "Conectar y Sincronizar Ahora".';
+                    txt.style.color = '#34d399';
+                  }
+                }
+              }
+            }
+          } catch (e) {}
+        }
+      }
+    });
+
     // Ingreso directo de credenciales
     if (btnSubmitDirect) {
       btnSubmitDirect.addEventListener('click', async () => {
@@ -318,16 +398,43 @@ class GarminCloudManager {
     }
   }
 
-  async exchangeTicketAndSave(ticket) {
+  async exchangeTicketAndSave(rawTicket) {
+    const txtStatus = document.getElementById('txtTicketStatus');
+    if (txtStatus) {
+      txtStatus.style.display = 'block';
+      txtStatus.textContent = '⏳ Validando ticket con Garmin Connect...';
+      txtStatus.style.color = '#38bdf8';
+    }
+
     try {
-      const exchangeUrl = `https://connect.garmin.com/modern/?ticket=${ticket}`;
-      await this.makeRequest({
-        method: 'GET',
-        url: exchangeUrl,
-        headers: {
-          'Referer': 'https://sso.garmin.com/'
+      const match = String(rawTicket).match(/(ST-[0-9a-zA-Z-]+)/);
+      const ticket = match ? match[1] : String(rawTicket).trim();
+
+      if (!ticket || !ticket.startsWith('ST-')) {
+        throw new Error('El formato del código no es válido. Debe comenzar por "ST-".');
+      }
+
+      // 1. Canjear contra Garmin Connect
+      const exchangeUrls = [
+        `https://connect.garmin.com/modern/?ticket=${ticket}`,
+        `https://connect.garmin.com/app/?ticket=${ticket}`,
+        `https://sso.garmin.com/sso/embed?ticket=${ticket}`
+      ];
+
+      for (const u of exchangeUrls) {
+        try {
+          await this.makeRequest({
+            method: 'GET',
+            url: u,
+            headers: {
+              'Referer': 'https://sso.garmin.com/',
+              'NK': 'NT'
+            }
+          });
+        } catch (e) {
+          console.warn('exchange URL:', u, e.message);
         }
-      });
+      }
 
       this.saveSession({
         authenticated: true,
@@ -350,7 +457,12 @@ class GarminCloudManager {
       }
     } catch (e) {
       console.error('Error al canjear ticket:', e);
-      alert('Error al validar sesión de Garmin: ' + (e.message || e));
+      if (txtStatus) {
+        txtStatus.textContent = '⚠️ ' + (e.message || 'Error al validar ticket.');
+        txtStatus.style.color = '#ef4444';
+      } else {
+        alert('Error al validar sesión de Garmin: ' + (e.message || e));
+      }
     }
   }
 
@@ -388,7 +500,7 @@ class GarminCloudManager {
     }
 
     if (postContent.includes('Cloudflare') || postContent.includes('Attention Required')) {
-      throw new Error('Verificación anti-bot requerida. Por favor usa el botón "Iniciar Sesión en Garmin Connect" para identificarte.');
+      throw new Error('Verificación anti-bot requerida. Por favor usa el botón "Abrir Login de Garmin en el Navegador" para identificarte.');
     }
 
     throw new Error('No se pudo validar el inicio de sesión directo.');
@@ -403,20 +515,37 @@ class GarminCloudManager {
     const todayKey = (typeof getLocalDateKey === 'function') ? getLocalDateKey(now) : now.toISOString().slice(0, 10);
 
     try {
-      const summaryUrl = `https://connect.garmin.com/modern/proxy/usersummary-service/usersummary/daily?calendarDate=${todayKey}`;
+      const endpoints = [
+        `https://connect.garmin.com/modern/proxy/usersummary-service/usersummary/daily?calendarDate=${todayKey}`,
+        `https://connect.garmin.com/usersummary-service/usersummary/daily?calendarDate=${todayKey}`
+      ];
 
-      let summaryRes = await this.makeRequest({
-        method: 'GET',
-        url: summaryUrl,
-        headers: {
-          'NK': 'NT',
-          'Referer': 'https://connect.garmin.com/modern/'
+      let data = null;
+      for (const ep of endpoints) {
+        try {
+          const res = await this.makeRequest({
+            method: 'GET',
+            url: ep,
+            headers: {
+              'NK': 'NT',
+              'Referer': 'https://connect.garmin.com/modern/'
+            }
+          });
+
+          if (res.status === 200 && res.data) {
+            data = typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
+            if (data && (data.totalKilocalories || data.activeKilocalories || data.totalSteps)) {
+              break;
+            }
+          } else if (res.status === 401 || res.status === 403) {
+            console.warn('Sesión de Garmin expirada (HTTP ' + res.status + ')');
+          }
+        } catch (e) {
+          console.warn('Error en endpoint ' + ep + ':', e.message);
         }
-      });
+      }
 
-      if (summaryRes.status === 200 && summaryRes.data) {
-        const data = typeof summaryRes.data === 'string' ? JSON.parse(summaryRes.data) : summaryRes.data;
-
+      if (data) {
         // Extraer Calorías Totales Oficiales de Garmin Connect
         const totalCalories = Number(data.totalKilocalories || ((data.bmrKilocalories || 1865) + (data.activeKilocalories || 0)));
         const steps = Number(data.totalSteps || 0);
@@ -445,6 +574,10 @@ class GarminCloudManager {
 
         if (!isSilent && typeof showToast === 'function') {
           showToast(`⌚ Garmin: ${totalCalories.toLocaleString()} kcal gastadas en total`);
+        }
+      } else {
+        if (!isSilent) {
+          alert('No se pudo obtener el resumen de calorías de Garmin Connect. Por favor verifica tu conexión o vuelve a iniciar sesión.');
         }
       }
     } catch (err) {
