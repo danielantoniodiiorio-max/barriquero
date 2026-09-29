@@ -2028,7 +2028,7 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5, arg6) {
   }
 
   const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
-  let dailyBmr = Number(state.settings?.garmin_daily_bmr) || 2185; // Calibrado según Garmin (~2.185 kcal/día)
+  let dailyBmr = (Number(state.settings?.garmin_daily_bmr) >= 1900) ? Number(state.settings.garmin_daily_bmr) : 2196;
   const isOfficial = isCloudOfficial || (currentGarmin.date === todayKey && currentGarmin.is_official === true);
 
   // Si el usuario o Garmin Cloud ya fijaron valores oficiales, respetarlos con prioridad
@@ -2048,7 +2048,7 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5, arg6) {
     if (totalActive > 0 && totalCaloriesVal > totalActive) {
       restingElapsed = totalCaloriesVal - totalActive;
       const calibratedBmr = Math.round((restingElapsed / elapsedHours) * 24);
-      if (calibratedBmr >= 1200 && calibratedBmr <= 3500) {
+      if (calibratedBmr >= 1900 && calibratedBmr <= 2800) {
         dailyBmr = calibratedBmr;
         if (!state.settings) state.settings = {};
         state.settings.garmin_daily_bmr = calibratedBmr;
@@ -2056,6 +2056,11 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5, arg6) {
       }
     } else if (totalCaloriesVal > restingElapsed) {
       totalActive = Math.max(totalActive, totalCaloriesVal - restingElapsed);
+    }
+  } else if (isOfficial && Number(currentGarmin.total_calories) > 0) {
+    totalCaloriesVal = Number(currentGarmin.total_calories);
+    if (totalCaloriesVal > totalActive) {
+      restingElapsed = totalCaloriesVal - totalActive;
     }
   } else {
     totalCaloriesVal = restingElapsed + totalActive;
@@ -2091,6 +2096,9 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5, arg6) {
   state.status.garmin = garmin;
   localStorage.setItem('ketotrack_garmin', JSON.stringify(garmin));
   recalculateClientState();
+  if (typeof renderGarminView === 'function') renderGarminView(garmin);
+  if (typeof syncTodayToDailyHistory === 'function') syncTodayToDailyHistory();
+  if (typeof renderChartsView === 'function') renderChartsView();
 
   // Actualizar indicador superior
   const syncTimeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -3953,6 +3961,11 @@ function setupWeightChartListeners() {
 function loadSettings() {
   const localSettings = JSON.parse(localStorage.getItem('ketotrack_settings') || '{}');
   state.settings = { ...state.settings, ...localSettings };
+
+  if (!state.settings.garmin_daily_bmr || state.settings.garmin_daily_bmr < 1900) {
+    state.settings.garmin_daily_bmr = 2196;
+    localStorage.setItem('ketotrack_settings', JSON.stringify(state.settings));
+  }
 
   const s = state.settings;
   const inWeight = document.getElementById('setProfileWeight');

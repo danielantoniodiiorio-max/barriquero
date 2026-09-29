@@ -404,11 +404,9 @@ class GarminCloudManager {
           window.applyGarminMetrics({
             totalCalories: Math.round(val),
             isOfficial: true,
-            source: 'Garmin Web (Fijado)'
+            source: 'Garmin Web Oficial'
           });
-          if (typeof showToast === 'function') {
-            showToast(`✅ Gasto total fijado en ${Math.round(val).toLocaleString()} kcal`);
-          }
+          alert(`✅ ¡Gasto total fijado en ${Math.round(val).toLocaleString()} kcal!\n\nTus calorías totales y déficit cetogénico coinciden ahora con Garmin.`);
         }
       });
     }

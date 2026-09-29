@@ -254,24 +254,40 @@ class HealthConnectManager {
 
     const maxSingle = Math.max(...validSamples.map(s => s.val));
 
-    // 4. Detectar si hay snapshots acumulativos de rango amplio:
-    //    En Garmin Connect, los sincronismos diarios envían el acumulado del día (inician a medianoche o duran >= 30 min).
-    //    Si existen snapshots acumulativos, el valor máximo representa el total real acumulado del día.
-    const wideSamples = validSamples.filter(s => s.durationMin >= 40 || (Math.abs(s.start - dayStartMs) <= 30 * 60 * 1000 && s.durationMin >= 20));
-
-    if (wideSamples.length > 0) {
-      const maxWide = Math.max(...wideSamples.map(s => s.val));
+    // 4. Prioridad absoluta: muestra consolidada autoritativa (isAggregate de Health Connect nativo)
+    const aggSample = validSamples.find(s => s.raw && s.raw.isAggregate === true);
+    if (aggSample && aggSample.val > 0) {
       return {
-        value: Math.round(maxWide),
+        value: Math.round(aggSample.val),
         count: targetList.length,
         sources: sourcesFound,
         garminFound: isGarmin,
-        maxSingle: Math.round(maxSingle)
+        maxSingle: Math.round(aggSample.val)
       };
     }
 
-    // 5. Si son intervalos discretos pequeños (ej. 1 a 15 min):
-    //    Deduplicar registros con id o timestamps idénticos
+    // 5. Detectar si hay snapshots acumulativos de rango diario completo:
+    // Solo aplica a muestras que inician en torno a la medianoche (00:00:00) y tienen una duración prolongada (>= 60 min).
+    // Jamás clasifica una sesión de actividad o entrenamiento que inicia a media mañana como snapshot diario.
+    const midnightSnapshots = validSamples.filter(s => 
+      Math.abs(s.start - dayStartMs) <= 45 * 60 * 1000 && s.durationMin >= 60
+    );
+
+    if (midnightSnapshots.length > 0) {
+      const maxMidnight = Math.max(...midnightSnapshots.map(s => s.val));
+      if (maxMidnight > 0) {
+        return {
+          value: Math.round(maxMidnight),
+          count: targetList.length,
+          sources: sourcesFound,
+          garminFound: isGarmin,
+          maxSingle: Math.round(maxSingle)
+        };
+      }
+    }
+
+    // 6. Si son intervalos discretos (ej. calorías activas por bloques de ejercicio o pasos por períodos):
+    // Deduplicar registros con id o timestamps idénticos de la misma fuente
     const dedupedMap = new Map();
     for (const s of validSamples) {
       const uniqueKey = s.raw.id ? String(s.raw.id) : `${s.raw.sourceId || ''}_${s.raw.startDate}_${s.raw.endDate}`;
@@ -281,26 +297,12 @@ class HealthConnectManager {
       }
     }
 
-    // Sumar solo intervalos que no se solapan en el tiempo
-    const sortedDeduped = Array.from(dedupedMap.values()).sort((a, b) => a.start - b.start || a.end - b.end);
-    let nonOverlappingSum = 0;
-    let lastEnd = 0;
-
-    for (const s of sortedDeduped) {
-      if (s.start >= lastEnd) {
-        nonOverlappingSum += s.val;
-        lastEnd = s.end;
-      } else if (s.end > lastEnd) {
-        const overlap = lastEnd - s.start;
-        const totalLen = Math.max(1, s.end - s.start);
-        if (overlap / totalLen < 0.5) {
-          nonOverlappingSum += Math.round(s.val * (1 - (overlap / totalLen)));
-          lastEnd = s.end;
-        }
-      }
+    let intervalSum = 0;
+    for (const s of dedupedMap.values()) {
+      intervalSum += s.val;
     }
 
-    const finalValue = Math.round(Math.max(nonOverlappingSum, maxSingle));
+    const finalValue = Math.round(Math.max(intervalSum, maxSingle));
 
     return {
       value: finalValue,
@@ -477,9 +479,9 @@ class HealthConnectManager {
       // 2a. Leer Calorías Totales Quemadas de Health Connect (TotalCaloriesBurnedRecord de Garmin)
       let totalCaloriesHC = 0;
       const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
-      const dailyBmr = (typeof window.state !== 'undefined' && window.state.settings && window.state.settings.garmin_daily_bmr) 
+      const dailyBmr = (typeof window.state !== 'undefined' && window.state.settings && window.state.settings.garmin_daily_bmr && window.state.settings.garmin_daily_bmr >= 1900) 
         ? Number(window.state.settings.garmin_daily_bmr) 
-        : 2185;
+        : 2196;
       const bmrSoFar = Math.round((dailyBmr / 24) * elapsedHours);
 
       try {
@@ -505,6 +507,12 @@ class HealthConnectManager {
       } catch (totErr) {
         console.warn('TotalCalories no disponible en este dispositivo:', totErr);
       }
+
+      // Si Health Connect devolvió TotalCaloriesBurnedRecord (> activeCalories), usarlo.
+      // Si no, el gasto total exacto hasta este momento es descanso basal acumulado (bmrSoFar) + activas (activeCalories)
+      const computedTotal = (totalCaloriesHC > 0 && totalCaloriesHC > activeCalories)
+        ? totalCaloriesHC
+        : Math.round(bmrSoFar + activeCalories);
 
       // 2b. Leer Sesiones de Ejercicio de Hoy (Gimnasio / Musculación / etc.)
       let detectedExercises = [];
@@ -624,7 +632,7 @@ class HealthConnectManager {
         window.applyGarminMetrics({
           steps: steps,
           activeCalories: activeCalories,
-          totalCalories: totalCaloriesHC,
+          totalCalories: computedTotal,
           restingHr: restingHr,
           heartRate: restingHr,
           source: sourceLabel,
@@ -643,7 +651,7 @@ class HealthConnectManager {
         this.updateUIStatus('⚠️ Error al leer pasos: ' + stepsError + ' (Toca para reintentar o ver diagnóstico)');
       } else if (steps > 0 || totalCaloriesHC > 0 || activeCalories > 0) {
         const garminTag = (stepsDiagnostic && stepsDiagnostic.garminFound) ? 'de Garmin' : 'de Health Connect';
-        const displayTotal = totalCaloriesHC > 0 ? totalCaloriesHC : (activeCalories + bmrSoFar);
+        const displayTotal = computedTotal;
         this.updateUIStatus('Sincronizado: ' + timeStr + ' • ' + steps.toLocaleString() + ' pasos y ' + displayTotal.toLocaleString() + ' kcal totales (' + activeCalories + ' activas) ' + garminTag + ' ✓');
       } else {
         // Pasos = 0: explicar la causa exacta
@@ -802,9 +810,9 @@ class HealthConnectManager {
       }
 
       const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-      const dailyBmr = (typeof window.state !== 'undefined' && window.state.settings && window.state.settings.garmin_daily_bmr) 
+      const dailyBmr = (typeof window.state !== 'undefined' && window.state.settings && window.state.settings.garmin_daily_bmr && window.state.settings.garmin_daily_bmr >= 1900) 
         ? Number(window.state.settings.garmin_daily_bmr) 
-        : 2185;
+        : 2196;
 
       for (const dKey of allPastKeys) {
         const dObj = new Date(dKey + 'T12:00:00');

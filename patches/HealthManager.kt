@@ -83,30 +83,9 @@ class HealthManager {
         val samples = mutableListOf<Pair<Instant, JSObject>>()
         when (dataType) {
             HealthDataType.STEPS -> {
-                var readSuccess = false
-                try {
-                    readRecords(client, StepsRecord::class, startTime, endTime, limit) { record ->
-                        val payload = createSamplePayload(
-                            dataType,
-                            record.startTime,
-                            record.endTime,
-                            record.count.toDouble(),
-                            record.metadata
-                        )
-                        samples.add(record.startTime to payload)
-                    }
-                    readSuccess = true
-                } catch (e: Throwable) {
-                    Log.w("HealthManager", "readRecords StepsRecord threw exception: ${e.message}. Using aggregate fallback.")
-                }
-
-                // If readRecords failed (e.g. IllegalArgumentException count < 1) or returned 0 samples,
-                // query Health Connect's aggregate API which aggregates at the database level and never crashes on 0-count intervals.
-                if (!readSuccess) {
-                    samples.clear()
-                }
-
-                if (samples.isEmpty()) {
+                val isSingleDay = Duration.between(startTime, endTime).toHours() <= 30
+                var aggregateSteps = 0L
+                if (isSingleDay) {
                     try {
                         val agg = client.aggregate(
                             AggregateRequest(
@@ -114,48 +93,53 @@ class HealthManager {
                                 timeRangeFilter = TimeRangeFilter.between(startTime, endTime)
                             )
                         )
-                        val totalSteps = agg[StepsRecord.COUNT_TOTAL] ?: 0L
-                        if (totalSteps > 0L) {
+                        aggregateSteps = agg[StepsRecord.COUNT_TOTAL] ?: 0L
+                        if (aggregateSteps > 0L) {
                             val payload = JSObject().apply {
                                 put("dataType", dataType.identifier)
-                                put("value", totalSteps.toDouble())
+                                put("value", aggregateSteps.toDouble())
                                 put("unit", dataType.unit)
                                 put("startDate", formatter.format(startTime))
                                 put("endDate", formatter.format(endTime))
                                 put("sourceId", "com.garmin.android.apps.connectmobile")
                                 put("sourceName", "Garmin Connect")
+                                put("isAggregate", true)
                             }
                             samples.add(startTime to payload)
                         }
                     } catch (aggErr: Throwable) {
-                        Log.e("HealthManager", "Steps aggregate fallback error: ${aggErr.message}")
+                        Log.w("HealthManager", "Steps aggregate: ${aggErr.message}")
+                    }
+                }
+
+                if (aggregateSteps <= 0L) {
+                    var readSuccess = false
+                    try {
+                        readRecords(client, StepsRecord::class, startTime, endTime, limit) { record ->
+                            val payload = createSamplePayload(
+                                dataType,
+                                record.startTime,
+                                record.endTime,
+                                record.count.toDouble(),
+                                record.metadata
+                            )
+                            samples.add(record.startTime to payload)
+                        }
+                        readSuccess = true
+                    } catch (e: Throwable) {
+                        Log.w("HealthManager", "readRecords StepsRecord threw exception: ${e.message}")
+                    }
+
+                    if (!readSuccess) {
+                        samples.clear()
                     }
                 }
             }
 
             HealthDataType.CALORIES -> {
-                var readSuccess = false
-                try {
-                    readRecords(client, ActiveCaloriesBurnedRecord::class, startTime, endTime, limit) { record ->
-                        val payload = createSamplePayload(
-                            dataType,
-                            record.startTime,
-                            record.endTime,
-                            record.energy.inKilocalories,
-                            record.metadata
-                        )
-                        samples.add(record.startTime to payload)
-                    }
-                    readSuccess = true
-                } catch (e: Throwable) {
-                    Log.w("HealthManager", "readRecords ActiveCaloriesBurnedRecord threw: ${e.message}. Using aggregate fallback.")
-                }
-
-                if (!readSuccess) {
-                    samples.clear()
-                }
-
-                if (samples.isEmpty()) {
+                val isSingleDay = Duration.between(startTime, endTime).toHours() <= 30
+                var aggregateTotal = 0.0
+                if (isSingleDay) {
                     try {
                         val agg = client.aggregate(
                             AggregateRequest(
@@ -164,21 +148,45 @@ class HealthManager {
                             )
                         )
                         val energy = agg[ActiveCaloriesBurnedRecord.ACTIVE_CALORIES_TOTAL]
-                        val totalKcal = energy?.inKilocalories ?: 0.0
-                        if (totalKcal > 0.0) {
+                        aggregateTotal = energy?.inKilocalories ?: 0.0
+                        if (aggregateTotal > 0.0) {
                             val payload = JSObject().apply {
                                 put("dataType", dataType.identifier)
-                                put("value", totalKcal)
+                                put("value", aggregateTotal)
                                 put("unit", dataType.unit)
                                 put("startDate", formatter.format(startTime))
                                 put("endDate", formatter.format(endTime))
                                 put("sourceId", "com.garmin.android.apps.connectmobile")
                                 put("sourceName", "Garmin Connect")
+                                put("isAggregate", true)
                             }
                             samples.add(startTime to payload)
                         }
                     } catch (aggErr: Throwable) {
-                        Log.e("HealthManager", "Calories aggregate fallback error: ${aggErr.message}")
+                        Log.w("HealthManager", "Calories aggregate: ${aggErr.message}")
+                    }
+                }
+
+                if (aggregateTotal <= 0.0) {
+                    var readSuccess = false
+                    try {
+                        readRecords(client, ActiveCaloriesBurnedRecord::class, startTime, endTime, limit) { record ->
+                            val payload = createSamplePayload(
+                                dataType,
+                                record.startTime,
+                                record.endTime,
+                                record.energy.inKilocalories,
+                                record.metadata
+                            )
+                            samples.add(record.startTime to payload)
+                        }
+                        readSuccess = true
+                    } catch (e: Throwable) {
+                        Log.w("HealthManager", "readRecords ActiveCaloriesBurnedRecord threw: ${e.message}")
+                    }
+
+                    if (!readSuccess) {
+                        samples.clear()
                     }
                 }
             }
@@ -237,22 +245,9 @@ class HealthManager {
             }
 
             HealthDataType.TOTAL_CALORIES -> {
-                try {
-                    readRecords(client, TotalCaloriesBurnedRecord::class, startTime, endTime, limit) { record ->
-                        val payload = createSamplePayload(
-                            dataType,
-                            record.startTime,
-                            record.endTime,
-                            record.energy.inKilocalories,
-                            record.metadata
-                        )
-                        samples.add(record.startTime to payload)
-                    }
-                } catch (e: Throwable) {
-                    Log.w("HealthManager", "readRecords TotalCaloriesBurnedRecord threw: ${e.message}")
-                }
-
-                if (samples.isEmpty()) {
+                val isSingleDay = Duration.between(startTime, endTime).toHours() <= 30
+                var aggregateTotal = 0.0
+                if (isSingleDay) {
                     try {
                         val agg = client.aggregate(
                             AggregateRequest(
@@ -261,21 +256,39 @@ class HealthManager {
                             )
                         )
                         val energy = agg[TotalCaloriesBurnedRecord.ENERGY_TOTAL]
-                        val totalKcal = energy?.inKilocalories ?: 0.0
-                        if (totalKcal > 0.0) {
+                        aggregateTotal = energy?.inKilocalories ?: 0.0
+                        if (aggregateTotal > 0.0) {
                             val payload = JSObject().apply {
                                 put("dataType", dataType.identifier)
-                                put("value", totalKcal)
+                                put("value", aggregateTotal)
                                 put("unit", dataType.unit)
                                 put("startDate", formatter.format(startTime))
                                 put("endDate", formatter.format(endTime))
                                 put("sourceId", "com.garmin.android.apps.connectmobile")
                                 put("sourceName", "Garmin Connect")
+                                put("isAggregate", true)
                             }
                             samples.add(startTime to payload)
                         }
                     } catch (aggErr: Throwable) {
-                        Log.e("HealthManager", "TotalCalories aggregate fallback error: ${aggErr.message}")
+                        Log.w("HealthManager", "TotalCalories aggregate: ${aggErr.message}")
+                    }
+                }
+
+                if (aggregateTotal <= 0.0) {
+                    try {
+                        readRecords(client, TotalCaloriesBurnedRecord::class, startTime, endTime, limit) { record ->
+                            val payload = createSamplePayload(
+                                dataType,
+                                record.startTime,
+                                record.endTime,
+                                record.energy.inKilocalories,
+                                record.metadata
+                            )
+                            samples.add(record.startTime to payload)
+                        }
+                    } catch (e: Throwable) {
+                        Log.w("HealthManager", "readRecords TotalCaloriesBurnedRecord threw: ${e.message}")
                     }
                 }
             }
