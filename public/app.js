@@ -1899,7 +1899,10 @@ document.getElementById('btnAiCalc')?.addEventListener('click', () => {
 function calculateDailyMacrosClient(meals, settings, targetDateKey = null) {
   const targetKey = targetDateKey || getLocalDateKey(new Date());
   // Filtrar ESTRICTAMENTE las comidas que corresponden a la fecha consultada (por defecto HOY)
-  const filteredMeals = (meals || []).filter(m => getLocalDateKey(m.timestamp) === targetKey);
+  const filteredMeals = (meals || []).filter(m => {
+    const rawTime = m.timestamp || m.date || m.createdAt || (typeof m.id === 'number' && m.id > 1600000000000 ? m.id : null);
+    return getLocalDateKey(rawTime) === targetKey;
+  });
 
   let totalNetCarbs = 0;
   let totalCarbs = 0;
@@ -1909,9 +1912,10 @@ function calculateDailyMacrosClient(meals, settings, targetDateKey = null) {
   let totalCalories = 0;
 
   for (const m of filteredMeals) {
+    const mNet = Number(m.netCarbs != null ? m.netCarbs : (m.net_carbs != null ? m.net_carbs : (Number(m.carbs || 0) - Number(m.fiber || 0))));
     totalCarbs += Number(m.carbs || 0);
     totalFiber += Number(m.fiber || 0);
-    totalNetCarbs += Number(m.net_carbs || 0);
+    totalNetCarbs += Math.max(0, mNet);
     totalProtein += Number(m.protein || 0);
     totalFat += Number(m.fat || 0);
     totalCalories += Number(m.calories || 0);
@@ -1941,12 +1945,19 @@ function calculateDailyMacrosClient(meals, settings, targetDateKey = null) {
       carbs: Math.round(totalCarbs * 10) / 10,
       fiber: Math.round(totalFiber * 10) / 10,
       netCarbs: Math.round(totalNetCarbs * 10) / 10,
+      net_carbs: Math.round(totalNetCarbs * 10) / 10,
       protein: Math.round(totalProtein * 10) / 10,
       fat: Math.round(totalFat * 10) / 10,
       calories: Math.round(totalCalories)
     },
     ratios: { fat: fatRatio, protein: proteinRatio, carbs: carbRatio },
-    targets: { netCarbs: netCarbTarget, protein: proteinTarget, fat: fatTarget, calories: calorieTarget },
+    targets: {
+      netCarbs: netCarbTarget,
+      net_carbs: netCarbTarget,
+      protein: proteinTarget,
+      fat: fatTarget,
+      calories: calorieTarget
+    },
     status: {
       carbLimitExceeded,
       carbRemaining,
@@ -2015,12 +2026,14 @@ function calculateKetosisStateClient(meals, garmin, settings) {
   const oneDayAgo = now.getTime() - (24 * 60 * 60 * 1000);
 
   for (const meal of sortedMeals) {
-    const mealTime = new Date(meal.timestamp).getTime();
+    const rawTime = meal.timestamp || meal.date || meal.createdAt || (typeof meal.id === 'number' && meal.id > 1600000000000 ? meal.id : null);
+    const mealTime = rawTime ? new Date(rawTime).getTime() : now.getTime();
+    const mealNet = Number(meal.net_carbs != null ? meal.net_carbs : (meal.netCarbs != null ? meal.netCarbs : (Number(meal.carbs || 0) - Number(meal.fiber || 0))));
     if (mealTime >= oneDayAgo) {
-      totalNetCarbsLast24h += Number(meal.net_carbs || 0);
+      totalNetCarbsLast24h += Math.max(0, mealNet);
     }
-    if (Number(meal.net_carbs) >= 8) {
-      lastCarbTimestamp = new Date(meal.timestamp);
+    if (mealNet >= 5) {
+      lastCarbTimestamp = new Date(rawTime || meal.timestamp);
     }
   }
 
@@ -2536,8 +2549,14 @@ function renderPersonalizedKetoneHelp(ketosis, macros, garmin, settings) {
   const activeCal = Number(garmin?.active_calories || 0);
   const totalCal = Number(garmin?.total_calories || (bmr + activeCal));
   const steps = Number(garmin?.steps || 0);
-  const netCarbsIn = Math.round((macros?.totals?.net_carbs || 0) * 10) / 10;
-  const carbLimit = settings?.net_carbs_target || 25;
+  const netCarbsIn = Math.round(Number(macros?.totals?.netCarbs != null ? macros.totals.netCarbs : (macros?.totals?.net_carbs != null ? macros.totals.net_carbs : (macros?.totals?.carbs || 0))) * 10) / 10;
+  const totalCarbsIn = Math.round(Number(macros?.totals?.carbs || 0) * 10) / 10;
+  const carbLimit = Number(settings?.net_carbs_target || macros?.targets?.netCarbs || macros?.targets?.net_carbs || 25);
+  const mealsCount = Number(macros?.mealCount != null ? macros.mealCount : (state.meals || []).filter(m => {
+    const rawTime = m.timestamp || m.date || m.createdAt || (typeof m.id === 'number' && m.id > 1600000000000 ? m.id : null);
+    return getLocalDateKey(rawTime) === getLocalDateKey(new Date());
+  }).length);
+
   const remGlycogen = ketosis.glycogenRemainingGrams || 0;
   const depPct = ketosis.depletionPercent || 0;
   const day = ketosis.protocolDay || 1;
@@ -2549,6 +2568,10 @@ function renderPersonalizedKetoneHelp(ketosis, macros, garmin, settings) {
   } else if (ketosis.phase >= 4) {
     nextInfo = `• Estado Óptimo: <strong>¡Cetosis Profunda Activa (> 1.5 mmol/L)!</strong> Tu cuerpo se encuentra plenamente ceto-adaptado (lipólisis mitocondrial máxima).`;
   }
+
+  const mealSummaryText = mealsCount > 0 
+    ? `• <em>${mealsCount} ingesta${mealsCount === 1 ? '' : 's'} registrada${mealsCount === 1 ? '' : 's'} hoy</em>` 
+    : `• <em>(0 comidas guardadas hoy con el botón "Guardar Ingesta")</em>`;
 
   body.innerHTML = `
     <div class="exp-item exp-item-personal">
@@ -2567,7 +2590,7 @@ function renderPersonalizedKetoneHelp(ketosis, macros, garmin, settings) {
         <span>🧪</span> <span>Ingesta de Macros y Glucógeno Hepático (George Cahill, Harvard)</span>
       </div>
       <div>
-        • Carbohidratos netos consumidos hoy: <strong>${netCarbsIn}g</strong> (Límite diario: ${carbLimit}g).<br>
+        • Carbohidratos netos consumidos hoy: <strong>${netCarbsIn}g</strong> (Límite diario: ${carbLimit}g) ${mealSummaryText}.<br>
         • Depósito hepático residual estimado: <strong>~${remGlycogen}g restantes</strong> (de 110g iniciales).<br>
         • Vaciado de glucógeno: <strong>${depPct}% completado</strong>. Al caer por debajo de 30g, la enzima CPT-1 activa la cetogénesis mitocondrial.
       </div>
@@ -4786,11 +4809,15 @@ function syncTodayToDailyHistory() {
     if (h.date === todayKey) continue;
     if (h.steps > 45000) h.steps = 0;
     if (h.calories_out > 4500) h.calories_out = dailyBmr + Number(h.active_calories || 0);
-    const dayMeals = allMeals.filter(m => getLocalDateKey(m.timestamp) === h.date);
+    const dayMeals = allMeals.filter(m => {
+      const rawTime = m.timestamp || m.date || m.createdAt || (typeof m.id === 'number' && m.id > 1600000000000 ? m.id : null);
+      return getLocalDateKey(rawTime) === h.date;
+    });
     if (dayMeals.length > 0) {
       let dayNetCarbs = 0, dayFat = 0, dayProtein = 0, dayCalIn = 0;
       for (const m of dayMeals) {
-        dayNetCarbs += Number(m.net_carbs || 0);
+        const mNet = Number(m.netCarbs != null ? m.netCarbs : (m.net_carbs != null ? m.net_carbs : (Number(m.carbs || 0) - Number(m.fiber || 0))));
+        dayNetCarbs += Math.max(0, mNet);
         dayFat += Number(m.fat || 0);
         dayProtein += Number(m.protein || 0);
         dayCalIn += Number(m.calories || 0);
@@ -4805,7 +4832,8 @@ function syncTodayToDailyHistory() {
   // 2. Si hay fechas pasadas con comidas registradas que faltaban en history, incorporarlas
   const mealsByDate = {};
   for (const m of allMeals) {
-    const mKey = getLocalDateKey(m.timestamp);
+    const rawTime = m.timestamp || m.date || m.createdAt || (typeof m.id === 'number' && m.id > 1600000000000 ? m.id : null);
+    const mKey = getLocalDateKey(rawTime);
     if (mKey >= protocolStartKey && mKey < todayKey) {
       if (!mealsByDate[mKey]) mealsByDate[mKey] = [];
       mealsByDate[mKey].push(m);
@@ -4816,7 +4844,8 @@ function syncTodayToDailyHistory() {
     if (!history.some(h => h.date === dKey)) {
       let dayNetCarbs = 0, dayFat = 0, dayProtein = 0, dayCalIn = 0;
       for (const m of dMeals) {
-        dayNetCarbs += Number(m.net_carbs || 0);
+        const mNet = Number(m.netCarbs != null ? m.netCarbs : (m.net_carbs != null ? m.net_carbs : (Number(m.carbs || 0) - Number(m.fiber || 0))));
+        dayNetCarbs += Math.max(0, mNet);
         dayFat += Number(m.fat || 0);
         dayProtein += Number(m.protein || 0);
         dayCalIn += Number(m.calories || 0);
