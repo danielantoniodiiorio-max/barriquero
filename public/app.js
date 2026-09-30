@@ -4275,8 +4275,8 @@ function renderWeightCompareChart(trajectories) {
   canvas.height = h * dpr;
   ctx.scale(dpr, dpr);
 
-  const padLeft = 48;
-  const padRight = 24;
+  const padLeft = 56;
+  const padRight = 20;
   const padTop = 24;
   const padBottom = 32;
   const plotW = w - padLeft - padRight;
@@ -4310,10 +4310,10 @@ function renderWeightCompareChart(trajectories) {
     ctx.lineTo(w - padRight, y);
     ctx.stroke();
 
-    ctx.fillStyle = '#64748b';
-    ctx.font = '10px -apple-system, sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText(yVal.toFixed(1) + ' kg', padLeft - 6, y + 3);
+    ctx.fillText(yVal.toFixed(1) + ' kg', padLeft - 8, y + 4);
   }
 
   // Línea horizontal de Meta (Goal Weight)
@@ -5093,35 +5093,59 @@ function drawSmoothSplineOnCanvas(canvas, seriesList, xLabels, options = {}) {
 
   const w = rect.width;
   const h = rect.height;
-  const padLeft = 45;
-  const padRight = 15;
-  const padTop = 20;
-  const padBottom = 30;
+  const padLeft = 78; // Espacio amplio y limpio para evitar recortes del eje Y (ej. 2.500 kcal)
+  const padRight = 18;
+  const padTop = 22;
+  const padBottom = 32;
   const plotW = w - padLeft - padRight;
   const plotH = h - padTop - padBottom;
 
   ctx.clearRect(0, 0, w, h);
 
   // Encontrar valor máximo para escala Y
-  let maxVal = 0;
+  let maxDataVal = 0;
   for (const s of seriesList) {
     for (const v of s.values) {
-      if (v > maxVal) maxVal = v;
+      const num = Number(v) || 0;
+      if (num > maxDataVal) maxDataVal = num;
     }
   }
 
+  let maxVal = 100;
+  let gridSteps = 4;
+
   if (options.isDecimal) {
-    maxVal = Math.max(2.5, Math.ceil(maxVal * 1.35 * 10) / 10);
+    // Escala para cetonas (0.0 a 2.5 o 3.0 mmol/L)
+    const ceilVal = Math.max(2.0, maxDataVal * 1.2);
+    maxVal = Math.ceil(ceilVal * 2) / 2; // Múltiplos de 0.5 (ej. 2.0, 2.5, 3.0)
+    gridSteps = Math.max(3, Math.min(6, Math.round(maxVal / 0.5)));
   } else {
-    maxVal = Math.max(10, Math.ceil(maxVal * 1.15));
+    // Escala armónica "Nice Numbers" (Calorías, Pasos y Macros)
+    const targetSteps = 4;
+    const roughStep = Math.max(1, (maxDataVal * 1.12) / targetSteps);
+    const power = Math.pow(10, Math.floor(Math.log10(roughStep)));
+    const fraction = roughStep / power;
+
+    let niceFraction = 10;
+    if (fraction <= 1.25) niceFraction = 1;
+    else if (fraction <= 2.25) niceFraction = 2;
+    else if (fraction <= 3.5) niceFraction = 2.5;
+    else if (fraction <= 7.5) niceFraction = 5;
+    else niceFraction = 10;
+
+    const step = Math.max(1, Math.round(niceFraction * power));
+    maxVal = Math.max(step * targetSteps, Math.ceil(maxDataVal / step) * step);
+    if (maxVal - maxDataVal < step * 0.15 && maxDataVal > 0) {
+      maxVal += step;
+    }
+    gridSteps = Math.max(3, Math.min(6, Math.round(maxVal / step)));
   }
 
-  // Líneas horizontales de guía (Grid)
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+  // Líneas horizontales de guía (Grid) y Etiquetas del Eje Y
   ctx.lineWidth = 1;
-  const gridSteps = 4;
   for (let i = 0; i <= gridSteps; i++) {
     const y = padTop + (plotH / gridSteps) * i;
+    ctx.strokeStyle = i === gridSteps ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.07)';
     ctx.beginPath();
     ctx.moveTo(padLeft, y);
     ctx.lineTo(w - padRight, y);
@@ -5129,10 +5153,11 @@ function drawSmoothSplineOnCanvas(canvas, seriesList, xLabels, options = {}) {
 
     const rawVal = maxVal - (maxVal / gridSteps) * i;
     const val = options.isDecimal ? (Math.round(rawVal * 10) / 10) : Math.round(rawVal);
-    ctx.fillStyle = '#64748b';
-    ctx.font = '10px -apple-system, sans-serif';
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '500 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText(options.formatY ? options.formatY(val) : val.toLocaleString(), padLeft - 6, y + 3);
+    const formattedY = options.formatY ? options.formatY(val) : val.toLocaleString();
+    ctx.fillText(formattedY, padLeft - 8, y + 4);
   }
 
   // Líneas de referencia especiales (ej. 0.5 mM Óptimo, 1.5 mM Cetosis Profunda)
@@ -5319,7 +5344,7 @@ function renderChartsView() {
       { name: 'Pasos Garmin', color: '#10b981', values: slice.map(h => h.steps) },
       { name: 'Gasto Activo (kcal)', color: '#38bdf8', values: slice.map(h => h.calories_out) }
     ];
-    formatY = v => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v;
+    formatY = v => v >= 1000 ? (v % 1000 === 0 ? (v / 1000) + 'k' : (v / 1000).toFixed(1) + 'k') : v;
     chartOptions = { formatY };
   } else if (activeChartMetric === 'macros') {
     if (lblStat1) lblStat1.textContent = 'Carbos Prom.';
@@ -5338,7 +5363,7 @@ function renderChartsView() {
       { name: 'Grasas (g)', color: '#10b981', values: slice.map(h => h.fat) },
       { name: 'Proteínas (g)', color: '#38bdf8', values: slice.map(h => h.protein) }
     ];
-    formatY = v => v + 'g';
+    formatY = v => (v === 0 ? '0 g' : v + ' g');
     chartOptions = { formatY };
   } else if (activeChartMetric === 'calories') {
     if (lblStat1) lblStat1.textContent = 'Ingeridas Prom.';
@@ -5356,7 +5381,7 @@ function renderChartsView() {
       { name: 'Calorías Ingeridas', color: '#f59e0b', values: slice.map(h => h.calories_in) },
       { name: 'Calorías Quemadas Garmin', color: '#10b981', values: slice.map(h => h.calories_out) }
     ];
-    formatY = v => v + ' kcal';
+    formatY = v => (v === 0 ? '0 kcal' : Math.round(v).toLocaleString('es-ES') + ' kcal');
     chartOptions = { formatY };
   } else if (activeChartMetric === 'ketosis') {
     // CURVA CIENTÍFICA DE CETOSIS: IDEAL VS REAL (Phinney & Volek, 2011)
