@@ -1703,8 +1703,106 @@ function initGramChips() {
   });
 }
 
-// Disparador principal de cálculo nutricional con base 100g
-function triggerAiMacroCalc(forcedGrams = null) {
+// Consulta Opcional a la API de Google Gemini (si el usuario la configuró en Ajustes)
+async function estimateMealWithGeminiApi(mealName, grams, apiKey) {
+  if (!apiKey || !apiKey.trim() || !navigator.onLine) return null;
+
+  try {
+    const targetG = grams ? `${grams} gramos` : 'porción estándar habitual (especifica los gramos exactos)';
+    const prompt = `Actúa como un nutricionista y bioquímico clínico experto en dieta cetogénica.
+Calcula los macronutrientes reales para el siguiente plato o alimento:
+Alimento: "${mealName}"
+Cantidad requerida: ${targetG}
+
+REGLAS CRÍTICAS DE FÍSICA Y BIOLOGÍA:
+1. Ley de conservación de masa: La suma de (carbohidratos totales + proteínas + grasas) NUNCA puede ser mayor que el peso total en gramos del alimento. Por ejemplo, en 50g de comida es imposible físicamente que haya más de 50g de carbohidratos o nutrientes.
+2. Si es un plato con arroz cocido, pasta o legumbres, recuerda que el arroz cocido tiene ~28g de carbohidratos por cada 100g (no 100g de carbos por 100g).
+
+Responde EXCLUSIVAMENTE un objeto JSON válido con los siguientes campos numéricos y textuales (sin bloques de código markdown, solo el JSON):
+{
+  "carbs": 0.0,
+  "fiber": 0.0,
+  "protein": 0.0,
+  "fat": 0.0,
+  "calories": 0,
+  "grams": 0,
+  "detected": "Nombre descriptivo de la porción analizada",
+  "ketoStatus": "optimal" o "moderate" o "exceeded",
+  "ketoBadge": "🟢 100% Compatible Keto" o "🟡 Carbohidratos Moderados" o "🔴 Alto en Carbohidratos (Excede Límite Keto)",
+  "ketoNote": "Breve explicación sobre el impacto en la cetosis nutricional"
+}`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 segundos max
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.1,
+          responseMimeType: "application/json"
+        }
+      }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    if (!resp.ok) {
+      console.warn('Gemini API HTTP Error:', resp.status, resp.statusText);
+      return null;
+    }
+
+    const data = await resp.json();
+    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!rawText) return null;
+
+    const parsed = JSON.parse(rawText.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim());
+    const totalGrams = parseFloat(parsed.grams) || grams || 100;
+    let carbs = parseFloat(parsed.carbs) || 0;
+    let fiber = parseFloat(parsed.fiber) || 0;
+    let protein = parseFloat(parsed.protein) || 0;
+    let fat = parseFloat(parsed.fat) || 0;
+
+    // Validación física obligatoria
+    if (totalGrams > 0) {
+      if (carbs > totalGrams) carbs = totalGrams * 0.9;
+      const sumM = carbs + protein + fat;
+      if (sumM > totalGrams) {
+        const factor = (totalGrams * 0.95) / sumM;
+        carbs *= factor;
+        protein *= factor;
+        fat *= factor;
+      }
+      if (fiber > carbs) fiber = carbs * 0.5;
+    }
+
+    const netCarbs = Math.max(0, Math.round((carbs - fiber) * 10) / 10);
+    const cal = Math.round(parseFloat(parsed.calories) || ((fat * 9) + (protein * 4) + (netCarbs * 4)));
+
+    return {
+      fromGemini: true,
+      carbs: Math.round(carbs * 10) / 10,
+      fiber: Math.round(fiber * 10) / 10,
+      net_carbs: netCarbs,
+      protein: Math.round(protein * 10) / 10,
+      fat: Math.round(fat * 10) / 10,
+      calories: cal,
+      detected: parsed.detected || `${mealName} [${Math.round(totalGrams)}g]`,
+      ketoStatus: parsed.ketoStatus || (netCarbs > 20 ? 'exceeded' : (netCarbs > 8 ? 'moderate' : 'optimal')),
+      ketoBadge: parsed.ketoBadge || (netCarbs > 20 ? '🔴 Alto en Carbohidratos (Excede Límite Keto)' : (netCarbs > 8 ? '🟡 Carbohidratos Moderados' : '🟢 100% Compatible Keto')),
+      ketoNote: parsed.ketoNote || `Aporte de ${netCarbs}g de carbohidratos netos en ${Math.round(totalGrams)}g.`
+    };
+  } catch (err) {
+    console.warn('Error al consultar Gemini API:', err);
+    return null;
+  }
+}
+
+// Disparador principal de cálculo nutricional (híbrido: local ultrarrápido + Gemini AI opcional)
+async function triggerAiMacroCalc(forcedGrams = null) {
   const inputMeal = document.getElementById('inputMealName');
   const mealName = (inputMeal?.value || '').trim();
   if (!mealName) {
@@ -1715,14 +1813,29 @@ function triggerAiMacroCalc(forcedGrams = null) {
 
   const explicitG = forcedGrams || parseFloat(document.getElementById('inputMealGrams')?.value) || null;
   const feedback = document.getElementById('aiCalcFeedback');
+  const geminiKey = state.settings?.gemini_api_key;
+
   if (feedback) {
     feedback.style.display = 'block';
     feedback.style.borderLeft = '4px solid #38bdf8';
     feedback.style.background = 'rgba(56, 189, 248, 0.12)';
-    feedback.innerHTML = '<span>🤖</span> <em>Calculando macronutrientes proporcionales a 100g...</em>';
+    feedback.innerHTML = geminiKey && navigator.onLine
+      ? '<span>✨</span> <em>Consultando a Google Gemini AI para análisis nutricional...</em>'
+      : '<span>🤖</span> <em>Calculando macronutrientes proporcionales a 100g...</em>';
   }
 
-  const result = estimateMealMacrosAI(mealName, explicitG);
+  let result = null;
+
+  // 1. Si el usuario configuró una clave de Google Gemini y hay conexión a internet, consultar Gemini
+  if (geminiKey && navigator.onLine) {
+    result = await estimateMealWithGeminiApi(mealName, explicitG, geminiKey);
+  }
+
+  // 2. Si no hay Gemini API key, falló la consulta o no hay red, usar el motor local ultrarrápido Barriketo
+  if (!result) {
+    result = estimateMealMacrosAI(mealName, explicitG);
+  }
+
   if (result) {
     if (result.unknown) {
       if (feedback) {
@@ -1736,7 +1849,7 @@ function triggerAiMacroCalc(forcedGrams = null) {
             No reconocimos con certeza <strong>"${escapeHtml(mealName)}"</strong> en la base de datos de 100g.
           </div>
           <div style="font-size:0.78rem; color:var(--text-muted); margin-bottom:4px;">
-            💡 <em>Para proteger tu cetosis no inventamos números al azar. Elige una opción de la lista o escribe el peso y corte (ej: "300g vacío", "bife 200g").</em>
+            💡 <em>Para proteger tu cetosis no inventamos números al azar. Elige una opción de la lista, escribe el peso (ej: "50g arroz") o configura tu clave de Gemini en Ajustes.</em>
           </div>
         `;
       }
@@ -1752,14 +1865,17 @@ function triggerAiMacroCalc(forcedGrams = null) {
     if (feedback) {
       let badgeColor = result.ketoStatus === 'exceeded' ? '#ef4444' : (result.ketoStatus === 'moderate' ? '#f59e0b' : '#10b981');
       let bgColor = result.ketoStatus === 'exceeded' ? 'rgba(239, 68, 68, 0.14)' : (result.ketoStatus === 'moderate' ? 'rgba(245, 158, 11, 0.14)' : 'rgba(16, 185, 129, 0.14)');
+      const sourceTag = result.fromGemini ? '✨ Google Gemini AI' : '⚖️ Base Exacta Barriketo';
+
       feedback.style.borderLeft = `4px solid ${badgeColor}`;
       feedback.style.background = bgColor;
       feedback.innerHTML = `
-        <div style="font-size:0.86rem; font-weight:800; color:${badgeColor}; margin-bottom:4px;">
-          ${result.ketoBadge}
+        <div style="font-size:0.86rem; font-weight:800; color:${badgeColor}; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+          <span>${result.ketoBadge}</span>
+          <span style="font-size:0.74rem; background:rgba(255,255,255,0.08); padding:2px 6px; border-radius:4px; color:#94a3b8;">${sourceTag}</span>
         </div>
         <div style="font-size:0.84rem; color:var(--text-main); margin-bottom:4px;">
-          <strong>⚖️ Calculado con exactitud:</strong> ${escapeHtml(result.detected)}
+          <strong>Alimento:</strong> ${escapeHtml(result.detected)}
         </div>
         <div style="font-size:0.82rem; color:var(--text-muted); margin-bottom:4px;">
           👉 <strong>${result.net_carbs}g carbos netos</strong> (${result.carbs}g tot / ${result.fiber}g fibra) • <strong>${result.protein}g proteína</strong> • <strong>${result.fat}g grasa</strong> • <strong>${result.calories} kcal</strong>
@@ -4349,6 +4465,11 @@ function loadSettings() {
     const localISOTime = (new Date(sDate.getTime() - tzOffset)).toISOString().slice(0, 16);
     inStartDate.value = localISOTime;
   }
+
+  const inGeminiKey = document.getElementById('setGeminiApiKey');
+  if (inGeminiKey) {
+    inGeminiKey.value = s.gemini_api_key || '';
+  }
 }
 
 function updateGoalWeightFeedback() {
@@ -4426,6 +4547,7 @@ document.getElementById('formSettings')?.addEventListener('submit', (e) => {
     protein_target: parseFloat(document.getElementById('setProtein')?.value) || 140,
     fat_target: parseFloat(document.getElementById('setFat')?.value) || 150,
     calories_target: parseFloat(document.getElementById('setCalories')?.value) || 2000,
+    gemini_api_key: (document.getElementById('setGeminiApiKey')?.value || '').trim(),
     keto_start_date: startDateIso
   };
 

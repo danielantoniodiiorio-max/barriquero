@@ -880,6 +880,86 @@ const FOOD_DATABASE_100G = [
     defaultGrams: 180, unitName: 'porción'
   },
   {
+    id: 'arroz_con_salsa',
+    names: ['arroz con salsa de tomate', 'arroz con salsa', 'arroz con tuco', 'arroz con tomate', 'arroz con pomarola', 'arroz con salsa fileto'],
+    label: 'Arroz blanco con salsa de tomate',
+    category: 'elaborados',
+    carbs: 22.0, fiber: 0.8, protein: 2.5, fat: 1.2, calories: 110,
+    defaultGrams: 200, unitName: 'plato'
+  },
+  {
+    id: 'fideos_con_salsa',
+    names: ['fideos con salsa de tomate', 'fideos con salsa', 'fideos con tuco', 'pasta con tuco', 'pasta con salsa', 'tallarines con tuco', 'espaguetis con salsa'],
+    label: 'Fideos / Pasta con salsa de tomate',
+    category: 'elaborados',
+    carbs: 24.0, fiber: 1.5, protein: 4.5, fat: 2.0, calories: 135,
+    defaultGrams: 200, unitName: 'plato'
+  },
+  {
+    id: 'arroz_con_pollo',
+    names: ['arroz con pollo', 'pollo con arroz'],
+    label: 'Arroz con pollo a la cacerola',
+    category: 'elaborados',
+    carbs: 16.0, fiber: 0.6, protein: 14.0, fat: 4.5, calories: 162,
+    defaultGrams: 250, unitName: 'plato'
+  },
+  {
+    id: 'carne_con_ensalada',
+    names: ['carne con ensalada', 'bife con ensalada', 'asado con ensalada'],
+    label: 'Bife / Carne con ensalada mixta',
+    category: 'elaborados',
+    carbs: 2.0, fiber: 1.0, protein: 22.0, fat: 14.0, calories: 225,
+    defaultGrams: 250, unitName: 'plato'
+  },
+  {
+    id: 'pollo_con_ensalada',
+    names: ['pollo con ensalada', 'pechuga con ensalada'],
+    label: 'Pechuga / Pollo con ensalada mixta',
+    category: 'elaborados',
+    carbs: 2.0, fiber: 1.0, protein: 24.0, fat: 7.0, calories: 170,
+    defaultGrams: 250, unitName: 'plato'
+  },
+  {
+    id: 'milanesa_con_pure',
+    names: ['milanesa con pure', 'milanga con pure', 'suprema con pure'],
+    label: 'Milanesa con puré de papas',
+    category: 'elaborados',
+    carbs: 16.0, fiber: 1.2, protein: 12.0, fat: 11.0, calories: 215,
+    defaultGrams: 300, unitName: 'plato'
+  },
+  {
+    id: 'guiso',
+    names: ['guiso', 'guisado', 'guiso de carne', 'guiso de lentejas', 'guiso de fideos'],
+    label: 'Guiso tradicional de carne y vegetales',
+    category: 'elaborados',
+    carbs: 12.0, fiber: 2.5, protein: 11.0, fat: 7.0, calories: 158,
+    defaultGrams: 300, unitName: 'plato'
+  },
+  {
+    id: 'tortilla_papas',
+    names: ['tortilla de papas', 'tortilla de papa', 'tortilla espanola', 'tortilla'],
+    label: 'Tortilla de papas tradicional',
+    category: 'elaborados',
+    carbs: 14.0, fiber: 1.2, protein: 6.0, fat: 10.0, calories: 172,
+    defaultGrams: 150, unitName: 'porción'
+  },
+  {
+    id: 'revuelto_gramajo',
+    names: ['revuelto gramajo', 'gramajo'],
+    label: 'Revuelto Gramajo (papas, huevo, jamón)',
+    category: 'elaborados',
+    carbs: 12.0, fiber: 1.0, protein: 11.0, fat: 14.0, calories: 220,
+    defaultGrams: 200, unitName: 'plato'
+  },
+  {
+    id: 'salsa_tomate',
+    names: ['salsa de tomate', 'tuco', 'salsa tuco', 'salsa pomarola', 'pure de tomate', 'salsa fileto', 'salsa de tomates', 'salsa bolognesa', 'salsa bolonesa'],
+    label: 'Salsa de tomate cocida / Tuco',
+    category: 'condimentos',
+    carbs: 6.5, fiber: 1.5, protein: 1.5, fat: 2.0, calories: 50,
+    defaultGrams: 60, unitName: 'cucharadas'
+  },
+  {
     id: 'pan_blanco',
     names: ['pan', 'pan blanco', 'tostada', 'tostadas', 'flautita', 'mignon'],
     label: 'Pan blanco de panadería / Tostadas',
@@ -1188,118 +1268,157 @@ function calculateMealMacrosExact(inputText, explicitGrams = null) {
              .replace(/\s+/g, ' ');
 
   let workingText = text;
-  let totalCarbs = 0;
-  let totalFiber = 0;
-  let totalProtein = 0;
-  let totalFat = 0;
-  let totalCalories = 0;
-  let detectedItems = [];
-  const matchedFoodIds = new Set();
 
-  // Si el usuario especificó gramos manualmente en el campo o chip auxiliar
-  const forcedGrams = (explicitGrams && !isNaN(explicitGrams) && explicitGrams > 0) ? parseFloat(explicitGrams) : null;
+  // 1. Extraer peso global si fue especificado explícitamente en el control o en el texto
+  let globalTargetGrams = (explicitGrams && !isNaN(explicitGrams) && explicitGrams > 0) ? parseFloat(explicitGrams) : null;
+
+  // Si no vino desde el control de gramos, buscar si la frase entera termina o empieza con un peso
+  // Ej: "arroz con salsa de tomate 50 gramos", "arroz con salsa 50g", "150g de carne con ensalada"
+  if (!globalTargetGrams) {
+    const trailingGramMatch = workingText.match(/(?:^|\s)(\d+(?:\.\d+)?)\s*(?:g|gr|gramos|kg|kilos?)\s*$/i);
+    if (trailingGramMatch) {
+      const rawVal = parseFloat(trailingGramMatch[1]);
+      globalTargetGrams = trailingGramMatch[0].toLowerCase().includes('kg') ? rawVal * 1000 : rawVal;
+      workingText = workingText.slice(0, trailingGramMatch.index).trim();
+    } else {
+      const leadingGramMatch = workingText.match(/^(\d+(?:\.\d+)?)\s*(?:g|gr|gramos|kg|kilos?)\s+(?:de\s+)?/i);
+      if (leadingGramMatch) {
+        const rawVal = parseFloat(leadingGramMatch[1]);
+        globalTargetGrams = leadingGramMatch[0].toLowerCase().includes('kg') ? rawVal * 1000 : rawVal;
+        workingText = workingText.slice(leadingGramMatch[0].length).trim();
+      }
+    }
+  }
+
+  // 2. Coincidencia de Alimentos en la Base de Datos (priorizando nombres más largos)
+  const matches = [];
+  const matchedFoodIds = new Set();
 
   for (const rule of FLATTENED_RULES_100G) {
     if (matchedFoodIds.has(rule.food.id)) continue;
 
     const regex = new RegExp('(?:^|\\s)(' + rule.norm.replace(/\s+/g, '\\s+') + ')(?:$|\\s)', 'i');
     const match = workingText.match(regex);
-
     if (match) {
       const matchStart = match.index + (match[0].startsWith(' ') ? 1 : 0);
       const matchEnd = matchStart + match[1].length;
 
-      // Determinar el peso exacto en gramos:
-      let grams = rule.food.defaultGrams;
-      let isExplicit = false;
+      // Verificar si tiene un peso explícito local pegado al alimento
+      const localQty = extractFoodQuantityGrams(workingText, matchStart, matchEnd, rule.food.defaultGrams);
 
-      if (forcedGrams && matchedFoodIds.size === 0) {
-        // Si hay gramos explícitos en el control y es el primer alimento
-        grams = forcedGrams;
-        isExplicit = true;
-      } else {
-        const q = extractFoodQuantityGrams(workingText, matchStart, matchEnd, rule.food.defaultGrams);
-        grams = q.grams;
-        isExplicit = q.isExplicitWeight;
-
-        // Limpiar el texto procesado para que no interfiera
-        const padLen = q.endPad - q.startPad;
-        workingText = workingText.substring(0, q.startPad) + ' '.repeat(padLen) + workingText.substring(q.endPad);
-      }
-
-      // Factor proporcional respecto a la base de 100 gramos:
-      const factor = grams / 100.0;
-
-      const itemCarbs = rule.food.carbs * factor;
-      const itemFiber = rule.food.fiber * factor;
-      const itemProtein = rule.food.protein * factor;
-      const itemFat = rule.food.fat * factor;
-      let itemCal = rule.food.calories * factor;
-      if (itemCal === 0 && (itemProtein > 0 || itemFat > 0 || itemCarbs > 0)) {
-        itemCal = (itemFat * 9) + (itemProtein * 4) + (Math.max(0, itemCarbs - itemFiber) * 4);
-      }
-
-      totalCarbs += itemCarbs;
-      totalFiber += itemFiber;
-      totalProtein += itemProtein;
-      totalFat += itemFat;
-      totalCalories += itemCal;
-
+      matches.push({
+        food: rule.food,
+        matchStart,
+        matchEnd,
+        localGrams: localQty.grams,
+        hasLocalExplicitWeight: localQty.isExplicitWeight,
+        defaultGrams: rule.food.defaultGrams
+      });
       matchedFoodIds.add(rule.food.id);
 
-      const netC = Math.max(0, Math.round((itemCarbs - itemFiber) * 10) / 10);
-      detectedItems.push({
-        name: rule.food.label,
-        grams: Math.round(grams),
-        isExplicit,
-        netCarbs: netC,
-        protein: Math.round(itemProtein * 10) / 10,
-        fat: Math.round(itemFat * 10) / 10,
-        calories: Math.round(itemCal)
-      });
+      // Limpiar texto para evitar falsos positivos encadenados
+      workingText = workingText.substring(0, matchStart) + ' '.repeat(match[1].length) + workingText.substring(matchEnd);
+    }
+  }
+
+  let detectedItems = [];
+
+  if (matches.length === 1) {
+    // 1 SOLO ALIMENTO DETECTADO: El peso total se aplica íntegro a este alimento
+    const m = matches[0];
+    const finalGrams = globalTargetGrams || (m.hasLocalExplicitWeight ? m.localGrams : m.defaultGrams);
+    const factor = finalGrams / 100.0;
+    detectedItems.push({
+      name: m.food.label,
+      grams: finalGrams,
+      isExplicit: Boolean(globalTargetGrams || m.hasLocalExplicitWeight),
+      carbs: m.food.carbs * factor,
+      fiber: m.food.fiber * factor,
+      protein: m.food.protein * factor,
+      fat: m.food.fat * factor,
+      calories: m.food.calories * factor
+    });
+  } else if (matches.length > 1) {
+    // MÚLTIPLES ALIMENTOS DETECTADOS (Platos combinados: ej. "arroz" + "salsa de tomate")
+    const allHaveLocalExplicit = matches.every(m => m.hasLocalExplicitWeight);
+
+    if (allHaveLocalExplicit && !globalTargetGrams) {
+      // Caso A: Cada ingrediente tenía su propio peso escrito (ej: "100g de bife y 50g de ensalada")
+      for (const m of matches) {
+        const factor = m.localGrams / 100.0;
+        detectedItems.push({
+          name: m.food.label,
+          grams: m.localGrams,
+          isExplicit: true,
+          carbs: m.food.carbs * factor,
+          fiber: m.food.fiber * factor,
+          protein: m.food.protein * factor,
+          fat: m.food.fat * factor,
+          calories: m.food.calories * factor
+        });
+      }
+    } else {
+      // Caso B: Plato compuesto con gramaje total único (ej. "arroz con salsa 50g" o selector en 50g)
+      // La suma de los ingredientes DEBE SER EXACTAMENTE igual al peso total ingresado.
+      const totalDefault = matches.reduce((sum, m) => sum + (m.defaultGrams || 100), 0);
+      const targetTotalWeight = globalTargetGrams || totalDefault;
+
+      let assignedSum = 0;
+      for (let i = 0; i < matches.length; i++) {
+        const m = matches[i];
+        let itemGrams = 0;
+        if (i === matches.length - 1) {
+          itemGrams = Math.max(1, Math.round(targetTotalWeight - assignedSum));
+        } else {
+          itemGrams = Math.max(1, Math.round(targetTotalWeight * (m.defaultGrams / totalDefault)));
+          assignedSum += itemGrams;
+        }
+
+        const factor = itemGrams / 100.0;
+        detectedItems.push({
+          name: m.food.label,
+          grams: itemGrams,
+          isExplicit: Boolean(globalTargetGrams),
+          carbs: m.food.carbs * factor,
+          fiber: m.food.fiber * factor,
+          protein: m.food.protein * factor,
+          fat: m.food.fat * factor,
+          calories: m.food.calories * factor
+        });
+      }
     }
   }
 
   // Si no se encontró ningún alimento en la base de datos:
   if (detectedItems.length === 0) {
-    // Verificar si el usuario puso gramos y alguna palabra clave de carne o verdura
     const anyGramMatch = text.match(/(\d+(?:\.\d+)?)\s*(?:g|gr|gramos|kg)\b/i);
-    const estimatedGrams = forcedGrams || (anyGramMatch ? parseFloat(anyGramMatch[1]) * (anyGramMatch[0].includes('kg') ? 1000 : 1) : 200);
+    const estimatedGrams = globalTargetGrams || (anyGramMatch ? parseFloat(anyGramMatch[1]) * (anyGramMatch[0].includes('kg') ? 1000 : 1) : 200);
 
     if (text.includes('carne') || text.includes('vaca') || text.includes('asado') || text.includes('corte') || text.includes('bife') || text.includes('muslo') || text.includes('filet')) {
       const factor = estimatedGrams / 100.0;
-      totalCarbs = 0;
-      totalFiber = 0;
-      totalProtein = 26.0 * factor;
-      totalFat = 18.0 * factor;
-      totalCalories = 270.0 * factor;
       detectedItems.push({
         name: `Corte de carne / proteína (${Math.round(estimatedGrams)}g)`,
         grams: Math.round(estimatedGrams),
         isExplicit: true,
-        netCarbs: 0,
-        protein: Math.round(totalProtein),
-        fat: Math.round(totalFat),
-        calories: Math.round(totalCalories)
+        carbs: 0,
+        fiber: 0,
+        protein: 26.0 * factor,
+        fat: 18.0 * factor,
+        calories: 270.0 * factor
       });
     } else if (text.includes('ensalada') || text.includes('verdura') || text.includes('vegetal')) {
       const factor = estimatedGrams / 100.0;
-      totalCarbs = 4.0 * factor;
-      totalFiber = 2.0 * factor;
-      totalProtein = 1.5 * factor;
-      totalFat = 5.0 * factor;
-      totalCalories = 65.0 * factor;
       detectedItems.push({
         name: `Vegetales / Ensalada (${Math.round(estimatedGrams)}g)`,
         grams: Math.round(estimatedGrams),
         isExplicit: true,
-        netCarbs: Math.round((totalCarbs - totalFiber) * 10) / 10,
-        protein: Math.round(totalProtein),
-        fat: Math.round(totalFat),
-        calories: Math.round(totalCalories)
+        carbs: 4.0 * factor,
+        fiber: 2.0 * factor,
+        protein: 1.5 * factor,
+        fat: 5.0 * factor,
+        calories: 65.0 * factor
       });
     } else {
-      // Alimento desconocido: NO inventamos números altos ni 22g de carbos arbitrarios
       return {
         unknown: true,
         rawInput: inputText,
@@ -1308,32 +1427,56 @@ function calculateMealMacrosExact(inputText, explicitGrams = null) {
     }
   }
 
+  // =========================================================================
+  // LEY INVIOLABLE DE CONSERVACIÓN DE MASA Y CONSISTENCIA FÍSICA
+  // En ningún alimento del universo conocido la suma de macronutrientes puede
+  // superar el peso de la comida consumida (ej: 50g no pueden tener 52g de carbos).
+  // =========================================================================
+  const totalMealGrams = detectedItems.reduce((acc, item) => acc + item.grams, 0);
+  let totalCarbs = detectedItems.reduce((acc, item) => acc + item.carbs, 0);
+  let totalFiber = detectedItems.reduce((acc, item) => acc + item.fiber, 0);
+  let totalProtein = detectedItems.reduce((acc, item) => acc + item.protein, 0);
+  let totalFat = detectedItems.reduce((acc, item) => acc + item.fat, 0);
+
+  if (totalMealGrams > 0) {
+    if (totalCarbs > totalMealGrams) {
+      totalCarbs = totalMealGrams * 0.90;
+    }
+    const macroSum = totalCarbs + totalProtein + totalFat;
+    if (macroSum > totalMealGrams) {
+      const scaleDown = (totalMealGrams * 0.95) / macroSum;
+      totalCarbs *= scaleDown;
+      totalProtein *= scaleDown;
+      totalFat *= scaleDown;
+    }
+    if (totalFiber > totalCarbs) {
+      totalFiber = totalCarbs * 0.5;
+    }
+  }
+
   const netCarbs = Math.max(0, Math.round((totalCarbs - totalFiber) * 10) / 10);
   const roundedCarbs = Math.round(totalCarbs * 10) / 10;
   const roundedFiber = Math.round(totalFiber * 10) / 10;
   const roundedProtein = Math.round(totalProtein * 10) / 10;
   const roundedFat = Math.round(totalFat * 10) / 10;
-  let roundedCalories = Math.round(totalCalories);
-  if (roundedCalories === 0 && (roundedFat > 0 || roundedProtein > 0 || netCarbs > 0)) {
-    roundedCalories = Math.round((roundedFat * 9) + (roundedProtein * 4) + (netCarbs * 4));
-  }
+  let roundedCalories = Math.round((roundedFat * 9) + (roundedProtein * 4) + (netCarbs * 4));
 
-  // Evaluación Cetogénica
+  // Evaluación Cetogénica adaptada a la porción
   let ketoStatus = 'optimal';
   let ketoBadge = '🟢 100% Compatible Keto';
   let ketoNote = 'Excelente elección: bajísimo o nulo en carbohidratos netos.';
 
-  if (netCarbs > 25) {
+  if (netCarbs > 20) {
     ketoStatus = 'exceeded';
     ketoBadge = '🔴 Alto en Carbohidratos (Excede Límite Keto)';
-    ketoNote = `Contiene ${netCarbs}g de carbohidratos netos. Podría pausar tu cetosis si supera tu tope diario.`;
-  } else if (netCarbs > 10) {
+    ketoNote = `Contiene ${netCarbs}g de carbohidratos netos en ${totalMealGrams}g. Podría pausar tu cetosis si supera tu tope diario.`;
+  } else if (netCarbs > 8) {
     ketoStatus = 'moderate';
     ketoBadge = '🟡 Carbohidratos Moderados';
-    ketoNote = `Aporta ${netCarbs}g de carbohidratos netos. Consúmelo con moderación para mantenerte en cetosis.`;
+    ketoNote = `Aporta ${netCarbs}g de carbohidratos netos en ${totalMealGrams}g. Consúmelo si entra en tu límite diario.`;
   }
 
-  // Descripción legible de todos los alimentos detectados y sus gramajes
+  // Descripción legible de todos los alimentos detectados y sus gramajes proporcionales
   const detectedSummary = detectedItems.map(item => `${item.name} [${item.grams}g]`).join(' + ');
 
   return {
@@ -1372,10 +1515,18 @@ function searchFoodDatabase(query, limit = 15) {
   return results;
 }
 
-// Exponer globalmente en window
+// Exponer globalmente en window y Node.js
 if (typeof window !== 'undefined') {
   window.FOOD_DATABASE_100G = FOOD_DATABASE_100G;
   window.calculateMealMacrosExact = calculateMealMacrosExact;
   window.extractFoodQuantityGrams = extractFoodQuantityGrams;
   window.searchFoodDatabase = searchFoodDatabase;
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    FOOD_DATABASE_100G,
+    calculateMealMacrosExact,
+    extractFoodQuantityGrams,
+    searchFoodDatabase
+  };
 }
