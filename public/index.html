@@ -223,6 +223,48 @@
           </div>
         </div>
 
+        <!-- TARJETA CIENTÍFICA DE QUEMA DE GRASA CORPORAL (DÉFICIT + PLUS CETOGÉNICO) -->
+        <div class="fat-burn-card" id="cardFatBurnBreakdown">
+          <div class="fat-burn-header">
+            <div class="fat-burn-title-row">
+              <span class="fat-burn-icon">🔥</span>
+              <div>
+                <h3 class="fat-burn-heading">Quema de Grasa Corporal</h3>
+                <span class="fat-burn-sub" id="txtFatBurnSub">Déficit calórico + Plus por cetogénesis</span>
+              </div>
+            </div>
+            <span class="fat-burn-badge" id="badgeKetoStageBonus">⚡ +210 kcal ventaja</span>
+          </div>
+
+          <div class="fat-burn-grid">
+            <!-- Por Déficit Calórico -->
+            <div class="fat-burn-col deficit-col">
+              <span class="fat-burn-col-label">📉 Por Déficit</span>
+              <span class="fat-burn-col-value" id="valFatLossDeficit">-0 g</span>
+              <span class="fat-burn-col-sub" id="subFatLossDeficit">0 kcal de déficit Garmin</span>
+            </div>
+
+            <!-- Símbolo + -->
+            <div class="fat-burn-plus-symbol">+</div>
+
+            <!-- Plus Cetogénico -->
+            <div class="fat-burn-col keto-col">
+              <span class="fat-burn-col-label">⚡ Plus Cetogénico</span>
+              <span class="fat-burn-col-value" id="valFatLossKeto">-0 g</span>
+              <span class="fat-burn-col-sub" id="subFatLossKeto">+0 kcal (BMJ / FASTER)</span>
+            </div>
+          </div>
+
+          <!-- Total de Quema Diaria -->
+          <div class="fat-burn-total-row">
+            <div class="fat-burn-total-label">
+              <span>🏆 Quema Total Estimada Hoy:</span>
+              <small id="subFatLossEffectiveBurn">Gasto total efectivo: 0 kcal</small>
+            </div>
+            <div class="fat-burn-total-val" id="valFatLossTotal">-0 g</div>
+          </div>
+        </div>
+
         <!-- BARRAS DE MACRONUTRIENTES -->
         <div class="macro-bars">
           <!-- Carbohidratos Netos -->
@@ -855,6 +897,7 @@
             <div class="period-loss-sub">
               <span class="period-loss-num" id="valPeriodLossToday">0 g</span>
               <span class="period-loss-lbl">grasa estimada</span>
+              <small class="period-loss-detail-text" id="lblPeriodLossTodayDetail">Déficit: 0g • Plus Keto: 0g</small>
             </div>
           </div>
 
@@ -868,6 +911,7 @@
             <div class="period-loss-sub">
               <span class="period-loss-num" id="valPeriodLossWeek">0.00 kg</span>
               <span class="period-loss-lbl">grasa acumulada</span>
+              <small class="period-loss-detail-text" id="lblPeriodLossWeekDetail">Con ventaja cetogénica BMJ</small>
             </div>
           </div>
 
@@ -881,6 +925,7 @@
             <div class="period-loss-sub">
               <span class="period-loss-num" id="valPeriodLossMonth">0.00 kg</span>
               <span class="period-loss-lbl">grasa acumulada</span>
+              <small class="period-loss-detail-text" id="lblPeriodLossMonthDetail">Proyección ceto-adaptada</small>
             </div>
           </div>
         </div>
@@ -1024,6 +1069,28 @@
               <li><strong>Umbral de Cetosis Nutricional Óptima (Phinney & Volek):</strong> Glucógeno hepático agotado (&le; 3g residuales). El hígado sintetiza beta-hidroxibutirato libre estabilizando niveles entre <strong>0.5 y 1.49 mmol/L</strong>.</li>
               <li><strong>Umbral de Cetosis Profunda y Ceto-Adaptación:</strong> Con mantenimiento de carbohidratos netos &le; 20-25g y gasto continuo por más de 48-72h, las cetonas superan <strong>1.5 mmol/L</strong> (hasta 3.0 mmol/L), entrando en lipólisis mitocondrial profunda.</li>
               <li><strong>Penalización por Ingesta de Carbohidratos:</strong> Cada gramo de carbohidrato neto consumido por encima del límite diario (&gt; 25g) restituye glucógeno hepático a razón de 1.5g y posterga el reloj metabólico a razón de ~2.5 horas por cada 10g excedentes.</li>
+            </ul>
+          </div>
+
+          <!-- 7. Diferenciación Científica: Quema por Déficit vs. Plus Cetogénico (The BMJ / FASTER) -->
+          <div class="science-source-box" style="border-color: rgba(16, 185, 129, 0.45); background: rgba(15, 23, 42, 0.85);">
+            <div class="source-header">
+              <span class="source-badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981;">The BMJ / FASTER</span>
+              <h3>Diferenciación de Quema de Grasa: Déficit Calórico vs. Plus Cetogénico</h3>
+            </div>
+            <p><strong>Fundamentación Fisiológica de la Ventaja Metabólica ("Metabolic Advantage"):</strong></p>
+            <ul>
+              <li><strong>Insuficiencia del Modelo Wishnofsky (7.700 kcal/kg) aislado:</strong> El cálculo clásico puramente calórico asume que todo déficit quema la misma mezcla de sustratos energéticos. En personas con dietas mixtas y glucosa circulante, la insulina alta inhibe la lipasa sensible a hormonas (HSL) y la enzima CPT-1, quemando glucógeno y masa magra.</li>
+              <li><strong>Ventaja Metabólica Cuantificada (The BMJ 2018; 363:k4583 - Ebbeling, Ludwig et al., Harvard):</strong> En un ensayo clínico aleatorizado de 20 semanas en 164 participantes evaluados mediante agua doblemente marcada (estándar de oro), la dieta baja en carbohidratos/cetogénica incrementó el Gasto Energético Total en <strong>+209 a +278 kcal/día</strong> a igual peso corporal. Esto representa un plus automático de <strong>+27 a +36 gramos diarios de grasa corporal oxidada</strong> sin reducción calórica adicional.</li>
+              <li><strong>Tasa de Oxidación de Grasas 2.3x Mayor (The FASTER Study, Metabolism 2016; 65:100-110 - Volek & Phinney):</strong> Las personas adaptadas a cetosis alcanzan tasas pico de oxidación lipídica de <strong>1.54 g/min vs. 0.67 g/min</strong> en controles con dietas altas en hidratos. El cociente respiratorio (RER) desciende a <strong>0.70 - 0.73</strong>, haciendo que entre el <strong>85% y el 95%</strong> de todo el gasto medido por Garmin provenga de ácidos grasos puros.</li>
+              <li><strong>Termodinámica de la Gluconeogénesis (Feinman & Fine, Nutr & Metab 2004, 1:15):</strong> Sintetizar glucosa endógena a partir de glicerol y aminoácidos para alimentar glóbulos rojos requiere <strong>6 ATP por molécula de glucosa</strong>. Este costo metabólico y el ciclo fútil triglicérido-ácido graso aumentan la termogénesis obligatoria en +100 a +180 kcal/día.</li>
+              <li><strong>Excreción Neta de Cuerpos Cetónicos (George Cahill, Annu. Rev. Nutr. 2006):</strong> Pérdida directa de energía química de entre <strong>15 y 45 kcal/día</strong> expulsada pasivamente a través de la acetona en el aliento y acetoacetato en orina (carbonos de grasa excretados sin almacenamiento).</li>
+              <li><strong>Fórmulas de Cálculo en Barriketo:</strong><br>
+                <code>Grasa por Déficit Garmin (g) = (Gasto Garmin - Calorías Consumidas) / 7.7</code><br>
+                <code>Plus Cetogénico (g) = Ventaja Metabólica según Estadio (Fase 1: 0g • Fase 2: ~12g • Fase 3: ~27g • Fase 4: ~36g)</code><br>
+                <code>Quema Total Diaria = Grasa por Déficit + Plus Cetogénico</code><br>
+                <code>Gasto Total Efectivo (kcal) = Gasto Garmin + Gasto Termogénico Cetogénico (+90 a +280 kcal)</code>
+              </li>
             </ul>
           </div>
         </div>

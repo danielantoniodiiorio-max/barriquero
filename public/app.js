@@ -2246,6 +2246,82 @@ function calculateKetosisStateClient(meals, garmin, settings) {
   };
 }
 
+// ==========================================================================
+// 3.B CÁLCULO CIENTÍFICO DE QUEMA DE GRASA: DÉFICIT VS. VENTAJA CETOGÉNICA
+// The BMJ 2018; 363:k4583 (Ebbeling & Ludwig) - The FASTER Study 2016 (Volek & Phinney)
+// Feinman & Fine 2004 - George Cahill 2006
+// ==========================================================================
+function calculateKetosisFatBurnPlus(ketosis, totalBurn, caloriesIn, activeCalories) {
+  const netDeficitToday = totalBurn - caloriesIn;
+  const isRealDeficit = netDeficitToday >= 0;
+  const deficitFatGrams = isRealDeficit ? Math.round(netDeficitToday / 7.7) : 0;
+  const surplusKcal = !isRealDeficit ? Math.abs(netDeficitToday) : 0;
+  const surplusFatGrams = !isRealDeficit ? Math.round(surplusKcal / 7.7) : 0;
+
+  const phase = Number(ketosis?.phase || 1);
+  const bhb = Number(ketosis?.estimatedKetones || 0.15);
+  const actCal = Number(activeCalories || 0);
+
+  let bonusKcal = 0;
+  let stageName = 'Fase 1: Basal';
+  let rer = '0.85';
+  let stageDescription = 'Depósitos en vaciado; quema basada en déficit calórico tradicional.';
+
+  if (phase === 1) {
+    bonusKcal = 0;
+    stageName = 'Fase 1: Basal';
+    rer = '0.85';
+    stageDescription = 'Insulina basal aún inhibe CPT-1. Sin ventaja metabólica activa.';
+  } else if (phase === 2) {
+    // Inducción (0.2 - 0.49 mM): activación inicial de CPT-1 mitocondrial
+    bonusKcal = Math.round(90 + Math.min(30, actCal * 0.03));
+    stageName = 'Fase 2: Inducción';
+    rer = '0.78';
+    stageDescription = 'CPT-1 mitocondrial activada. Inicio de gluconeogénesis obligatoria.';
+  } else if (phase === 3) {
+    // Cetosis Óptima (0.5 - 1.49 mM): estudio BMJ 2018 (Ludwig/Ebbeling) +209 a +278 kcal/día
+    bonusKcal = Math.round(210 + Math.min(45, actCal * 0.05));
+    stageName = 'Fase 3: Cetosis Óptima';
+    rer = '0.73';
+    stageDescription = 'Plena ventaja metabólica (The BMJ 2018). Ciclos de sustrato y RER 0.73.';
+  } else {
+    // Cetosis Profunda (>= 1.5 mM): FASTER study (Volek & Phinney) +280 kcal/día + excreción Cahill
+    bonusKcal = Math.round(280 + Math.min(60, actCal * 0.06));
+    stageName = 'Fase 4: Cetosis Profunda';
+    rer = '0.71';
+    stageDescription = 'Máxima lipólisis mitocondrial (FASTER 2016) y excreción de cetonas (Cahill).';
+  }
+
+  const bonusFatGrams = Math.round(bonusKcal / 7.7);
+  const totalEffectiveBurn = totalBurn + bonusKcal;
+  const totalEffectiveDeficit = totalEffectiveBurn - caloriesIn;
+
+  let totalFatLossGrams = 0;
+  if (isRealDeficit) {
+    totalFatLossGrams = deficitFatGrams + bonusFatGrams;
+  } else {
+    totalFatLossGrams = Math.max(0, bonusFatGrams - surplusFatGrams);
+  }
+
+  return {
+    phase,
+    bhb,
+    stageName,
+    stageDescription,
+    rer,
+    netDeficitToday,
+    isRealDeficit,
+    deficitFatGrams,
+    surplusKcal,
+    surplusFatGrams,
+    bonusKcal,
+    bonusFatGrams,
+    totalEffectiveBurn,
+    totalEffectiveDeficit,
+    totalFatLossGrams
+  };
+}
+
 function recalculateClientState() {
   checkAndPerformDailyRollover();
 
@@ -2573,6 +2649,9 @@ function renderPersonalizedKetoneHelp(ketosis, macros, garmin, settings) {
     ? `• <em>${mealsCount} ingesta${mealsCount === 1 ? '' : 's'} registrada${mealsCount === 1 ? '' : 's'} hoy</em>` 
     : `• <em>(0 comidas guardadas hoy con el botón "Guardar Ingesta")</em>`;
 
+  const calInToday = Math.round(Number(macros?.totals?.calories || 0));
+  const fatMetrics = calculateKetosisFatBurnPlus(ketosis, totalCal, calInToday, activeCal);
+
   body.innerHTML = `
     <div class="exp-item exp-item-personal">
       <div style="font-weight: 800; color: #38bdf8; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
@@ -2607,8 +2686,19 @@ function renderPersonalizedKetoneHelp(ketosis, macros, garmin, settings) {
       </div>
     </div>
 
+    <div class="exp-item exp-item-personal">
+      <div style="font-weight: 800; color: #fbbf24; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+        <span>🔥</span> <span>Quema Diferenciada: Déficit vs. Ventaja Cetogénica (The BMJ / FASTER)</span>
+      </div>
+      <div>
+        • <strong>Por Déficit Garmin (Wishnofsky 7.7 kcal/g):</strong> ${fatMetrics.isRealDeficit ? '-' + fatMetrics.deficitFatGrams + 'g grasa' : '+' + fatMetrics.surplusFatGrams + 'g superávit'} (${fatMetrics.isRealDeficit ? '+' : '-'}${Math.abs(fatMetrics.netDeficitToday).toLocaleString()} kcal de déficit neto).<br>
+        • <strong>Plus Cetogénico (${fatMetrics.stageName}):</strong> <strong style="color: #10b981;">-${fatMetrics.bonusFatGrams}g adicionales</strong> (+${fatMetrics.bonusKcal} kcal/día por RER ${fatMetrics.rer}, ciclo de sustratos y termogénesis BMJ).<br>
+        • <strong>Quema Total Estimada Hoy:</strong> <strong style="color: #fbbf24;">-${fatMetrics.totalFatLossGrams}g de grasa pura</strong> (Gasto efectivo total: ${fatMetrics.totalEffectiveBurn.toLocaleString()} kcal).
+      </div>
+    </div>
+
     <div class="exp-item" style="font-size: 0.74rem; color: #94a3b8; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 8px; margin-top: 6px;">
-      📚 <em>Todos los parámetros y fórmulas están respaldados por los consensos de Harvard (Cahill 2006), Virta Health (Phinney & Volek 2011) y ACSM 2021 detallados en el apartado superior <strong>📖 Bases Científicas</strong>.</em>
+      📚 <em>Todos los parámetros y fórmulas están respaldados por Harvard (Cahill 2006), The BMJ (Ebbeling & Ludwig 2018), Virta Health (Phinney & Volek 2011/2016) y ACSM 2021 detallados en el apartado superior <strong>📖 Bases Científicas</strong>.</em>
     </div>
   `;
 }
@@ -2867,10 +2957,11 @@ function renderDashboard(data) {
   const isOverLimit = caloriesIn > adjustedTargetCalories;
   const calPercent = adjustedTargetCalories > 0 ? Math.round((caloriesIn / adjustedTargetCalories) * 100) : 0;
 
-  // Déficit real frente al gasto total del reloj:
-  const netDeficitToday = totalBurn - caloriesIn;
-  const isRealDeficit = netDeficitToday >= 0;
-  const fatLossTodayGrams = Math.round(Math.abs(netDeficitToday) / 7.7);
+  // Déficit real y Quema de Grasa Diferenciada (Déficit Garmin vs. Plus Cetogénico)
+  const fatMetrics = calculateKetosisFatBurnPlus(ketosis, totalBurn, caloriesIn, activeCalories);
+  const netDeficitToday = fatMetrics.netDeficitToday;
+  const isRealDeficit = fatMetrics.isRealDeficit;
+  const fatLossTodayGrams = fatMetrics.deficitFatGrams;
 
   const elCalIn = document.getElementById('valCalIn');
   if (elCalIn) elCalIn.innerHTML = caloriesIn.toLocaleString() + ' <small>kcal</small>';
@@ -2920,13 +3011,55 @@ function renderDashboard(data) {
   const lblGarmin = document.getElementById('lblGarminBurned');
   if (lblGarmin) {
     const actNote = activeCalories > 0 ? ` (${activeCalories.toLocaleString()} activas)` : '';
-    if (isRealDeficit) {
-      lblGarmin.textContent = `⌚ Garmin: ${totalBurn.toLocaleString()} kcal${actNote} • Déficit real: +${netDeficitToday.toLocaleString()} kcal (≈ -${fatLossTodayGrams}g grasa)`;
+    if (fatMetrics.isRealDeficit) {
+      lblGarmin.textContent = `⌚ Garmin: ${totalBurn.toLocaleString()} kcal${actNote} • Gasto efectivo: ${fatMetrics.totalEffectiveBurn.toLocaleString()} kcal (+${fatMetrics.bonusKcal} kcal keto)`;
       lblGarmin.style.color = 'var(--text-muted)';
     } else {
-      lblGarmin.textContent = `⌚ Garmin: ${totalBurn.toLocaleString()} kcal${actNote} • Superávit: ${netDeficitToday.toLocaleString()} kcal (≈ +${fatLossTodayGrams}g grasa)`;
+      lblGarmin.textContent = `⌚ Garmin: ${totalBurn.toLocaleString()} kcal${actNote} • Superávit: ${fatMetrics.surplusKcal.toLocaleString()} kcal (+${fatMetrics.bonusKcal} kcal plus keto)`;
       lblGarmin.style.color = '#f87171';
     }
+  }
+
+  // Actualizar Tarjeta de Quema de Grasa Corporal (Déficit + Plus Cetogénico)
+  const txtFatBurnSub = document.getElementById('txtFatBurnSub');
+  if (txtFatBurnSub) {
+    txtFatBurnSub.textContent = `Déficit Garmin (${fatMetrics.isRealDeficit ? '-' : '+'}${Math.abs(fatMetrics.deficitFatGrams)}g) + Plus ${fatMetrics.stageName} (-${fatMetrics.bonusFatGrams}g)`;
+  }
+
+  const badgeKetoStageBonus = document.getElementById('badgeKetoStageBonus');
+  if (badgeKetoStageBonus) {
+    badgeKetoStageBonus.textContent = `⚡ +${fatMetrics.bonusKcal} kcal ventaja BMJ`;
+  }
+
+  const valFatLossDeficit = document.getElementById('valFatLossDeficit');
+  if (valFatLossDeficit) {
+    valFatLossDeficit.textContent = (fatMetrics.isRealDeficit ? '-' : '+') + Math.abs(fatMetrics.deficitFatGrams) + ' g';
+    valFatLossDeficit.style.color = fatMetrics.isRealDeficit ? '#38bdf8' : '#f87171';
+  }
+
+  const subFatLossDeficit = document.getElementById('subFatLossDeficit');
+  if (subFatLossDeficit) {
+    subFatLossDeficit.textContent = `${fatMetrics.isRealDeficit ? '+' : '-'}${Math.abs(fatMetrics.netDeficitToday).toLocaleString()} kcal ${fatMetrics.isRealDeficit ? 'déficit' : 'superávit'}`;
+  }
+
+  const valFatLossKeto = document.getElementById('valFatLossKeto');
+  if (valFatLossKeto) {
+    valFatLossKeto.textContent = '-' + fatMetrics.bonusFatGrams + ' g';
+  }
+
+  const subFatLossKeto = document.getElementById('subFatLossKeto');
+  if (subFatLossKeto) {
+    subFatLossKeto.textContent = `+${fatMetrics.bonusKcal} kcal (RER ${fatMetrics.rer} • BMJ)`;
+  }
+
+  const valFatLossTotal = document.getElementById('valFatLossTotal');
+  if (valFatLossTotal) {
+    valFatLossTotal.textContent = '-' + fatMetrics.totalFatLossGrams + ' g';
+  }
+
+  const subFatLossEffectiveBurn = document.getElementById('subFatLossEffectiveBurn');
+  if (subFatLossEffectiveBurn) {
+    subFatLossEffectiveBurn.textContent = `Gasto total efectivo: ${fatMetrics.totalEffectiveBurn.toLocaleString()} kcal (${totalBurn.toLocaleString()} Garmin + ${fatMetrics.bonusKcal} keto)`;
   }
 
   const badgeCalFeedback = document.getElementById('badgeCalFeedback');
@@ -3074,8 +3207,11 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
   const now = new Date();
   const todayKey = getLocalDateKey(now);
 
+  const ketosis = state.ketosisState || calculateKetosisStateClient(state.meals, garmin, state.settings);
+  const fatMetrics = calculateKetosisFatBurnPlus(ketosis, caloriesOut, caloriesIn, garmin?.active_calories || 0);
+
   const netDeficitToday = caloriesOut - caloriesIn;
-  const fatLossTodayGrams = Math.round(netDeficitToday / 7.7);
+  const fatLossTodayGrams = fatMetrics.totalFatLossGrams;
 
   // 1. Historial de días y consolidación de acumulación
   let rawHistory = [];
@@ -3091,12 +3227,14 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
   // Descartar entradas que no sean pasadas estrictas o que sean anteriores al protocolo
   const pastDays = (rawHistory || []).filter(h => h && h.date && h.date < todayKey && h.date >= protocolStartKey);
 
-  // Registro de HOY en tiempo real
+  // Registro de HOY en tiempo real con ventaja metabólica cetogénica
   const todayEntry = {
     date: todayKey,
     day_label: 'Hoy (' + ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][now.getDay()] + ' ' + String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + ')',
     calories_in: caloriesIn,
-    calories_out: caloriesOut
+    calories_out: caloriesOut,
+    keto_bonus_kcal: fatMetrics.bonusKcal,
+    keto_bonus_fat_g: fatMetrics.bonusFatGrams
   };
 
   const allDays = [...pastDays, todayEntry];
@@ -3115,26 +3253,33 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
   const elPeriodDeficitToday = document.getElementById('valPeriodDeficitToday');
   const elPeriodLossToday = document.getElementById('valPeriodLossToday');
   const elBadgePeriodToday = document.getElementById('badgePeriodTodayStatus');
+  const elPeriodLossTodayDetail = document.getElementById('lblPeriodLossTodayDetail');
 
   if (elPeriodDeficitToday) {
-    elPeriodDeficitToday.innerHTML = (netDeficitToday >= 0 ? '+' : '') + netDeficitToday.toLocaleString() + ' <small>kcal</small>';
-    elPeriodDeficitToday.style.color = netDeficitToday >= 0 ? '#34d399' : '#f87171';
+    elPeriodDeficitToday.innerHTML = (fatMetrics.totalEffectiveDeficit >= 0 ? '+' : '') + fatMetrics.totalEffectiveDeficit.toLocaleString() + ' <small>kcal efec.</small>';
+    elPeriodDeficitToday.style.color = fatMetrics.totalEffectiveDeficit >= 0 ? '#34d399' : '#f87171';
   }
   if (elPeriodLossToday) {
-    elPeriodLossToday.textContent = (netDeficitToday >= 0 ? '-' : '+') + Math.abs(fatLossTodayGrams) + ' g';
-    elPeriodLossToday.style.color = netDeficitToday >= 0 ? '#34d399' : '#f87171';
+    elPeriodLossToday.textContent = (fatMetrics.totalFatLossGrams >= 0 ? '-' : '+') + Math.abs(fatMetrics.totalFatLossGrams) + ' g';
+    elPeriodLossToday.style.color = fatMetrics.totalFatLossGrams >= 0 ? '#34d399' : '#f87171';
+  }
+  if (elPeriodLossTodayDetail) {
+    elPeriodLossTodayDetail.textContent = `Déficit: -${fatMetrics.deficitFatGrams}g • Plus Keto: -${fatMetrics.bonusFatGrams}g`;
   }
   if (elBadgePeriodToday) {
-    elBadgePeriodToday.textContent = netDeficitToday >= 0 ? 'En Déficit' : 'Superávit';
-    elBadgePeriodToday.style.color = netDeficitToday >= 0 ? '#34d399' : '#f87171';
+    elBadgePeriodToday.textContent = fatMetrics.totalEffectiveDeficit >= 0 ? 'En Déficit Óptimo' : 'Superávit';
+    elBadgePeriodToday.style.color = fatMetrics.totalEffectiveDeficit >= 0 ? '#34d399' : '#f87171';
   }
 
-  // B. 7 DÍAS (SEMANA)
+  // B. 7 DÍAS (SEMANA CON VENTAJA METABÓLICA CETOGÉNICA BMJ)
   const d7Ago = new Date(now);
   d7Ago.setDate(now.getDate() - 6);
   const d7AgoKey = getLocalDateKey(d7Ago);
   const weekDays = allDays.filter(d => d.date >= d7AgoKey && d.date >= protocolStartKey);
-  const deficitWeek = weekDays.reduce((sum, d) => sum + (Number(d.calories_out || 0) - Number(d.calories_in || 0)), 0);
+  const deficitWeek = weekDays.reduce((sum, d) => {
+    const kBonus = d.keto_bonus_kcal != null ? d.keto_bonus_kcal : (d.date === todayKey ? fatMetrics.bonusKcal : 210);
+    return sum + (Number(d.calories_out || 0) + kBonus - Number(d.calories_in || 0));
+  }, 0);
   const lossWeekKg = Math.round((deficitWeek / 7700) * 100) / 100;
   const daysInWeek = Math.max(1, weekDays.length);
   const projectedWeeklyLossKg = Math.round(((deficitWeek / daysInWeek) * 7 / 7700) * 10) / 10;
@@ -3144,7 +3289,7 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
   const elBadgeWeeklyPace = document.getElementById('badgeWeeklyPaceRate');
 
   if (elPeriodDeficitWeek) {
-    elPeriodDeficitWeek.innerHTML = (deficitWeek >= 0 ? '+' : '') + deficitWeek.toLocaleString() + ' <small>kcal</small>';
+    elPeriodDeficitWeek.innerHTML = (deficitWeek >= 0 ? '+' : '') + deficitWeek.toLocaleString() + ' <small>kcal efec.</small>';
     elPeriodDeficitWeek.style.color = deficitWeek >= 0 ? '#38bdf8' : '#f87171';
   }
   if (elPeriodLossWeek) {
@@ -3155,19 +3300,22 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
     elBadgeWeeklyPace.textContent = (projectedWeeklyLossKg >= 0 ? '-' : '+') + Math.abs(projectedWeeklyLossKg).toFixed(1) + ' kg/sem';
   }
 
-  // C. 30 DÍAS (MES)
+  // C. 30 DÍAS (MES CON VENTAJA METABÓLICA CETOGÉNICA)
   const d30Ago = new Date(now);
   d30Ago.setDate(now.getDate() - 29);
   const d30AgoKey = getLocalDateKey(d30Ago);
   const monthDays = allDays.filter(d => d.date >= d30AgoKey && d.date >= protocolStartKey);
-  const deficitMonth = monthDays.reduce((sum, d) => sum + (Number(d.calories_out || 0) - Number(d.calories_in || 0)), 0);
+  const deficitMonth = monthDays.reduce((sum, d) => {
+    const kBonus = d.keto_bonus_kcal != null ? d.keto_bonus_kcal : (d.date === todayKey ? fatMetrics.bonusKcal : 210);
+    return sum + (Number(d.calories_out || 0) + kBonus - Number(d.calories_in || 0));
+  }, 0);
   const lossMonthKg = Math.round((deficitMonth / 7700) * 100) / 100;
 
   const elPeriodDeficitMonth = document.getElementById('valPeriodDeficitMonth');
   const elPeriodLossMonth = document.getElementById('valPeriodLossMonth');
 
   if (elPeriodDeficitMonth) {
-    elPeriodDeficitMonth.innerHTML = (deficitMonth >= 0 ? '+' : '') + deficitMonth.toLocaleString() + ' <small>kcal</small>';
+    elPeriodDeficitMonth.innerHTML = (deficitMonth >= 0 ? '+' : '') + deficitMonth.toLocaleString() + ' <small>kcal efec.</small>';
     elPeriodDeficitMonth.style.color = deficitMonth >= 0 ? '#c084fc' : '#f87171';
   }
   if (elPeriodLossMonth) {
@@ -3175,14 +3323,17 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
     elPeriodLossMonth.style.color = lossMonthKg >= 0 ? '#c084fc' : '#f87171';
   }
 
-  // 3. Proyección hacia el Objetivo de Peso
+  // 3. Proyección hacia el Objetivo de Peso (Wishnofsky + BMJ 2018)
   const currentWeight = Number(state.settings?.weight || 80);
   const goalWeight = Number(state.settings?.goal_weight || (currentWeight > 4 ? currentWeight - 4 : currentWeight));
   const weightToLose = Math.max(0, Math.round((currentWeight - goalWeight) * 10) / 10);
   const totalKcalNeeded = Math.round(weightToLose * 7700);
 
-  // Déficit total acumulado en todo el protocolo
-  const totalProtocolDeficit = protocolDays.reduce((sum, d) => sum + (Number(d.calories_out || 0) - Number(d.calories_in || 0)), 0);
+  // Déficit total acumulado en todo el protocolo (incluye ventaja cetogénica de cada día)
+  const totalProtocolDeficit = protocolDays.reduce((sum, d) => {
+    const kBonus = d.keto_bonus_kcal != null ? d.keto_bonus_kcal : (d.date === todayKey ? fatMetrics.bonusKcal : 210);
+    return sum + (Number(d.calories_out || 0) + kBonus - Number(d.calories_in || 0));
+  }, 0);
   const effectiveAccumDeficit = Math.max(0, totalProtocolDeficit);
 
   const elGoalWeightDiff = document.getElementById('lblGoalWeightDiff');
@@ -3215,10 +3366,10 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
     }
     if (elGoalKgRemaining) elGoalKgRemaining.textContent = remainingKg.toFixed(1) + ' kg rest.';
 
-    // Estimación de días restantes según ritmo reciente
+    // Estimación de días restantes según ritmo reciente (acelerado por ventaja cetogénica)
     const avgRecentDailyDeficit = daysInWeek > 0 && (deficitWeek / daysInWeek) > 100 
       ? (deficitWeek / daysInWeek) 
-      : (netDeficitToday > 100 ? netDeficitToday : 0);
+      : (fatMetrics.totalEffectiveDeficit > 100 ? fatMetrics.totalEffectiveDeficit : 0);
 
     if (elGoalDaysEstimate) {
       if (remainingKcal === 0) {
@@ -3253,6 +3404,11 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
       const dFatGrams = Math.round(Math.abs(dDeficit) / 7.7);
       const isToday = (d.date === todayKey);
 
+      const dKetoKcal = d.keto_bonus_kcal != null ? d.keto_bonus_kcal : (isToday ? fatMetrics.bonusKcal : 210);
+      const dKetoFat = Math.round(dKetoKcal / 7.7);
+      const effectiveDeficitKcal = dDeficit + dKetoKcal;
+      const totalDayFatGrams = isDayDeficit ? (dFatGrams + dKetoFat) : Math.max(0, dKetoFat - dFatGrams);
+
       let label = d.day_label || d.date;
       if (isToday) {
         label = 'Hoy (' + ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][now.getDay()] + ' ' + String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + ')';
@@ -3266,14 +3422,16 @@ function renderDeficitAccumulation(caloriesIn, caloriesOut, garmin) {
               <span>⌚ ${cOut.toLocaleString()} kcal</span>
               <span class="math-op">−</span>
               <span>🍽️ ${cIn.toLocaleString()} kcal</span>
+              <span class="math-op">+</span>
+              <span style="color:#10b981;">⚡ ${dKetoKcal} kcal keto</span>
             </div>
           </div>
           <div class="tracking-day-result">
-            <span class="tracking-day-badge ${isDayDeficit ? 'badge-day-deficit' : 'badge-day-surplus'}">
-              ${isDayDeficit ? '+' + dDeficit.toLocaleString() : dDeficit.toLocaleString()} kcal
+            <span class="tracking-day-badge ${effectiveDeficitKcal >= 0 ? 'badge-day-deficit' : 'badge-day-surplus'}">
+              ${effectiveDeficitKcal >= 0 ? '+' + effectiveDeficitKcal.toLocaleString() : effectiveDeficitKcal.toLocaleString()} kcal efec.
             </span>
-            <span class="tracking-day-fat ${isDayDeficit ? 'green-fat' : 'red-fat'}">
-              ${isDayDeficit ? '≈ -' + dFatGrams + ' g grasa' : '≈ +' + dFatGrams + ' g superávit'}
+            <span class="tracking-day-fat green-fat">
+              -${totalDayFatGrams}g grasa <small style="font-size:0.6rem; opacity:0.8;">(-${dFatGrams}g def + -${dKetoFat}g keto)</small>
             </span>
           </div>
         </div>
@@ -3898,10 +4056,12 @@ function calculateWeightTrajectories(range) {
   const garminActiveCal = Number(garmin.active_calories || 450);
   const tdee = Math.round(bmrBase + garminActiveCal);
 
-  // Déficit calórico diario saludable (ACSM / OMS: ~400-600 kcal/día = ~0.4 - 0.6 kg/semana)
+  // Déficit calórico diario base (ACSM / OMS) + Ventaja Metabólica Cetogénica (The BMJ 2018 / FASTER Study)
   const targetCal = Number(settings.calories_target || (tdee - 500));
   const dailyDeficit = Math.max(300, Math.min(1000, tdee - targetCal));
-  const dailyLossKg = dailyDeficit / 7700; // ~0.065 kg/día = 0.455 kg/sem
+  const ketoMetabolicAdvantageKcal = 210; // Ventaja metabólica por cetosis nutricional (The BMJ 2018)
+  const totalDailyEffectiveLossDeficit = dailyDeficit + ketoMetabolicAdvantageKcal;
+  const dailyLossKg = totalDailyEffectiveLossDeficit / 7700; // Refleja quema lipídica ceto-adaptada real
 
   // Determinar horizonte en días según el rango
   let horizonDays = 14;
