@@ -11,9 +11,9 @@
 </head>
 <body>
   <div class="app-container">
-    <!-- Header con Luz Verde y Acceso a Bases Científicas -->
+    <!-- Header Profesional Centrado con Luz Verde y Accesos Rápidos -->
     <header class="app-header">
-      <div class="brand">
+      <div class="header-left">
         <div class="logo-icon-svg" title="Barriketo Metabolic Engine">
           <svg viewBox="0 0 24 24" width="28" height="28" fill="none">
             <circle cx="12" cy="12" r="10" stroke="#10b981" stroke-width="2" fill="rgba(16, 185, 129, 0.15)"/>
@@ -21,12 +21,12 @@
             <circle cx="12" cy="13.5" r="1.8" fill="#38bdf8"/>
           </svg>
         </div>
-        <div>
-          <h1>Barriketo</h1>
-          <div class="header-sync-pill" id="headerSyncPill">
-            <span class="pulse-dot"></span>
-            <span id="txtHeaderSync">Garmin Sincronizado</span>
-          </div>
+      </div>
+      <div class="header-center">
+        <h1 class="brand-title">Barriketo</h1>
+        <div class="header-sync-pill" id="headerSyncPill">
+          <span class="pulse-dot"></span>
+          <span id="txtHeaderSync">Garmin Sincronizado</span>
         </div>
       </div>
       <div class="header-actions">
@@ -46,15 +46,12 @@
       </div>
     </header>
 
-
-
     <!-- PESTAÑA 1: ESTADO (DASHBOARD REDISEÑADO CON FUEGO, CUENTA REGRESIVA Y PASOS DE CETOSIS) -->
     <main id="tab-dashboard" class="tab-pane active">
       <!-- Tarjeta Dinámica de Cetosis (Limpia, Elegante y Enfocada) -->
       <section class="card ketosis-card" id="cardKetosisStatus">
-        <div class="card-header">
+        <div class="card-header" style="justify-content: flex-start;">
           <span class="badge" id="badgePhase">Día 1: En Proceso</span>
-          <button class="btn-start-process" id="btnOpenStartProcessModal" title="Iniciar o reiniciar protocolo">🚀 Iniciar Proceso</button>
         </div>
 
         <!-- MODO FUEGO: Se activa al llegar al estado de cetosis -->
@@ -121,7 +118,7 @@
             <div class="gauge-inner">
               <span class="ketone-val" id="valEstimatedKetones">0.3</span>
               <span class="ketone-unit">mmol/L</span>
-              <span class="ketone-sublabel">Cetonas Sangre</span>
+              <span class="ketone-sublabel">Cetonas en Sangre</span>
             </div>
           </div>
           <div class="gauge-details">
@@ -159,7 +156,7 @@
           <div class="ketone-exp-header" id="btnToggleKetoHelp" role="button" tabindex="0">
             <div class="ketone-exp-title">
               <span class="exp-icon">💡</span>
-              <span>¿Qué significa <strong id="lblHelpKetones">0.3 mmol/L</strong> y base científica?</span>
+              <span>¿Cómo se calculan tus <strong id="lblHelpKetones">0.3 mmol/L</strong> y tiempos?</span>
             </div>
             <span class="exp-arrow" id="arrowKetoHelp">▾</span>
           </div>
@@ -1011,6 +1008,24 @@
               <li>Consenso clínico que avala la restricción estricta de carbohidratos (&le; 20-50g diarios) como el enfoque nutricional más eficaz para reducir la variabilidad glucémica, vaciar los depósitos hepáticos y estimular la lipólisis celular.</li>
             </ul>
           </div>
+
+          <!-- 6. Parámetros Fisiológicos y Algoritmo de Cálculo Barriketo -->
+          <div class="science-source-box" style="border-color: rgba(56, 189, 248, 0.4); background: rgba(15, 23, 42, 0.85);">
+            <div class="source-header">
+              <span class="source-badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8;">Motor Barriketo</span>
+              <h3>Parámetros Fisiológicos y Fórmulas Exactas del Sistema</h3>
+            </div>
+            <p><strong>Variables y Constantes Biológicas Utilizadas en el Algoritmo Personalizado:</strong></p>
+            <ul>
+              <li><strong>Reserva Hepática de Glucógeno Inicial:</strong> Se establece un promedio clínico de <strong>105 - 110 gramos</strong> para un adulto estándar (Cahill, 2006; Wasserman, 2009).</li>
+              <li><strong>Tasa de Depleción Basal en Ayuno/Keto:</strong> En reposo absoluto sin ingesta de glucosa, el cerebro y tejidos consumen <strong>~3.8 g de glucógeno hepático por hora</strong> (90-100 kcal/h de glucosa cerebral y tisular).</li>
+              <li><strong>Acelerador de Ejercicio Garmin (ACSM):</strong> En caminata o actividad aeróbica moderada (RER 0.80), el 40% del gasto energético es cubierto por glucosa/glucógeno (0.00342g por paso / 2.5g por cada 100 kcal activas). 10,000 pasos de Garmin queman ~34g de glucógeno adicional.</li>
+              <li><strong>Umbral de Activación de CPT-1 (Inducción):</strong> Cuando el depósito de glucógeno hepático residual cae por debajo de <strong>30 gramos</strong>, el malonil-CoA se deprime y la enzima CPT-1 activa la cetogénesis mitocondrial, elevando las cetonas a <strong>0.2 - 0.49 mmol/L</strong>.</li>
+              <li><strong>Umbral de Cetosis Nutricional Óptima (Phinney & Volek):</strong> Glucógeno hepático agotado (&le; 3g residuales). El hígado sintetiza beta-hidroxibutirato libre estabilizando niveles entre <strong>0.5 y 1.49 mmol/L</strong>.</li>
+              <li><strong>Umbral de Cetosis Profunda y Ceto-Adaptación:</strong> Con mantenimiento de carbohidratos netos &le; 20-25g y gasto continuo por más de 48-72h, las cetonas superan <strong>1.5 mmol/L</strong> (hasta 3.0 mmol/L), entrando en lipólisis mitocondrial profunda.</li>
+              <li><strong>Penalización por Ingesta de Carbohidratos:</strong> Cada gramo de carbohidrato neto consumido por encima del límite diario (&gt; 25g) restituye glucógeno hepático a razón de 1.5g y posterga el reloj metabólico a razón de ~2.5 horas por cada 10g excedentes.</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
@@ -1032,8 +1047,8 @@
             <small class="text-muted">Calcula automáticamente los días y el vaciado de glucógeno.</small>
           </div>
 
-          <button type="button" id="btnResetProtocolDay" class="btn btn-outline full-width" style="margin-bottom: 14px;">
-            🔄 Iniciar Protocolo Hoy (Comenzar Día 1)
+          <button type="button" class="btn btn-outline full-width" id="btnOpenStartProcessModal" style="margin-bottom: 14px; border-color: #38bdf8; color: #38bdf8; font-weight: 700; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <span>🚀</span> Iniciar / Reiniciar Protocolo Cetogénico (Día 1)
           </button>
 
           <hr class="divider">

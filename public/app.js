@@ -2518,6 +2518,78 @@ function calculateStepsForKetosis(totalNetCarbs, garminSteps, netCarbTarget) {
   };
 }
 
+// Generación dinámica y personalizada de la leyenda del proceso cetogénico
+function renderPersonalizedKetoneHelp(ketosis, macros, garmin, settings) {
+  const lblHelpKetones = document.getElementById('lblHelpKetones');
+  if (lblHelpKetones) {
+    lblHelpKetones.textContent = ketosis.estimatedKetones.toFixed(1) + ' mmol/L';
+  }
+
+  const body = document.getElementById('bodyKetoHelp');
+  if (!body) return;
+
+  const weight = settings?.weight || 80;
+  const height = settings?.height || 175;
+  const age = settings?.age || 35;
+  const gender = settings?.gender || 'male';
+  const bmr = garmin?.bmr_calories || Math.round(10 * weight + 6.25 * height - 5 * age + (gender === 'male' ? 5 : -161));
+  const activeCal = Number(garmin?.active_calories || 0);
+  const totalCal = Number(garmin?.total_calories || (bmr + activeCal));
+  const steps = Number(garmin?.steps || 0);
+  const netCarbsIn = Math.round((macros?.totals?.net_carbs || 0) * 10) / 10;
+  const carbLimit = settings?.net_carbs_target || 25;
+  const remGlycogen = ketosis.glycogenRemainingGrams || 0;
+  const depPct = ketosis.depletionPercent || 0;
+  const day = ketosis.protocolDay || 1;
+  const hoursSince = Math.round(ketosis.hoursFastingOrKeto || 0);
+
+  let nextInfo = '';
+  if (ketosis.phase < 4 && ketosis.targetNextPhaseFormatted) {
+    nextInfo = `• Próximo hito: Llegada estimada a <strong>${escapeHtml(ketosis.nextPhaseName)}</strong> (≥ ${ketosis.nextPhaseThreshold} mmol/L): <strong style="color:#38bdf8;">${ketosis.targetNextPhaseFormatted}</strong> con tu déficit calórico y quema activa.`;
+  } else if (ketosis.phase >= 4) {
+    nextInfo = `• Estado Óptimo: <strong>¡Cetosis Profunda Activa (> 1.5 mmol/L)!</strong> Tu cuerpo se encuentra plenamente ceto-adaptado (lipólisis mitocondrial máxima).`;
+  }
+
+  body.innerHTML = `
+    <div class="exp-item exp-item-personal">
+      <div style="font-weight: 800; color: #38bdf8; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+        <span>👤</span> <span>Tu Perfil Fisiológico y Gasto (Mifflin-St Jeor & Garmin)</span>
+      </div>
+      <div>
+        • Peso actual: <strong>${weight} kg</strong> • BMR Basal: <strong>${bmr} kcal/día</strong>.<br>
+        • Actividad hoy: <strong>${steps.toLocaleString()} pasos</strong> (${activeCal} kcal activas). Gasto calórico total: <strong>${totalCal.toLocaleString()} kcal</strong>.<br>
+        • <em>Aceleración Garmin:</em> Tu movimiento diario adelantó <strong>~${ketosis.garminImpact?.hoursSaved || 0} horas</strong> el vaciado de glucógeno (ACSM / OMS).
+      </div>
+    </div>
+
+    <div class="exp-item exp-item-personal">
+      <div style="font-weight: 800; color: #10b981; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+        <span>🧪</span> <span>Ingesta de Macros y Glucógeno Hepático (George Cahill, Harvard)</span>
+      </div>
+      <div>
+        • Carbohidratos netos consumidos hoy: <strong>${netCarbsIn}g</strong> (Límite diario: ${carbLimit}g).<br>
+        • Depósito hepático residual estimado: <strong>~${remGlycogen}g restantes</strong> (de 110g iniciales).<br>
+        • Vaciado de glucógeno: <strong>${depPct}% completado</strong>. Al caer por debajo de 30g, la enzima CPT-1 activa la cetogénesis mitocondrial.
+      </div>
+    </div>
+
+    <div class="exp-item exp-item-personal">
+      <div style="font-weight: 800; color: #f59e0b; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+        <span>⏱️</span> <span>Cronología Personal y Proyección (Phinney & Volek, AJCN)</span>
+      </div>
+      <div>
+        • Tiempo en restricción: <strong>${hoursSince} horas</strong> (Día ${day} de tu protocolo).<br>
+        • Concentración de cetonas en sangre actual: <strong style="color: ${ketosis.statusColor};">${ketosis.estimatedKetones.toFixed(2)} mmol/L</strong> (${escapeHtml(ketosis.phaseName)}).<br>
+        ${nextInfo}
+      </div>
+    </div>
+
+    <div class="exp-item" style="font-size: 0.74rem; color: #94a3b8; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 8px; margin-top: 6px;">
+      📚 <em>Todos los parámetros y fórmulas están respaldados por los consensos de Harvard (Cahill 2006), Virta Health (Phinney & Volek 2011) y ACSM 2021 detallados en el apartado superior <strong>📖 Bases Científicas</strong>.</em>
+    </div>
+  `;
+}
+
 // ==========================================================================
 // 4. RENDER DASHBOARD (CON FUEGO O CUENTA REGRESIVA)
 // ==========================================================================
@@ -2552,13 +2624,32 @@ function renderDashboard(data) {
       : 'Vaciando depósitos para cruzar al umbral de quema de grasa.';
   }
 
-  // Velocímetro metabólico circular
+  // Velocímetro metabólico circular con degradee tricolor dinámico
   const gaugePercent = Math.min(100, Math.max(10, (ketosis.estimatedKetones / 2.5) * 100));
   const gaugeDeg = Math.round((gaugePercent / 100) * 360);
   const gaugeCircle = document.getElementById('gaugeCircle');
   if (gaugeCircle) {
-    gaugeCircle.style.background = 'conic-gradient(' + ketosis.statusColor + ' 0deg ' + gaugeDeg + 'deg, var(--card-border) ' + gaugeDeg + 'deg 360deg)';
-    gaugeCircle.style.boxShadow = '0 0 16px ' + ketosis.statusColor + '44';
+    if (ketosis.phase >= 4 || ketosis.estimatedKetones >= 1.5) {
+      // FASE PROFUNDA: Espectacular degradé Verde, Amarillo y Rojo con brillo pulsante
+      gaugeCircle.classList.add('deep-ketosis-glow');
+      gaugeCircle.style.background = `conic-gradient(from 180deg, #10b981 0deg, #eab308 ${Math.round(gaugeDeg * 0.45)}deg, #ef4444 ${gaugeDeg}deg, rgba(255,255,255,0.08) ${gaugeDeg}deg 360deg)`;
+      gaugeCircle.style.boxShadow = '0 0 25px rgba(239, 68, 68, 0.5), 0 0 45px rgba(234, 179, 8, 0.35)';
+    } else {
+      gaugeCircle.classList.remove('deep-ketosis-glow');
+      if (ketosis.phase === 3) {
+        // Fase 3 Óptima: Verde Esmeralda radiante
+        gaugeCircle.style.background = `conic-gradient(#10b981 0deg ${gaugeDeg}deg, rgba(255,255,255,0.08) ${gaugeDeg}deg 360deg)`;
+        gaugeCircle.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.45)';
+      } else if (ketosis.phase === 2) {
+        // Fase 2 Inducción: Amarillo Ámbar cálido
+        gaugeCircle.style.background = `conic-gradient(#f59e0b 0deg ${gaugeDeg}deg, rgba(255,255,255,0.08) ${gaugeDeg}deg 360deg)`;
+        gaugeCircle.style.boxShadow = '0 0 20px rgba(245, 158, 11, 0.4)';
+      } else {
+        // Fase 1 Glucosa: Azul Cian
+        gaugeCircle.style.background = `conic-gradient(#0284c7 0deg ${gaugeDeg}deg, rgba(255,255,255,0.08) ${gaugeDeg}deg 360deg)`;
+        gaugeCircle.style.boxShadow = '0 0 16px rgba(2, 132, 199, 0.3)';
+      }
+    }
   }
 
   // Lógica de Fuego vs Pronóstico y Reloj Metabólico
@@ -2677,11 +2768,8 @@ function renderDashboard(data) {
     barDepletion.style.width = Math.min(100, Math.max(4, progPct)) + '%';
   }
 
-  // 5. Actualizar tarjeta explicativa
-  const lblHelpKetones = document.getElementById('lblHelpKetones');
-  if (lblHelpKetones) {
-    lblHelpKetones.textContent = ketosis.estimatedKetones.toFixed(1) + ' mmol/L';
-  }
+  // 5. Actualizar tarjeta explicativa personalizada
+  renderPersonalizedKetoneHelp(ketosis, macros, garmin, state.settings);
 
   // Chip de fase en el velocímetro
   const chipGauge = document.getElementById('chipGaugeStage');
@@ -5267,6 +5355,8 @@ function setupStartProcessModal() {
   const btnReset = document.getElementById('btnStartResetAll');
 
   btnOpen?.addEventListener('click', () => {
+    const sModal = document.getElementById('settingsModal');
+    if (sModal) sModal.classList.remove('show');
     if (modal) modal.classList.add('show');
   });
 
@@ -5528,7 +5618,7 @@ function setupKetoneHelpListener() {
     btn.onclick = () => {
       const isCollapsed = body.classList.toggle('collapsed');
       if (arrow) {
-        arrow.style.transform = isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+        arrow.textContent = isCollapsed ? '▸' : '▾';
       }
     };
   }
