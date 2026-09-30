@@ -69,14 +69,14 @@
           </div>
         </div>
 
-        <!-- RELOJ METABÓLICO MODERNO (CUENTA REGRESIVA Y DEPLETACIÓN) -->
+        <!-- RELOJ METABÓLICO MODERNO (CUENTA REGRESIVA A PRÓXIMA FASE) -->
         <div id="boxKetoForecast" class="modern-clock-widget">
           <div class="clock-widget-top">
             <div class="clock-badge-live">
               <span class="clock-ping-dot"></span>
-              <span class="clock-badge-title">CUENTA REGRESIVA A CETOSIS</span>
+              <span class="clock-badge-title" id="txtClockTitle">CUENTA REGRESIVA A PRÓXIMA FASE</span>
             </div>
-            <span class="clock-target-pill">Umbral Meta: ≥ 0.5 mmol/L</span>
+            <span class="clock-target-pill" id="lblClockTargetPill">Próxima Fase: ≥ 1.5 mmol/L</span>
           </div>
 
           <div class="clock-widget-center">
@@ -98,15 +98,15 @@
                 <span class="clock-arrival-text" id="valKetoTargetDate">Hoy a las 03:18 p. m.</span>
               </div>
               <div class="clock-glycogen-status" id="txtClockDepletionNote">
-                Vaciando últimas ~10g de glucógeno hepático
+                Acelerado por tu gasto calórico y pasos Garmin
               </div>
             </div>
           </div>
 
-          <!-- Barra de vaciado de glucógeno hacia cetosis -->
+          <!-- Barra de vaciado de glucógeno y progreso hacia próxima fase -->
           <div class="metabolic-depletion-bar">
             <div class="depletion-bar-header">
-              <span>Depósito Hepático: <strong id="lblGlycogenGrams">~10g restantes</strong></span>
+              <span id="lblProgressHeader">Depósito Hepático: <strong id="lblGlycogenGrams">~10g restantes</strong></span>
               <span id="lblDepletionPercent" class="depletion-pct">89% vaciado</span>
             </div>
             <div class="depletion-track">
@@ -159,22 +159,26 @@
           <div class="ketone-exp-header" id="btnToggleKetoHelp" role="button" tabindex="0">
             <div class="ketone-exp-title">
               <span class="exp-icon">💡</span>
-              <span>¿Qué significa <strong>0.3 mmol/L</strong> y cómo se calcula?</span>
+              <span>¿Qué significa <strong id="lblHelpKetones">0.3 mmol/L</strong> y base científica?</span>
             </div>
             <span class="exp-arrow" id="arrowKetoHelp">▾</span>
           </div>
           <div class="ketone-exp-body" id="bodyKetoHelp">
             <div class="exp-item">
-              <strong>• mmol/L (milimoles por litro):</strong> Mide la concentración de beta-hidroxibutirato (cetonas) en sangre.
+              <strong>• mmol/L (Beta-hidroxibutirato en sangre):</strong> Mide la concentración de BOHB sintetizado por el hígado a partir de ácidos grasos (Phinney & Volek, 2011; Cahill, 2006).
             </div>
             <div class="exp-item">
-              <strong>• 0.3 mmol/L (Inducción):</strong> Tu cuerpo está en transición; el glucógeno del hígado se agotó al 90% y empieza la síntesis acelerada de cetonas.
+              <strong>• Dinámica de Glucógeno y CPT-1:</strong> Mientras existan depósitos de glucógeno hepático (>30 g), la enzima carnitina palmitoiltransferasa-1 (CPT-1) permanece inhibida. Al agotarse el glucógeno por déficit de carbohidratos y gasto activo, se dispara la síntesis exponencial de cetonas.
             </div>
             <div class="exp-item">
-              <strong>• Umbral ≥ 0.5 mmol/L:</strong> Al cruzar este valor (hoy a las 3:18 p. m.), tu metabolismo apaga los carbohidratos y quema grasa a pleno.
+              <strong>• Fases Científicas de Cetosis:</strong>
+              <br>1. Basal/Glucosa (&lt;0.2 mM): Utilización primaria de glucógeno y glucosa.
+              <br>2. Inducción (0.2–0.49 mM): Deplesión hepática activa acelerada por pasos y entrenamientos.
+              <br>3. Óptima Nutricional (0.5–1.49 mM): Máxima lipólisis y oxidación de grasa mitocondrial.
+              <br>4. Profunda (&ge;1.5 mM): Adaptación metabólica sostenida y ceto-adaptación.
             </div>
             <div class="exp-item">
-              <strong>• El Reloj:</strong> Calcula con exactitud matemática el momento en que tus pasos de Garmin y gasto basal vacían el glucógeno restante.
+              <strong>• Acelerador Garmin:</strong> Cada paso y caloría activa de Garmin consume glucógeno muscular y hepático, acelerando drásticamente el reloj de llegada a la siguiente fase de cetosis.
             </div>
           </div>
         </div>
@@ -580,6 +584,10 @@
           <button class="metric-pill" data-metric="calories">
             <svg class="pill-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
             <span>Calorías</span>
+          </button>
+          <button class="metric-pill" data-metric="ketosis">
+            <svg class="pill-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span>Cetosis</span>
           </button>
         </div>
 

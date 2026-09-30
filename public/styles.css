@@ -3252,11 +3252,11 @@ input:focus, select:focus {
   padding-bottom: 86px !important;
 }
 
-/* SELECTOR DE MÉTRICA EN GRÁFICAS - 3 COLUMNAS RESPONSIVAS QUE NUNCA SE CORTAN */
+/* SELECTOR DE MÉTRICA EN GRÁFICAS - 4 COLUMNAS RESPONSIVAS QUE NUNCA SE CORTAN */
 .chart-metric-selector {
   display: grid !important;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  gap: 6px !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 4px !important;
   background: rgba(15, 23, 42, 0.7) !important;
   border: 1px solid var(--card-border) !important;
   border-radius: 10px !important;
@@ -3270,15 +3270,15 @@ input:focus, select:focus {
   background: transparent !important;
   border: 1px solid transparent !important;
   color: var(--text-muted) !important;
-  padding: 7px 4px !important;
+  padding: 6px 2px !important;
   border-radius: 7px !important;
-  font-size: 0.75rem !important;
+  font-size: 0.70rem !important;
   font-weight: 700 !important;
   cursor: pointer !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 5px !important;
+  gap: 4px !important;
   white-space: nowrap !important;
   transition: all 0.2s ease !important;
   min-width: 0 !important;
