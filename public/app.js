@@ -1658,8 +1658,9 @@ function estimateMealMacrosAI(input, explicitGrams = null) {
   if (netCarbs > 25) {
     ketoStatus = 'exceeded';
     ketoBadge = '🚨 Alto en Carbohidratos (+' + netCarbs + 'g)';
-    const approxSteps = Math.round((netCarbs - 25) * 292);
-    ketoNote = 'Supera el límite keto diario. Generará ~' + approxSteps.toLocaleString() + ' pasos compensatorios en tu reloj Garmin para vaciar el glucógeno.';
+    const excess = Math.round((netCarbs - 25) * 10) / 10;
+    const estHours = Math.round((2.0 + (excess / 15.0)) * 10) / 10;
+    ketoNote = 'Supera el límite diario keto (+' + excess + 'g). Induce latencia insulínica (~' + estHours + 'h). Tu actividad física activará GLUT4 para acelerar el retorno a lipólisis.';
   } else if (netCarbs > 8) {
     ketoStatus = 'moderate';
     ketoBadge = '⚠️ Moderado en Carbohidratos (' + netCarbs + 'g)';
@@ -2072,11 +2073,12 @@ function calculateKetosisStateClient(meals, garmin, settings) {
     hoursSinceCarbs = Math.min(totalProtocolHours, 168);
   }
 
-  // 3. MODELO BICOMPARTIMENTAL DE GLUCÓGENO v4.0 (DESACOPLAMIENTO ESTRICTO)
+  // 3. MODELO BICOMPARTIMENTAL DE GLUCÓGENO v4.1 (DESACOPLAMIENTO ESTRICTO Y CONSERVACIÓN DE MASA)
   // A. Depósito Hepático (G_H): Capacidad 90-110g.
   //    Drenado EXCLUSIVAMENTE por el SNC y eritrocitos a 2.5 g/h neta (3.8 consumo basal - 1.3 gluconeogénesis).
   //    ¡Ningún paso ni ejercicio de Garmin drena este compartimento!
-  const hepaticIntake = totalNetCarbsLast24h * 0.25;
+  //    Estequiometría: 1g glucosa -> 0.90g glucógeno anhidro. Extracción hepática de primer paso: ~25%.
+  const hepaticIntake = totalNetCarbsLast24h * 0.25 * 0.90;
   const hoursToDrain = Math.min(hoursSinceCarbs, totalProtocolHours);
   const basalHepaticDrain = 2.5 * hoursToDrain;
   const initialHepatic = currentProtocolDay > 3 ? 30.0 : 105.0;
@@ -2084,12 +2086,13 @@ function calculateKetosisStateClient(meals, garmin, settings) {
   
   let glycogenHepatic = Math.max(0, Math.min(110.0, initialHepatic + hepaticIntake - basalHepaticDrain));
   if (excessCarbs > 0) {
-    glycogenHepatic = Math.min(110.0, glycogenHepatic + (excessCarbs * 0.5));
+    glycogenHepatic = Math.min(110.0, glycogenHepatic + (excessCarbs * 0.25 * 0.90));
   }
 
   // B. Depósito Muscular (G_M): Capacidad 300-500g (media 380g).
   //    Drenado por la contracción muscular local según telemetría de Garmin (Brooks Crossover Concept).
-  const muscularIntake = totalNetCarbsLast24h * 0.75;
+  //    Captación periférica en músculo esquelético: ~75%. Estequiometría: 1g glucosa -> 0.90g glucógeno anhidro.
+  const muscularIntake = totalNetCarbsLast24h * 0.75 * 0.90;
   const initialMuscular = currentProtocolDay > 3 ? 280.0 : 380.0;
   const glycolyticFraction = activeCalories > 500 ? 0.45 : 0.35;
   const muscularLocomotorDrain = (activeCalories * glycolyticFraction) / 4.0;

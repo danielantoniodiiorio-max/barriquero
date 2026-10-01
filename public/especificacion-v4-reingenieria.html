@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>KetoTrack v4.0 - Especificación Técnica y Reingeniería Bioenergética</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 15mm 14mm 15mm 14mm;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 10pt;
+      line-height: 1.55;
+      color: #0f172a;
+      background: #ffffff;
+      margin: 0;
+      padding: 0;
+    }
+    .header-banner {
+      border-bottom: 3px solid #059669;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 8pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-blue { background: #e0f2fe; color: #075985; }
+    .badge-amber { background: #fef3c7; color: #92400e; }
+    h1 {
+      font-size: 19pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 8px 0 4px 0;
+      line-height: 1.2;
+    }
+    .subtitle {
+      font-size: 11pt;
+      color: #475569;
+      margin: 0 0 12px 0;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      font-size: 8pt;
+      background: #f8fafc;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+    }
+    .meta-item strong {
+      display: block;
+      color: #64748b;
+      font-size: 7pt;
+      text-transform: uppercase;
+    }
+    .meta-item span {
+      color: #0f172a;
+      font-weight: 600;
+    }
+    h2 {
+      font-size: 13pt;
+      font-weight: 700;
+      color: #0f172a;
+      border-bottom: 1.5px solid #cbd5e1;
+      padding-bottom: 4px;
+      margin: 22px 0 10px 0;
+      page-break-after: avoid;
+    }
+    h3 {
+      font-size: 11pt;
+      font-weight: 700;
+      color: #047857;
+      margin: 14px 0 6px 0;
+      page-break-after: avoid;
+    }
+    p { margin: 0 0 8px 0; }
+    .math-card {
+      background: #f8fafc;
+      border-left: 4px solid #059669;
+      padding: 10px 14px;
+      margin: 10px 0;
+      border-radius: 0 6px 6px 0;
+      font-family: "Cascadia Code", "Consolas", monospace;
+      font-size: 9pt;
+      color: #0f172a;
+      page-break-inside: avoid;
+    }
+    .formula-title {
+      font-weight: 700;
+      color: #047857;
+      font-size: 8pt;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 8.5pt;
+      page-break-inside: avoid;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 6px 8px;
+      text-align: left;
+    }
+    th {
+      background: #f1f5f9;
+      color: #0f172a;
+      font-weight: 700;
+    }
+    .callout {
+      padding: 10px 12px;
+      margin: 10px 0;
+      border-radius: 6px;
+      font-size: 8.5pt;
+      border: 1px solid;
+      page-break-inside: avoid;
+    }
+    .callout-info { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+    .callout-warning { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+    .code-box {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-family: "Cascadia Code", "Consolas", monospace;
+      font-size: 8pt;
+      overflow-x: auto;
+      margin: 8px 0;
+      line-height: 1.4;
+      page-break-inside: avoid;
+    }
+    .page-break { page-break-before: always; }
+    ul { margin: 0 0 10px 0; padding-left: 18px; }
+    li { margin-bottom: 3px; }
+  </style>
+</head>
+<body>
+
+  <div class="header-banner">
+    <div class="badge badge-green">Arquitectura v4.0 - Reingeniería Bioenergética</div>
+    <h1>KetoTrack v4.0: Especificación y Directivas de Modelado Biofísico</h1>
+    <div class="subtitle">Desacoplamiento compartimental de glucógeno, cinética no lineal de CPT-1, eliminación de ventajas ficticias y aclaramiento periférico GLUT4</div>
+    <div class="meta-grid">
+      <div class="meta-item">
+        <strong>Versión Motor</strong>
+        <span>KetoTrack v4.0 (NIH/Hall)</span>
+      </div>
+      <div class="meta-item">
+        <strong>Directivas</strong>
+        <span>Hall, Cahill, Jensen, Brooks</span>
+      </div>
+      <div class="meta-item">
+        <strong>Compartimentos</strong>
+        <span>G_H (Hepático) &ne; G_M (Muscular)</span>
+      </div>
+      <div class="meta-item">
+        <strong>Salida Cetonas</strong>
+        <span>Intervalo 95% CI (Sigmoidal)</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>1. Matriz de Cambios Paradigmáticos (v3.0 vs v4.0)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Módulo Bioenergético</th>
+        <th>Enfoque v3.0 (Deprecado)</th>
+        <th>Arquitectura v4.0 (Alineada al Consenso)</th>
+        <th>Fisiología Subyacente</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Pool de Glucógeno</strong></td>
+        <td>Fusión en un único pool drenado por pasos de Garmin.</td>
+        <td><strong>Bicompartimental estricto:</strong> G_H (Hepático) vs G_M (Muscular).</td>
+        <td>El músculo carece de glucosa-6-fosfatasa; los pasos no drenan el glucógeno hepático.</td>
+      </tr>
+      <tr>
+        <td><strong>Balance Energético</strong></td>
+        <td>Bono metabólico arbitrario (+210 a +280 kcal/día).</td>
+        <td><strong>0 kcal de bono ficticio:</strong> TEF dinámico real + densidad de triglicéridos.</td>
+        <td>Leyes de la termodinámica y calorimetría de cámara respiratoria (Kevin Hall, NIH).</td>
+      </tr>
+      <tr>
+        <td><strong>Estimación de Cetonas</strong></td>
+        <td>Fases discretas y valores escalares rígidos deterministas.</td>
+        <td><strong>Curva Sigmoidal Hill/Michaelis-Menten</strong> + Intervalos de confianza.</td>
+        <td>Cinética enzimática de desinhibición de CPT-1 mediada por caída de Malonil-CoA.</td>
+      </tr>
+      <tr>
+        <td><strong>Transgresión (Cheat Meal)</strong></td>
+        <td>"292 pasos neutralizan 1g de carbohidrato".</td>
+        <td><strong>Tiempo hacia desinhibición de CPT-1</strong> vía sumidero GLUT4 muscular.</td>
+        <td>Translocación no insulino-dependiente de GLUT4 inducida por contracción (AMPK/CaMKII).</td>
+      </tr>
+      <tr>
+        <td><strong>Composición Corporal</strong></td>
+        <td>Asunción de que toda la pérdida inicial es tejido graso.</td>
+        <td><strong>Desglose hídrico-osmótico:</strong> 3.0 g H2O liberados por gramo de glucógeno.</td>
+        <td>Solvatación de glucógeno y balance de fluidos intracelulares (Olsson & Saltin).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>2. Especificación Matemática de los 5 Módulos</h2>
+
+  <h3>Módulo 1: Metabolismo y Gasto Energético Total (TDEE)</h3>
+  <div class="math-card">
+    <div class="formula-title">TDEE Integrado con TEF Dinámico y Adaptación Metabólica</div>
+    BMR_Mifflin = (10 &times; Peso_kg) + (6.25 &times; Altura_cm) - (5 &times; Edad_años) + S &nbsp; [S=+5 H, -161 M]<br>
+    BMR_Katch = 370 + (21.6 &times; Masa_Magra_kg) &nbsp; [si existe bioimpedancia/DEXA]<br>
+    TEF_Dinámico = (Proteína_g &times; 4 &times; 0.25) + (Carbohidratos_g &times; 4 &times; 0.08) + (Grasas_g &times; 9 &times; 0.02)<br>
+    Adaptación_Metabólica = BMR &times; min(0.15, Días_en_Déficit &times; 0.005) &nbsp; [Hall 2011]<br>
+    TDEE = BMR + Calorías_Activas_Garmin + TEF_Dinámico - Adaptación_Metabólica
+  </div>
+
+  <h3>Módulo 2: Cinética Bicompartimental de Glucógeno (G_H vs G_M)</h3>
+  <div class="math-card">
+    <div class="formula-title">Compartimento Hepático (G_H): Capacidad 90-110g</div>
+    G_H(t) = max(0, min(110, G_H(t-1) + Ingesta_Carbos_Hepática - (Tasa_Neta_SNC &times; &Delta;t)))<br>
+    - Tasa_Neta_SNC = 2.5 g/hora (3.8 g/h consumo basal SNC/eritrocitos - 1.3 g/h gluconeogénesis endógena)<br>
+    - Ingesta_Carbos_Hepática = 0.25 &times; Carbos_Netos_Ingeridos (captación esplácnica de primer paso)<br>
+    *IMPORTANTE: Ningún paso de Garmin descuenta este compartimento.*
+  </div>
+  <div class="math-card">
+    <div class="formula-title">Compartimento Muscular (G_M): Capacidad 300-500g</div>
+    G_M(t) = max(0, min(450, G_M(t-1) + Ingesta_Carbos_Muscular - Gasto_Locomotor_Glucosa))<br>
+    - Ingesta_Carbos_Muscular = 0.75 &times; Carbos_Netos_Ingeridos (distribución periférica sistémica)<br>
+    - Gasto_Locomotor_Glucosa = (Calorías_Activas_Garmin &times; Fracción_Glucolítica) / 4.0 kcal/g<br>
+    - Fracción_Glucolítica = 0.30 (caminata ligera Z1) a 0.85 (alta intensidad/fuerza) (Brooks Crossover)
+  </div>
+
+  <div class="page-break"></div>
+
+  <h3>Módulo 3: Estimación Sigmoidal y Probabilística de BOHB</h3>
+  <div class="math-card">
+    <div class="formula-title">Desinhibición de CPT-1 (Cinética Hill n=3, K=20g)</div>
+    F_CPT1 = 1 / (1 + (G_H / 20.0)^3)<br>
+    <br>
+    Latencia_Insulínica = 2.0 + max(0, Carbos_Comida - 15) / 15.0 &nbsp; [horas si Carbos > 15g]<br>
+    Modulador_Ayuno = 1.0 - exp(-max(0, Tiempo_Sin_Carbos) / &tau;_recuperación)<br>
+    <br>
+    BOHB_Centro = 0.15 + (F_CPT1 &times; 2.2) &times; Modulador_Ayuno<br>
+    Intervalo_Salida = [max(0.10, BOHB_Centro - 0.25), min(3.50, BOHB_Centro + 0.25)] mmol/L
+  </div>
+
+  <h3>Módulo 4: Balance de Masa Corporal y Tejido Adiposo (Kevin Hall NIH)</h3>
+  <div class="math-card">
+    <div class="formula-title">Desglose Fisiológico de la Pérdida de Peso</div>
+    &Delta;Peso = &Delta;Agua_Osmótica + &Delta;Masa_Grasa + &Delta;Masa_Magra<br>
+    &Delta;Agua_Osmótica = (&Delta;G_H + &Delta;G_M) &times; 3.0 gramos de agua ligada<br>
+    <br>
+    Pérdida_Grasa_Pura_g = max(0, TDEE - Calorías_Ingeridas) / 9.1 kcal/g (en balance negativo)<br>
+    *Nota: Se erradica por completo el bono ficticio de 210-280 kcal/día.*
+  </div>
+
+  <h3>Módulo 5: Desviaciones Dietéticas (Aclaramiento GLUT4 Muscular)</h3>
+  <div class="math-card">
+    <div class="formula-title">Tiempo Estimado hacia la Desinhibición de CPT-1 (T_CPT1)</div>
+    Exceso_Carbos = max(0, Carbos_Consumidos - Carbos_Objetivo)<br>
+    T_CPT1_Base = 2.0 + (Exceso_Carbos / 15.0) &times; 1.0 &nbsp; [horas en reposo]<br>
+    <br>
+    Factor_GLUT4 = 1.0 + min(1.5, (Pasos_Postprandiales / 5000) &times; 0.6 + (Calorías_Activas_Post / 300) &times; 0.4)<br>
+    T_CPT1_Activo = T_CPT1_Base / Factor_GLUT4 &nbsp; [reducción máxima: 50% a 60%]<br>
+    Mensaje UX: "Tu caminata activó GLUT4 muscular acortando la inhibición lipolítica de X h a Y h."
+  </div>
+
+  <h2>3. Matriz de Vectores de Prueba (Test Vectors v4.0)</h2>
+  
+  <h3>Caso 1: Hombre Sedentario en Inicio de Protocolo (Día 1)</h3>
+  <div class="code-box">
+ENTRADAS:
+- Varón, 35 años, 175 cm, 80 kg. Ayuno: 14h. Carbos: 15g (P: 144g, F: 128g).
+- Garmin: 2,400 pasos, 120 kcal activas (caminata suave, fracción glucolítica = 0.30).
+
+RESULTADOS ESPERADOS (v4.0):
+- BMR Mifflin: 1,724 kcal | TEF Dinámico: 172 kcal | TDEE: 2,016 kcal
+- Glucógeno Hepático (G_H): 73.8 g (drenado a 2.5 g/h, NO por pasos)
+- Glucógeno Muscular (G_M): 382.3 g (recibió 11.25g y gastó 9.0g por pasos)
+- Factor CPT-1 (Hill): 0.02 (98% inhibida por Malonil-CoA)
+- BOHB Estimado: Mediana 0.19 mmol/L [Rango de Confianza: 0.10 - 0.34 mmol/L]
+  </div>
+
+  <h3>Caso 2: Atleta Ceto-Adaptado en Plena Cetosis (Día 5)</h3>
+  <div class="code-box">
+ENTRADAS:
+- Varón, 38 años, 180 cm, 78 kg. Ayuno: 28h sin carbos. Carbos: 12g (P: 140g, F: 135g).
+- Garmin: 14,200 pasos, 750 kcal activas. Gasto Total: 2,638 kcal. Ingesta: 1,850 kcal.
+
+RESULTADOS ESPERADOS (v4.0):
+- BMR Mifflin: 1,720 kcal | TEF Dinámico: 168 kcal | TDEE: 2,638 kcal
+- Déficit Real: 788 kcal | Pérdida de Grasa Pura: 86.6 g (788 / 9.1 kcal/g)
+- Glucógeno Hepático (G_H): 0.0 g (Agotado)
+- Glucógeno Muscular (G_M): 204.6 g (Preservado parcialmente, NO en cero)
+- Factor CPT-1: 1.0 (100% activa)
+- BOHB Estimado: Mediana 2.4 mmol/L [Rango de Confianza: 2.1 - 2.7 mmol/L]
+  </div>
+
+  <h3>Caso 3: Excursión Glucídica de 40g (Aclaramiento GLUT4)</h3>
+  <div class="code-box">
+ENTRADAS:
+- Exceso de Carbohidratos: 40 g. Pasos postprandiales: 3,500 pasos (150 kcal activas).
+
+RESULTADOS ESPERADOS (v4.0):
+- Tiempo de Supresión Basal (Reposo): 4.7 horas
+- Factor de Aceleración GLUT4: 1.62 (+62% velocidad de aclaramiento muscular)
+- Tiempo Reducido a Reapertura Lipolítica: 2.9 horas (Ahorro: 1.8 horas / 38% reducción)
+  </div>
+
+</body>
+</html>

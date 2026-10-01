@@ -991,7 +991,7 @@
               <li><strong>Día 2 (Cetosis Inicial / Inducción):</strong> El glucógeno hepático residual cae por debajo de 20-30g. La caída del malonil-CoA activa la carnitina palmitoiltransferasa-1, canalizando ácidos grasos a la mitocondria hepática. Cetonas: <strong>0.3 - 0.5 mmol/L</strong>.</li>
               <li><strong>Día 3 - 4 (Cetosis Intermedia / Umbral Clínico):</strong> Depleción total de glucógeno hepático. La producción de acetoacetato y beta-hidroxibutirato supera el umbral clínico de <strong>0.5 mmol/L</strong> (0.5 a 1.5 mmol/L), activando el modo de quema de grasa y fuego 🔥. El cerebro cubre hasta el 50% de su energía con cetonas.</li>
               <li><strong>Día 5+ (Cetosis Avanzada / Ceto-Adaptada):</strong> Validado por Phinney & Volek (AJCN). Aumento de transportadores de monocarboxilato (MCT1) y biogénesis mitocondrial muscular, estabilizando niveles entre <strong>1.5 y 3.0 mmol/L</strong>.</li>
-              <li><strong>Acelerador Garmin (ACSM / OMS):</strong> Cada 1,000 pasos aeróbicos queman ~3.4g de glucógeno. Un volumen activo de 15,000 pasos diarios quema ~50g de glucógeno adicional, reduciendo el tiempo de entrada de 72h a solo <strong>28 - 36 horas (final del Día 1 o durante el Día 2)</strong>.</li>
+              <li><strong>Acelerador de Aclaramiento Glucémico (Jensen / Brooks):</strong> La actividad física registrada por Garmin (pasos y ejercicio) drena el glucógeno muscular e induce la translocación de transportadores GLUT4 no dependientes de insulina vía AMPK. Esto aplana la curva glucémica postprandial y acorta el tiempo de supresión insulínica, facilitando un retorno más rápido a la lipólisis activa.</li>
             </ul>
           </div>
 
@@ -1014,12 +1014,10 @@
               <span class="source-badge badge-acsm">ACSM</span>
               <h3>American College of Sports Medicine (2021)</h3>
             </div>
-            <p><strong>Cinética de Oxidación de Sustratos en Marcha Aeróbica:</strong></p>
+            <p><strong>Cinética de Oxidación de Sustratos y Aclaramiento Postprandial:</strong></p>
             <ul>
-              <li><strong>Tasa de Quema:</strong> A ritmo de caminata (4 a 5 km/h), el cociente respiratorio (RER) es de aproximadamente 0.80, donde el <strong>40% de la energía proviene de glucosa/glucógeno</strong> y el 60% de ácidos grasos libres.</li>
-              <li><strong>Fórmula de Compensación Glucogénica:</strong> Con la tasa calibrada de tu Garmin (0.0342 kcal/paso), oxidar 1 gramo de carbohidrato excedente (4 kcal) requiere: <br>
-                <code>Pasos = 4 kcal / (0.0342 kcal/paso * 0.40) ≈ 292 pasos por gramo neto excedente</code>.
-              </li>
+              <li><strong>Oxidación de Sustratos en Marcha:</strong> A ritmo de caminata (4 a 5 km/h, RER ~0.80), el músculo activo oxida primordialmente ácidos grasos libres plasmáticos y triglicéridos intramusculares, junto con una fracción glucolítica local. La marcha no drena el glucógeno hepático, el cual se reserva biológicamente para la glucemia cerebral.</li>
+              <li><strong>Módulo GLUT4 de Compensación Postprandial:</strong> Caminar tras una ingesta acelera el aclaramiento de glucosa circulante a través de la contracción muscular (vía AMPK/CaMKII), reduciendo la duración de la hiperinsulinemia y acortando la ventana de inhibición de CPT-1.</li>
             </ul>
           </div>
 
@@ -1047,9 +1045,10 @@
             <ul>
               <li>Aplica la ecuación validada de <strong>Mifflin-St Jeor</strong> (avalada por la Academy of Nutrition and Dietetics): <br>
                 <code>Hombres: (10 * peso_kg) + (6.25 * altura_cm) - (5 * edad) + 5</code><br>
-                <code>Mujeres: (10 * peso_kg) + (6.25 * altura_cm) - (5 * edad) - 161</code>
+                <code>Mujeres: (10 * peso_kg) + (6.25 * altura_cm) - (5 * edad) - 161</code><br>
+                <em>Ejemplo para 83 kg, 189 cm, 44 años: 10(83) + 6.25(189) - 5(44) + 5 = 1,796 kcal/día (sin inflaciones ficticias).</em>
               </li>
-              <li>El gasto se distribuye minuto a minuto a lo largo del día y se suma al gasto por actividad física leído por tu reloj Garmin.</li>
+              <li>El gasto basal se distribuye minuto a minuto y se suma al gasto por actividad física medido objetivamente por tu reloj Garmin.</li>
             </ul>
           </div>
 
@@ -1068,39 +1067,35 @@
           <!-- 6. Parámetros Fisiológicos y Algoritmo de Cálculo Barriketo -->
           <div class="science-source-box" style="border-color: rgba(56, 189, 248, 0.4); background: rgba(15, 23, 42, 0.85);">
             <div class="source-header">
-              <span class="source-badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8;">Motor Barriketo</span>
-              <h3>Parámetros Fisiológicos y Fórmulas Exactas del Sistema</h3>
+              <span class="source-badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8;">Motor Barriketo v4.1</span>
+              <h3>Parámetros Fisiológicos y Desacoplamiento Bicompartimental</h3>
             </div>
             <p><strong>Variables y Constantes Biológicas Utilizadas en el Algoritmo Personalizado:</strong></p>
             <ul>
-              <li><strong>Reserva Hepática de Glucógeno Inicial:</strong> Se establece un promedio clínico de <strong>105 - 110 gramos</strong> para un adulto estándar (Cahill, 2006; Wasserman, 2009).</li>
-              <li><strong>Tasa de Depleción Basal en Ayuno/Keto:</strong> En reposo absoluto sin ingesta de glucosa, el cerebro y tejidos consumen <strong>~3.8 g de glucógeno hepático por hora</strong> (90-100 kcal/h de glucosa cerebral y tisular).</li>
-              <li><strong>Acelerador de Ejercicio Garmin (ACSM):</strong> En caminata o actividad aeróbica moderada (RER 0.80), el 40% del gasto energético es cubierto por glucosa/glucógeno (0.00342g por paso / 2.5g por cada 100 kcal activas). 10,000 pasos de Garmin queman ~34g de glucógeno adicional.</li>
-              <li><strong>Umbral de Activación de CPT-1 (Inducción):</strong> Cuando el depósito de glucógeno hepático residual cae por debajo de <strong>30 gramos</strong>, el malonil-CoA se deprime y la enzima CPT-1 activa la cetogénesis mitocondrial, elevando las cetonas a <strong>0.2 - 0.49 mmol/L</strong>.</li>
-              <li><strong>Umbral de Cetosis Nutricional Óptima (Phinney & Volek):</strong> Glucógeno hepático agotado (&le; 3g residuales). El hígado sintetiza beta-hidroxibutirato libre estabilizando niveles entre <strong>0.5 y 1.49 mmol/L</strong>.</li>
-              <li><strong>Umbral de Cetosis Profunda y Ceto-Adaptación:</strong> Con mantenimiento de carbohidratos netos &le; 20-25g y gasto continuo por más de 48-72h, las cetonas superan <strong>1.5 mmol/L</strong> (hasta 3.0 mmol/L), entrando en lipólisis mitocondrial profunda.</li>
-              <li><strong>Penalización por Ingesta de Carbohidratos:</strong> Cada gramo de carbohidrato neto consumido por encima del límite diario (&gt; 25g) restituye glucógeno hepático a razón de 1.5g y posterga el reloj metabólico a razón de ~2.5 horas por cada 10g excedentes.</li>
+              <li><strong>Reserva Hepática de Glucógeno Inicial:</strong> Promedio clínico de <strong>105 - 110 gramos</strong> para un adulto estándar (Cahill, 2006; Wasserman, 2009).</li>
+              <li><strong>Tasa de Depleción Hepática Neta en Ayuno/Keto:</strong> El cerebro y eritrocitos consumen ~3.8 g/h, amortiguado por ~1.3 g/h de gluconeogénesis basal, resultando en una depleción hepática neta autónoma de <strong>~2.5 g/h</strong>. Ningún paso ni ejercicio de Garmin drena este depósito hepático (el músculo carece de glucosa-6-fosfatasa).</li>
+              <li><strong>Compartimento Muscular (300-500g):</strong> El ejercicio y pasos de Garmin vacían exclusivamente el glucógeno muscular y activan el aclaramiento GLUT4.</li>
+              <li><strong>Regulación de CPT-1 por Malonil-CoA (McGarry &amp; Foster):</strong> Cuando el glucógeno hepático cae por debajo de <strong>30 gramos</strong>, el malonil-CoA desciende drásticamente, desinhibiendo la carnitina palmitoiltransferasa-1 (cinética sigmoidal de Hill n=3, K=20g) e iniciando la producción medible de BOHB.</li>
+              <li><strong>Estequiometría Estricta y Conservación de Masa:</strong> 1g de carbohidrato ingerido genera a lo sumo <strong>0.90g de polímero de glucógeno anhidro</strong> (debido a la pérdida de una molécula de agua en el enlace glucosídico). De este exceso, aproximadamente el 25% se incorpora al hígado y el 75% al músculo esquelético.</li>
             </ul>
           </div>
 
-          <!-- 7. Diferenciación Científica: Quema por Déficit vs. Plus Cetogénico (The BMJ / FASTER) -->
+          <!-- 7. Modelado Bioenergético NIH Kevin Hall (Sin Bonos Ficticios) -->
           <div class="science-source-box" style="border-color: rgba(16, 185, 129, 0.45); background: rgba(15, 23, 42, 0.85);">
             <div class="source-header">
-              <span class="source-badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981;">The BMJ / FASTER</span>
-              <h3>Diferenciación de Quema de Grasa: Déficit Calórico vs. Plus Cetogénico</h3>
+              <span class="source-badge" style="background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981;">Consenso NIH / Kevin Hall</span>
+              <h3>Modelado Bioenergético de Pérdida de Grasa y Agua Osmótica</h3>
             </div>
-            <p><strong>Fundamentación Fisiológica de la Ventaja Metabólica ("Metabolic Advantage"):</strong></p>
+            <p><strong>Termodinámica Estricta y Desglose de Masa Corporal (Kevin Hall et al., NIH):</strong></p>
             <ul>
-              <li><strong>Insuficiencia del Modelo Wishnofsky (7.700 kcal/kg) aislado:</strong> El cálculo clásico puramente calórico asume que todo déficit quema la misma mezcla de sustratos energéticos. En personas con dietas mixtas y glucosa circulante, la insulina alta inhibe la lipasa sensible a hormonas (HSL) y la enzima CPT-1, quemando glucógeno y masa magra.</li>
-              <li><strong>Ventaja Metabólica Cuantificada (The BMJ 2018; 363:k4583 - Ebbeling, Ludwig et al., Harvard):</strong> En un ensayo clínico aleatorizado de 20 semanas en 164 participantes evaluados mediante agua doblemente marcada (estándar de oro), la dieta baja en carbohidratos/cetogénica incrementó el Gasto Energético Total en <strong>+209 a +278 kcal/día</strong> a igual peso corporal. Esto representa un plus automático de <strong>+27 a +36 gramos diarios de grasa corporal oxidada</strong> sin reducción calórica adicional.</li>
-              <li><strong>Tasa de Oxidación de Grasas 2.3x Mayor (The FASTER Study, Metabolism 2016; 65:100-110 - Volek & Phinney):</strong> Las personas adaptadas a cetosis alcanzan tasas pico de oxidación lipídica de <strong>1.54 g/min vs. 0.67 g/min</strong> en controles con dietas altas en hidratos. El cociente respiratorio (RER) desciende a <strong>0.70 - 0.73</strong>, haciendo que entre el <strong>85% y el 95%</strong> de todo el gasto medido por Garmin provenga de ácidos grasos puros.</li>
-              <li><strong>Termodinámica de la Gluconeogénesis (Feinman & Fine, Nutr & Metab 2004, 1:15):</strong> Sintetizar glucosa endógena a partir de glicerol y aminoácidos para alimentar glóbulos rojos requiere <strong>6 ATP por molécula de glucosa</strong>. Este costo metabólico y el ciclo fútil triglicérido-ácido graso aumentan la termogénesis obligatoria en +100 a +180 kcal/día.</li>
-              <li><strong>Excreción Neta de Cuerpos Cetónicos (George Cahill, Annu. Rev. Nutr. 2006):</strong> Pérdida directa de energía química de entre <strong>15 y 45 kcal/día</strong> expulsada pasivamente a través de la acetona en el aliento y acetoacetato en orina (carbonos de grasa excretados sin almacenamiento).</li>
-              <li><strong>Fórmulas de Cálculo en Barriketo:</strong><br>
-                <code>Grasa por Déficit Garmin (g) = (Gasto Garmin - Calorías Consumidas) / 7.7</code><br>
-                <code>Plus Cetogénico (g) = Ventaja Metabólica según Estadio (Fase 1: 0g • Fase 2: ~12g • Fase 3: ~27g • Fase 4: ~36g)</code><br>
-                <code>Quema Total Diaria = Grasa por Déficit + Plus Cetogénico</code><br>
-                <code>Gasto Total Efectivo (kcal) = Gasto Garmin + Gasto Termogénico Cetogénico (+90 a +280 kcal)</code>
+              <li><strong>Eliminación de Bonos Ficticios:</strong> Los estudios controlados en cámaras metabólicas del NIH demuestran que a igualdad de calorías y proteínas, no existe una "ventaja metabólica" mágica de 200-300 kcal/día. La termogénesis se rige por el TEF dinámico real de los alimentos (Proteínas ~25%, Carbohidratos ~8%, Grasas ~2%).</li>
+              <li><strong>Pérdida de Tejido Adiposo (Wishnofsky 7.7 kcal/g):</strong> El tejido adiposo humano está compuesto por ~87% lípidos y ~13% agua intracelular y matriz conectiva. Un déficit calórico real de 7,700 kcal reduce 1 kg de tejido graso bruto.</li>
+              <li><strong>Grasa Pura Anhidra (9.1 kcal/g):</strong> Corresponde a los triglicéridos anhidros libres oxidados mitocondrialmente.</li>
+              <li><strong>Agua Osmótica Ligada al Glucógeno (Olsson &amp; Saltin, 1970):</strong> Cada gramo de glucógeno movilizado libera entre <strong>2.7 y 4.0 gramos de agua intracelular</strong>. El rápido descenso de peso en los primeros 2 a 3 días corresponde prioritariamente a agua osmótica ligada al glucógeno deplecionado (~300-400g H₂O), no a grasa pura.</li>
+              <li><strong>Fórmulas Reales del Sistema:</strong><br>
+                <code>Déficit Calórico Neto = Gasto Total TDEE (BMR + Garmin Activo + TEF) - Ingesta Calórica</code><br>
+                <code>Pérdida Tejido Adiposo (g) = Déficit Calórico Neto / 7.7 kcal/g</code><br>
+                <code>Agua Osmótica Liberada (g) = Glucógeno Deplecionado (g) * 3.0 g H₂O</code>
               </li>
             </ul>
           </div>
