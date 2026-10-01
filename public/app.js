@@ -60,15 +60,27 @@ document.getElementById('btnCloseSettingsModal')?.addEventListener('click', () =
 });
 
 // Science Modal Handlers
-const scienceModal = document.getElementById('scienceModal');
-document.getElementById('btnOpenScienceModal')?.addEventListener('click', () => {
-  if (scienceModal) scienceModal.classList.add('show');
+window.openScienceModal = function() {
+  const scienceModal = document.getElementById('scienceModal');
+  if (scienceModal) {
+    scienceModal.classList.add('show');
     document.body.classList.add('modal-open');
-});
-document.getElementById('btnCloseScienceModal')?.addEventListener('click', () => {
-  if (scienceModal) scienceModal.classList.remove('show');
-  document.body.classList.remove('modal-open');
-});
+    if (state && state.status) {
+      renderPersonalizedScienceModal(state.status);
+    }
+  }
+};
+
+window.closeScienceModal = function() {
+  const scienceModal = document.getElementById('scienceModal');
+  if (scienceModal) {
+    scienceModal.classList.remove('show');
+    document.body.classList.remove('modal-open');
+  }
+};
+
+document.getElementById('btnOpenScienceModal')?.addEventListener('click', window.openScienceModal);
+document.getElementById('btnCloseScienceModal')?.addEventListener('click', window.closeScienceModal);
 
 
 // Helper de escape HTML
@@ -2523,7 +2535,7 @@ function calculateStepsForKetosis(totalNetCarbs, garminSteps, netCarbTarget, gar
   // Exceso de carbohidratos consumidos sobre el límite keto
   const excessCarbs = Math.max(0, Math.round((netCarbs - carbLimit) * 10) / 10);
 
-  // Si NO hay exceso: cetosis y CPT-1 protegidas
+  // Si NO hay exceso: cetosis y quema protegidas
   if (excessCarbs === 0) {
     return {
       stepsDone,
@@ -2534,9 +2546,9 @@ function calculateStepsForKetosis(totalNetCarbs, garminSteps, netCarbTarget, gar
       status: 'no_excess',
       badgeText: '🥑 Cetosis Protegida',
       badgeColor: '#10b981',
-      title: '✨ Carbohidratos en Rango Cetogénico',
-      desc: 'Has consumido ' + netCarbs + 'g de tu límite de ' + carbLimit + 'g. CPT-1 mitocondrial plenamente operativa sin latencia insulínica.' + 
-            (stepsDone > 0 ? ' Llevas ' + stepsDone.toLocaleString() + ' pasos registrados con tu Garmin.' : ''),
+      title: '✨ Carbohidratos Bajo Control',
+      desc: 'Has consumido ' + netCarbs + 'g de tu meta de ' + carbLimit + 'g. Tu cuerpo continúa quemando grasa a pleno rendimiento.' + 
+            (stepsDone > 0 ? ' Llevas ' + stepsDone.toLocaleString() + ' pasos registrados hoy con Garmin.' : ''),
       baselineRecoveryHours: 0,
       activeRecoveryHours: 0,
       timeSavedHours: 0,
@@ -2544,11 +2556,11 @@ function calculateStepsForKetosis(totalNetCarbs, garminSteps, netCarbTarget, gar
     };
   }
 
-  // Si HAY exceso de carbohidratos (Módulo 5 GLUT4):
-  // 1. Supresión basal en reposo: 2h base + 1h por cada 15g de exceso
+  // Si HAY exceso de carbohidratos (Módulo GLUT4):
+  // 1. Tiempo en reposo: 2h base + 1h por cada 15g de exceso
   const tBaseHours = 2.0 + (excessCarbs / 15.0);
 
-  // 2. Factor de translocación GLUT4 muscular (AMPK) por pasos y calorías activas
+  // 2. Factor de aceleración por actividad (pasos y calorías activas)
   const stepsFactor = (stepsDone / 5000.0) * 0.6;
   const calFactor = (actCal / 300.0) * 0.4;
   const glut4AccelerationFactor = 1.0 + Math.min(1.5, stepsFactor + calFactor);
@@ -2558,7 +2570,7 @@ function calculateStepsForKetosis(totalNetCarbs, garminSteps, netCarbTarget, gar
   const timeSavedHours = Math.round((tBaseHours - tActiveHours) * 10) / 10;
   const reductionPercent = Math.round((timeSavedHours / tBaseHours) * 100);
 
-  // Pasos objetivo para lograr la máxima translocación (~factor 2.5)
+  // Pasos objetivo recomendados
   const targetSteps = Math.min(15000, Math.max(3000, Math.round(excessCarbs * 220)));
   const stepsRemaining = Math.max(0, targetSteps - stepsDone);
   const percent = Math.min(100, Math.round((stepsDone / targetSteps) * 100));
@@ -2571,10 +2583,10 @@ function calculateStepsForKetosis(totalNetCarbs, garminSteps, netCarbTarget, gar
       percent: 100,
       excessCarbs,
       status: 'neutralized',
-      badgeText: '⚡ GLUT4 Maximizado ✓',
+      badgeText: '⚡ Actividad Completada ✓',
       badgeColor: '#10b981',
-      title: '✅ Aclaramiento Muscular GLUT4 Maximizado',
-      desc: 'Tus ' + stepsDone.toLocaleString() + ' pasos activaron la translocación de GLUT4 no dependiente de insulina. La ventana de inhibición lipolítica se redujo de ' + tBaseHours.toFixed(1) + 'h a ' + tActiveHours.toFixed(1) + 'h (un ' + reductionPercent + '% más rápido).',
+      title: '✅ Exceso Compensado con tu Actividad',
+      desc: 'Tus ' + stepsDone.toLocaleString() + ' pasos aceleraron la absorción muscular de glucosa, reduciendo el tiempo de pausa en la quema de grasa de ' + tBaseHours.toFixed(1) + 'h a solo ' + tActiveHours.toFixed(1) + 'h (un ' + reductionPercent + '% más rápido).',
       baselineRecoveryHours: Math.round(tBaseHours * 10) / 10,
       activeRecoveryHours: tActiveHours,
       timeSavedHours,
@@ -2582,7 +2594,7 @@ function calculateStepsForKetosis(totalNetCarbs, garminSteps, netCarbTarget, gar
     };
   }
 
-  // Falta completar estímulo de contracción
+  // Falta completar actividad
   const minWalk = Math.round(stepsRemaining / 100);
   return {
     stepsDone,
@@ -2591,10 +2603,10 @@ function calculateStepsForKetosis(totalNetCarbs, garminSteps, netCarbTarget, gar
     percent,
     excessCarbs,
     status: 'compensation_needed',
-    badgeText: '⏳ ' + tActiveHours.toFixed(1) + 'h para CPT-1',
+    badgeText: '⏳ ~' + tActiveHours.toFixed(1) + 'h para quemar grasa',
     badgeColor: '#f59e0b',
-    title: '⚡ Aclaramiento GLUT4 Activo (+' + excessCarbs + 'g Carbos)',
-    desc: 'Exceso de ' + excessCarbs + 'g sobre tu límite (' + netCarbs + 'g consumidos / ' + carbLimit + 'g meta). En reposo tardaría ' + tBaseHours.toFixed(1) + 'h en disinhibir CPT-1; con tu actividad actual ya se redujo a ' + tActiveHours.toFixed(1) + 'h (~' + stepsRemaining.toLocaleString() + ' pasos o ' + minWalk + ' min para aceleración plena).',
+    title: '⚡ Actividad Recomendada: +' + excessCarbs + 'g Carbos',
+    desc: 'Superaste tu meta en ' + excessCarbs + 'g de carbohidratos (' + netCarbs + 'g consumidos / ' + carbLimit + 'g meta). En reposo tardarías ' + tBaseHours.toFixed(1) + 'h en volver a quemar grasa. Con tus pasos y actividad ya se redujo a ' + tActiveHours.toFixed(1) + 'h (~' + stepsRemaining.toLocaleString() + ' pasos o ' + minWalk + ' min de caminata para volver más rápido).',
     baselineRecoveryHours: Math.round(tBaseHours * 10) / 10,
     activeRecoveryHours: tActiveHours,
     timeSavedHours,
@@ -2602,11 +2614,11 @@ function calculateStepsForKetosis(totalNetCarbs, garminSteps, netCarbTarget, gar
   };
 }
 
-// Generación dinámica y personalizada de la leyenda del proceso cetogénico
+// Generación dinámica y amigable para fitness de la leyenda del proceso cetogénico
 function renderPersonalizedKetoneHelp(ketosis, macros, garmin, settings) {
   const lblHelpKetones = document.getElementById('lblHelpKetones');
   if (lblHelpKetones) {
-    const rangeText = ketosis.formattedRange ? ` (IC 95%: ${ketosis.formattedRange})` : '';
+    const rangeText = ketosis.formattedRange ? ` (${ketosis.formattedRange})` : '';
     lblHelpKetones.textContent = ketosis.estimatedKetones.toFixed(1) + ' mmol/L' + rangeText;
   }
 
@@ -2628,19 +2640,15 @@ function renderPersonalizedKetoneHelp(ketosis, macros, garmin, settings) {
     return getLocalDateKey(rawTime) === getLocalDateKey(new Date());
   }).length);
 
-  const remHepatic = ketosis.glycogenRemainingGrams != null ? ketosis.glycogenRemainingGrams : 100;
-  const remMuscular = ketosis.glycogenMuscularGrams != null ? ketosis.glycogenMuscularGrams : 380;
-  const depPct = ketosis.depletionPercent || 0;
   const day = ketosis.protocolDay || 1;
   const hoursSince = Math.round(ketosis.hoursFastingOrKeto || 0);
-  const cpt1Factor = ketosis.cpt1InductionFactor != null ? Math.round(ketosis.cpt1InductionFactor * 100) : 0;
   const bohbRange = ketosis.formattedRange || `${(ketosis.estimatedKetones - 0.25).toFixed(1)} - ${(ketosis.estimatedKetones + 0.25).toFixed(1)} mmol/L`;
 
   let nextInfo = '';
   if (ketosis.phase < 4 && ketosis.targetNextPhaseFormatted) {
-    nextInfo = `• Próximo hito: Llegada estimada a <strong>${escapeHtml(ketosis.nextPhaseName)}</strong> (≥ ${ketosis.nextPhaseThreshold} mmol/L): <strong style="color:#38bdf8;">${ketosis.targetNextPhaseFormatted}</strong> con tu déficit calórico y quema activa.`;
+    nextInfo = `• Próximo hito: Llegada estimada a <strong>${escapeHtml(ketosis.nextPhaseName)}</strong>: <strong style="color:#38bdf8;">${ketosis.targetNextPhaseFormatted}</strong> con tu déficit calórico y quema activa.`;
   } else if (ketosis.phase >= 4) {
-    nextInfo = `• Estado Óptimo: <strong>¡Cetosis Profunda Activa (> 1.5 mmol/L)!</strong> Tu cuerpo se encuentra plenamente ceto-adaptado (lipólisis mitocondrial máxima).`;
+    nextInfo = `• Estado Óptimo: <strong>¡Cetosis Profunda Activa!</strong> Tu cuerpo se encuentra plenamente adaptado quemando grasa a máxima eficiencia.`;
   }
 
   const mealSummaryText = mealsCount > 0 
@@ -2653,51 +2661,155 @@ function renderPersonalizedKetoneHelp(ketosis, macros, garmin, settings) {
   body.innerHTML = `
     <div class="exp-item exp-item-personal">
       <div style="font-weight: 800; color: #38bdf8; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-        <span>👤</span> <span>Gasto Energético y Dinámica TEF (Kevin Hall NIH)</span>
+        <span>👤</span> <span>Tu Gasto Calórico y Actividad (Garmin)</span>
       </div>
       <div>
-        • Peso actual: <strong>${weight} kg</strong> • BMR Basal: <strong>${bmr} kcal/día</strong>.<br>
-        • Actividad Garmin: <strong>${steps.toLocaleString()} pasos</strong> (${activeCal} kcal activas). Gasto calórico total: <strong>${totalCal.toLocaleString()} kcal</strong>.<br>
-        • Efecto Térmico de Alimentos (TEF Dinámico): Proteína 25%, Carbos 8%, Grasa 2% (cero bonus arbitrario).
+        • Peso actual: <strong>${weight} kg</strong> • Gasto en reposo (BMR): <strong>${bmr} kcal/día</strong>.<br>
+        • Movimiento hoy: <strong>${steps.toLocaleString()} pasos</strong> (${activeCal} kcal activas de tu Garmin).<br>
+        • Gasto calórico total hoy: <strong>${totalCal.toLocaleString()} kcal</strong>.
       </div>
     </div>
 
     <div class="exp-item exp-item-personal">
       <div style="font-weight: 800; color: #10b981; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-        <span>🧪</span> <span>Modelo Bicompartimental de Glucógeno (Jensen / Cahill)</span>
+        <span>🥑</span> <span>Control de Carbohidratos y Glucosa</span>
       </div>
       <div>
-        • <strong>Compartimento Hepático (SNC / Euglucemia):</strong> <strong>~${remHepatic}g restantes</strong> (de 110g máx). Tasa neta de drenaje: ~2.5 g/h.<br>
-        • <strong>Compartimento Muscular (Locomoción Garmin):</strong> <strong>~${remMuscular}g restantes</strong> (de 450g máx). Consumo local por pasos y ejercicio.<br>
-        • Carbohidratos netos consumidos hoy: <strong>${netCarbsIn}g</strong> (Límite: ${carbLimit}g) ${mealSummaryText}.
+        • Carbohidratos netos consumidos hoy: <strong>${netCarbsIn}g</strong> de tu meta de <strong>${carbLimit}g</strong> ${mealSummaryText}.<br>
+        • Estado: ${ketosis.phase >= 3 ? 'Tus depósitos de glucosa rápida están agotados, obligando a tu cuerpo a usar grasa como energía principal.' : 'Vaciando depósitos de glucosa para activar la producción continua de cetonas.'}
       </div>
     </div>
 
     <div class="exp-item exp-item-personal">
       <div style="font-weight: 800; color: #f59e0b; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-        <span>⏱️</span> <span>Cinética de CPT-1 e Intervalo BOHB (Hill Kinetics n=3)</span>
+        <span>🔥</span> <span>Nivel de Cetonas y Estado (${ketosis.estimatedKetones.toFixed(2)} mmol/L)</span>
       </div>
       <div>
-        • Tiempo en restricción: <strong>${hoursSince} horas</strong> (Día ${day} de tu protocolo).<br>
-        • Desinhibición de CPT-1: <strong>${cpt1Factor}% activa</strong> (Regulada exclusivamente por vaciado hepático G_H &lt; 20g).<br>
-        • Concentración BOHB: <strong style="color: ${ketosis.statusColor};">${ketosis.estimatedKetones.toFixed(2)} mmol/L</strong> • Rango IC 95%: <strong>${bohbRange}</strong>.<br>
+        • Estado actual: <strong style="color: ${ketosis.statusColor};">${escapeHtml(ketosis.phaseName)}</strong> (Día ${day} de tu protocolo).<br>
+        • Rango estimado: <strong>${bohbRange}</strong>.<br>
         ${nextInfo}
       </div>
     </div>
 
     <div class="exp-item exp-item-personal">
       <div style="font-weight: 800; color: #fbbf24; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
-        <span>🔥</span> <span>Balance de Masa Corporal y Tejido Adiposo (Kevin Hall / NIH)</span>
+        <span>📉</span> <span>Pérdida Real de Grasa Estimada Hoy</span>
       </div>
       <div>
-        • <strong>Grasa Pura (Triglicéridos Anhidros 9.1 kcal/g):</strong> ${fatMetrics.isRealDeficit ? '-' + fatMetrics.pureFatGrams + 'g' : '+0g'} (${fatMetrics.isRealDeficit ? '+' : '-'}${Math.abs(fatMetrics.netDeficitToday).toLocaleString()} kcal déficit real).<br>
-        • <strong>Tejido Adiposo Humano Hidratado (7.7 kcal/g):</strong> <strong style="color: #10b981;">${fatMetrics.isRealDeficit ? '-' + fatMetrics.adiposeTissueGrams + 'g' : '+' + fatMetrics.surplusFatGrams + 'g'}</strong>.<br>
-        • <strong>Desglose Osmótico (3.0g H₂O / g glucógeno):</strong> ~${fatMetrics.osmoticWaterGrams}g agua intracelular ligada al glucógeno deplecionado (peso transitorio: -${fatMetrics.transientWeightLossKg} kg).
+        • Balance calórico: ${fatMetrics.isRealDeficit ? `Déficit de <strong>${Math.abs(fatMetrics.netDeficitToday).toLocaleString()} kcal</strong>` : `Superávit de <strong>${fatMetrics.surplusKcal.toLocaleString()} kcal</strong>`}.<br>
+        • Grasa corporal reducida hoy: <strong style="color: #10b981;">~${fatMetrics.adiposeTissueGrams} gramos</strong> de grasa neta.<br>
+        • Calculado con tu déficit real sin bonos ficticios.
       </div>
     </div>
 
-    <div class="exp-item" style="font-size: 0.74rem; color: #94a3b8; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 8px; margin-top: 6px;">
-      🔬 <em>Motor Bioenergético v4.0 alineado a los modelos matemáticos de Kevin Hall (NIH 2011/2012), George Cahill (Harvard 2006), Jørgen Jensen (2011) y Brooks &amp; Mercier (1994).</em>
+    <div style="margin-top: 12px; text-align: center;">
+      <button type="button" onclick="window.openScienceModal()" class="btn-primary" style="width: 100%; padding: 10px 14px; font-size: 0.82rem; background: linear-gradient(135deg, #0284c7, #0ea5e9); border: none; border-radius: 8px; color: #fff; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);">
+        <span>📚</span> <span>Ver tu Informe Bioenergético Completo (Bases Científicas) →</span>
+      </button>
+    </div>
+  `;
+}
+
+// Generación del informe bioenergético clínico individual en el modal de Bases Científicas
+function renderPersonalizedScienceModal(data) {
+  const container = document.getElementById('personalizedScienceContainer');
+  if (!container) return;
+
+  const { ketosis, macros, garmin } = data || {};
+  const settings = state.settings || {};
+
+  const weight = Number(settings.weight || 80);
+  const height = Number(settings.height || 175);
+  const age = Number(settings.age || 35);
+  const gender = settings.gender || 'male';
+  const bodyFat = settings.body_fat_pct != null ? Number(settings.body_fat_pct) : null;
+
+  const bmr = garmin?.bmr_calories || (bodyFat && bodyFat > 3 
+    ? Math.round(370 + (21.6 * (weight * (1 - bodyFat / 100))))
+    : Math.round(10 * weight + 6.25 * height - 5 * age + (gender === 'male' ? 5 : -161)));
+  
+  const activeCal = Number(garmin?.active_calories || 0);
+  const totalCal = Number(garmin?.total_calories || (bmr + activeCal));
+  const steps = Number(garmin?.steps || 0);
+
+  const calInToday = Math.round(Number(macros?.totals?.calories || 0));
+  const fatMetrics = calculateKetosisFatBurnPlus(ketosis, totalCal, calInToday, activeCal);
+
+  const p = Number(macros?.totals?.protein || 0);
+  const c = Number(macros?.totals?.netCarbs != null ? macros.totals.netCarbs : (macros?.totals?.carbs || 0));
+  const f = Number(macros?.totals?.fat || 0);
+  const tefKcal = Math.round(((p * 4 * 0.25) + (c * 4 * 0.08) + (f * 9 * 0.02)) * 10) / 10;
+
+  const remHepatic = ketosis?.glycogenRemainingGrams ?? 100;
+  const remMuscular = ketosis?.glycogenMuscularGrams ?? 380;
+  const cpt1Pct = ketosis?.cpt1InductionFactor != null ? Math.round(ketosis.cpt1InductionFactor * 100) : 0;
+  const bohbCenter = ketosis?.estimatedKetones != null ? ketosis.estimatedKetones.toFixed(2) : '0.20';
+  const bohbRange = ketosis?.formattedRange || `${(Number(bohbCenter) - 0.25).toFixed(1)} - ${(Number(bohbCenter) + 0.25).toFixed(1)} mmol/L`;
+
+  container.innerHTML = `
+    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+        <span style="background: #0284c7; color: #fff; font-size: 0.75rem; font-weight: 800; padding: 4px 10px; border-radius: 6px; letter-spacing: 0.5px;">
+          🔬 TU PERFIL BIOENERGÉTICO INDIVIDUAL v4.0
+        </span>
+        <span style="font-size: 0.75rem; color: #94a3b8;">
+          Modelos Clínicos NIH (Kevin Hall) &amp; Cahill (Harvard)
+        </span>
+      </div>
+
+      <h3 style="color: #38bdf8; font-size: 1.05rem; margin: 0 0 12px 0;">
+        Fórmulas Exactas y Modelado Biofísico para tu Metabolismo
+      </h3>
+
+      <!-- 1. GASTO Y TERMODINÁMICA -->
+      <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 10px; margin-bottom: 10px; font-size: 0.8rem; line-height: 1.5; color: #cbd5e1;">
+        <div style="font-weight: 700; color: #38bdf8; margin-bottom: 4px;">
+          1. Gasto Energético y Termogénesis Real (Kevin Hall / NIH 2011)
+        </div>
+        • Ecuación Base (${bodyFat ? 'Katch-McArdle FFM' : 'Mifflin-St Jeor'}): <strong>${bmr} kcal/día</strong> (${weight} kg, ${height} cm, ${age} años).<br>
+        • Termogénesis de los Alimentos (TEF Dinámico): <strong>+${tefKcal} kcal</strong> (Proteína 25%, Carbohidratos 8%, Grasas 2%).<br>
+        • Gasto Activo Garmin: <strong>+${activeCal} kcal</strong> (${steps.toLocaleString()} pasos).<br>
+        • Gasto Total Dinámico (TDEE): <strong>${totalCal} kcal/día</strong>. Cero bonos arbitrarios.<br>
+        • Balance Energético Hoy: ${fatMetrics.isRealDeficit ? `Déficit de <strong style="color:#38bdf8;">${Math.abs(fatMetrics.netDeficitToday).toLocaleString()} kcal</strong>` : `Superávit de <strong style="color:#f87171;">${fatMetrics.surplusKcal.toLocaleString()} kcal</strong>`}.
+      </div>
+
+      <!-- 2. MODELO BICOMPARTIMENTAL DE GLUCÓGENO -->
+      <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 10px; margin-bottom: 10px; font-size: 0.8rem; line-height: 1.5; color: #cbd5e1;">
+        <div style="font-weight: 700; color: #10b981; margin-bottom: 4px;">
+          2. Desacoplamiento Bicompartimental de Glucógeno (Jensen 2011 / Cahill 2006)
+        </div>
+        • <strong>Glucógeno Hepático (G_H):</strong> <strong>~${remHepatic}g restantes</strong> (de 110g máx). Mantenimiento exclusivo de euglucemia SNC/eritrocitos a tasa neta de <strong>2.5 g/h</strong> (3.8 g/h basal - 1.3 g/h gluconeogénesis). Ningún paso ni caloría de Garmin vacía este depósito.<br>
+        • <strong>Glucógeno Muscular (G_M):</strong> <strong>~${remMuscular}g restantes</strong> (de 450g máx). Drenado exclusivamente por contracción muscular y actividad física de tu reloj Garmin.
+      </div>
+
+      <!-- 3. CINÉTICA DE HILL CPT-1 Y BOHB -->
+      <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 10px; margin-bottom: 10px; font-size: 0.8rem; line-height: 1.5; color: #cbd5e1;">
+        <div style="font-weight: 700; color: #f59e0b; margin-bottom: 4px;">
+          3. Cinética Sigmoidal de Hill para CPT-1 e Intervalo BOHB (Hill n=3, K=20g)
+        </div>
+        • Desinhibición CPT-1: <code>F_CPT1 = 1 / (1 + (G_H / 20)³) = ${cpt1Pct}%</code>.<br>
+        • Concentración Central de BOHB: <strong style="color: #f59e0b;">${bohbCenter} mmol/L</strong>.<br>
+        • Intervalo de Confianza del 95%: <strong>${bohbRange}</strong> (refleja la variabilidad analítica y biológica en sangre capilar).
+      </div>
+
+      <!-- 4. BALANCE DE MASA GRASA Y AGUA OSMÓTICA -->
+      <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 10px; margin-bottom: 10px; font-size: 0.8rem; line-height: 1.5; color: #cbd5e1;">
+        <div style="font-weight: 700; color: #fbbf24; margin-bottom: 4px;">
+          4. Pérdida Real de Grasa vs. Agua Osmótica (Kevin Hall / Olsson &amp; Saltin)
+        </div>
+        • <strong>Grasa Pura Anhidra (9.1 kcal/g):</strong> ${fatMetrics.isRealDeficit ? '-' + fatMetrics.pureFatGrams + 'g' : '+0g'}.<br>
+        • <strong>Tejido Adiposo Humano Hidratado (7.7 kcal/g):</strong> <strong style="color:#10b981;">${fatMetrics.isRealDeficit ? '-' + fatMetrics.adiposeTissueGrams + 'g' : '+' + fatMetrics.surplusFatGrams + 'g'}</strong>.<br>
+        • <strong>Desglose Osmótico (3.0g H₂O / g glucógeno):</strong> ~${fatMetrics.osmoticWaterGrams}g de agua intracelular ligada al glucógeno deplecionado (peso transitorio: -${fatMetrics.transientWeightLossKg} kg).
+      </div>
+
+      <!-- 5. GLUT4 COMPENSACIÓN -->
+      <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 10px; font-size: 0.8rem; line-height: 1.5; color: #cbd5e1;">
+        <div style="font-weight: 700; color: #a855f7; margin-bottom: 4px;">
+          5. Aclaramiento Muscular GLUT4 (Jørgen Jensen / Brooks &amp; Mercier)
+        </div>
+        • Supresión lipolítica basal post-carbos: <code>T_base = 2h + (exceso / 15)</code>.<br>
+        • La contracción muscular (pasos / ejercicio) transloca transportadores GLUT4 independientes de insulina vía AMPK/CaMKII, acelerando la reapertura de CPT-1 de forma no farmacológica.
+      </div>
     </div>
   `;
 }
@@ -2724,7 +2836,7 @@ function renderDashboard(data) {
 
   const elKetoneRange = document.getElementById('lblKetoneRange');
   if (elKetoneRange) {
-    elKetoneRange.textContent = ketosis.formattedRange ? `IC 95%: ${ketosis.formattedRange}` : '';
+    elKetoneRange.textContent = ketosis.formattedRange ? `Rango estimado: ${ketosis.formattedRange}` : '';
   }
 
   const elPhaseTitle = document.getElementById('txtPhaseTitle');
@@ -2777,9 +2889,14 @@ function renderDashboard(data) {
     flameBox.style.display = ketosis.isKetosisActive ? 'flex' : 'none';
   }
 
-  // Reloj de cuenta regresiva SIEMPRE VISIBLE para guiar hacia la siguiente fase
+  // Reloj de cuenta regresiva para guiar hacia la siguiente fase
+  // Si ya se alcanzó la cetosis profunda (Fase 4, última etapa), el contador no debe estar
   if (forecastBox) {
-    forecastBox.style.display = 'block';
+    if (ketosis.phase >= 4) {
+      forecastBox.style.display = 'none';
+    } else {
+      forecastBox.style.display = 'block';
+    }
   }
 
   if (cardKetosis) {
@@ -2859,13 +2976,12 @@ function renderDashboard(data) {
   const barDepletion = document.getElementById('barDepletionFill');
 
   if (lblProgressHeader) {
-    const muscText = ketosis.glycogenMuscularGrams != null ? ` • Muscular: <strong>~${ketosis.glycogenMuscularGrams}g</strong>` : '';
     if (ketosis.phase <= 2) {
-      lblProgressHeader.innerHTML = `Hepático: <strong id="lblGlycogenGrams">~${ketosis.glycogenRemainingGrams}g</strong>${muscText}`;
+      lblProgressHeader.innerHTML = `Progreso hacia Cetosis: <strong>Vaciando Glucógeno</strong>`;
     } else if (ketosis.phase === 3) {
-      lblProgressHeader.innerHTML = `Hepático: <strong>~${ketosis.glycogenRemainingGrams}g</strong> • BOHB: <strong>${ketosis.estimatedKetones.toFixed(1)} mM</strong>`;
+      lblProgressHeader.innerHTML = `Progreso a Cetosis Profunda: <strong>${ketosis.estimatedKetones.toFixed(1)} / 1.5 mM</strong>`;
     } else {
-      lblProgressHeader.innerHTML = `Ceto-Adaptado Pleno: <strong>${ketosis.estimatedKetones.toFixed(1)} mM</strong>${muscText}`;
+      lblProgressHeader.innerHTML = `Objetivo Alcanzado: <strong>Cetosis Profunda Activa</strong>`;
     }
   }
 
@@ -3017,44 +3133,47 @@ function renderDashboard(data) {
   if (lblGarmin) {
     const actNote = activeCalories > 0 ? ` (${activeCalories.toLocaleString()} activas)` : '';
     if (fatMetrics.isRealDeficit) {
-      lblGarmin.textContent = `⌚ Garmin: ${totalBurn.toLocaleString()} kcal${actNote} • Gasto Total TDEE: ${fatMetrics.totalEffectiveBurn.toLocaleString()} kcal`;
+      lblGarmin.textContent = `⌚ Garmin: ${totalBurn.toLocaleString()} kcal quemadas hoy${actNote}`;
       lblGarmin.style.color = 'var(--text-muted)';
     } else {
-      lblGarmin.textContent = `⌚ Garmin: ${totalBurn.toLocaleString()} kcal${actNote} • Superávit: ${fatMetrics.surplusKcal.toLocaleString()} kcal`;
+      lblGarmin.textContent = `⌚ Garmin: ${totalBurn.toLocaleString()} kcal quemadas hoy${actNote} • Superávit: +${fatMetrics.surplusKcal.toLocaleString()} kcal`;
       lblGarmin.style.color = '#f87171';
     }
   }
 
-  // Actualizar Tarjeta de Quema de Grasa Corporal (Modelo NIH Kevin Hall)
+  // Actualizar Tarjeta de Quema de Grasa Corporal (Amigable para Fitness)
   const txtFatBurnSub = document.getElementById('txtFatBurnSub');
   if (txtFatBurnSub) {
-    txtFatBurnSub.textContent = `Oxidación neta según déficit calórico real (Modelo NIH Kevin Hall) • RER ${fatMetrics.rer}`;
+    txtFatBurnSub.textContent = fatMetrics.isRealDeficit 
+      ? `Déficit de ${Math.abs(fatMetrics.netDeficitToday).toLocaleString()} kcal generado hoy con tu Garmin`
+      : `Superávit de ${fatMetrics.surplusKcal.toLocaleString()} kcal sobre el gasto total`;
   }
 
   const badgeKetoStageBonus = document.getElementById('badgeKetoStageBonus');
   if (badgeKetoStageBonus) {
-    badgeKetoStageBonus.textContent = `🔬 ${fatMetrics.stageName.split(':')[1]?.trim() || fatMetrics.stageName}`;
+    badgeKetoStageBonus.textContent = fatMetrics.isRealDeficit ? '🔥 Quema Activa' : '⚡ En Balance';
   }
 
   const valFatLossDeficit = document.getElementById('valFatLossDeficit');
   if (valFatLossDeficit) {
-    valFatLossDeficit.textContent = (fatMetrics.isRealDeficit ? '-' : '+') + Math.abs(fatMetrics.pureFatGrams) + ' g';
+    valFatLossDeficit.textContent = (fatMetrics.isRealDeficit ? '-' : '+') + Math.abs(fatMetrics.netDeficitToday).toLocaleString() + ' kcal';
     valFatLossDeficit.style.color = fatMetrics.isRealDeficit ? '#38bdf8' : '#f87171';
   }
 
   const subFatLossDeficit = document.getElementById('subFatLossDeficit');
   if (subFatLossDeficit) {
-    subFatLossDeficit.textContent = `Grasa pura anhidra (9.1 kcal/g)`;
+    subFatLossDeficit.textContent = fatMetrics.isRealDeficit ? 'Déficit calórico neto' : 'Superávit calórico';
   }
 
   const valFatLossKeto = document.getElementById('valFatLossKeto');
   if (valFatLossKeto) {
     valFatLossKeto.textContent = (fatMetrics.isRealDeficit ? '-' : '+') + Math.abs(fatMetrics.adiposeTissueGrams) + ' g';
+    valFatLossKeto.style.color = '#10b981';
   }
 
   const subFatLossKeto = document.getElementById('subFatLossKeto');
   if (subFatLossKeto) {
-    subFatLossKeto.textContent = `Tejido adiposo bruto (7.7 kcal/g)`;
+    subFatLossKeto.textContent = 'Grasa corporal estimada';
   }
 
   const valFatLossTotal = document.getElementById('valFatLossTotal');
@@ -3064,7 +3183,7 @@ function renderDashboard(data) {
 
   const subFatLossEffectiveBurn = document.getElementById('subFatLossEffectiveBurn');
   if (subFatLossEffectiveBurn) {
-    subFatLossEffectiveBurn.textContent = `Déficit: ${Math.abs(fatMetrics.netDeficitToday).toLocaleString()} kcal • Agua osmótica ligada: ~${fatMetrics.osmoticWaterGrams} g H₂O`;
+    subFatLossEffectiveBurn.textContent = `Gasto total hoy: ${totalBurn.toLocaleString()} kcal (Basal + Actividad Garmin)`;
   }
 
   const badgeCalFeedback = document.getElementById('badgeCalFeedback');

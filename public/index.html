@@ -119,7 +119,7 @@
               <span class="ketone-val" id="valEstimatedKetones">0.3</span>
               <span class="ketone-unit">mmol/L</span>
               <span class="ketone-sublabel">Cetonas en Sangre</span>
-              <span class="ketone-range" id="lblKetoneRange" style="font-size: 0.72rem; color: #94a3b8; display: block; margin-top: 2px;">IC 95%: 0.1 - 0.4 mM</span>
+              <span class="ketone-range" id="lblKetoneRange" style="font-size: 0.72rem; color: #94a3b8; display: block; margin-top: 2px;">Rango estimado: 0.1 - 0.4 mmol/L</span>
             </div>
           </div>
           <div class="gauge-details">
@@ -224,45 +224,52 @@
           </div>
         </div>
 
-        <!-- TARJETA CIENTÍFICA DE QUEMA DE GRASA CORPORAL (MODELO NIH KEVIN HALL) -->
+        <!-- TARJETA DE QUEMA ESTIMADA DE GRASA CORPORAL -->
         <div class="fat-burn-card" id="cardFatBurnBreakdown">
           <div class="fat-burn-header">
             <div class="fat-burn-title-row">
-              <span class="fat-burn-icon">🔬</span>
+              <span class="fat-burn-icon">🔥</span>
               <div>
-                <h3 class="fat-burn-heading">Oxidación de Grasa y Tejido Adiposo</h3>
-                <span class="fat-burn-sub" id="txtFatBurnSub">Modelo bioenergético NIH (Kevin Hall) • RER dinámico</span>
+                <h3 class="fat-burn-heading">Quema Estimada de Grasa</h3>
+                <span class="fat-burn-sub" id="txtFatBurnSub">Calculada con tu déficit calórico y Garmin</span>
               </div>
             </div>
-            <span class="fat-burn-badge" id="badgeKetoStageBonus">🔬 Consenso NIH</span>
+            <span class="fat-burn-badge" id="badgeKetoStageBonus">🔥 Quema Activa</span>
           </div>
 
           <div class="fat-burn-grid">
-            <!-- Grasa Pura (9.1 kcal/g) -->
+            <!-- Déficit Calórico -->
             <div class="fat-burn-col deficit-col">
-              <span class="fat-burn-col-label">📉 Grasa Pura (9.1 kcal/g)</span>
-              <span class="fat-burn-col-value" id="valFatLossDeficit">-0 g</span>
-              <span class="fat-burn-col-sub" id="subFatLossDeficit">Triglicéridos anhidros</span>
+              <span class="fat-burn-col-label">📉 Déficit Calórico</span>
+              <span class="fat-burn-col-value" id="valFatLossDeficit">-0 kcal</span>
+              <span class="fat-burn-col-sub" id="subFatLossDeficit">Déficit neto hoy</span>
             </div>
 
-            <!-- Símbolo ~ -->
-            <div class="fat-burn-plus-symbol" style="font-size: 1.1rem; color: #94a3b8;">~</div>
+            <!-- Símbolo ➔ -->
+            <div class="fat-burn-plus-symbol" style="font-size: 1.1rem; color: #94a3b8;">➔</div>
 
-            <!-- Tejido Adiposo Humano (7.7 kcal/g) -->
+            <!-- Grasa Quemada -->
             <div class="fat-burn-col keto-col">
-              <span class="fat-burn-col-label">🧬 Tejido Adiposo (7.7 kcal/g)</span>
+              <span class="fat-burn-col-label">🔥 Grasa Reducida</span>
               <span class="fat-burn-col-value" id="valFatLossKeto">-0 g</span>
-              <span class="fat-burn-col-sub" id="subFatLossKeto">Tejido bruto hidratado</span>
+              <span class="fat-burn-col-sub" id="subFatLossKeto">Grasa corporal real</span>
             </div>
           </div>
 
           <!-- Total de Quema Diaria -->
           <div class="fat-burn-total-row">
             <div class="fat-burn-total-label">
-              <span>🏆 Quema Neta de Grasa Hoy:</span>
-              <small id="subFatLossEffectiveBurn">Déficit calórico real • Agua osmótica (3:1)</small>
+              <span>🏆 Grasa Corporal Reducida Hoy:</span>
+              <small id="subFatLossEffectiveBurn">Gasto total efectivo hoy</small>
             </div>
             <div class="fat-burn-total-val" id="valFatLossTotal">-0 g</div>
+          </div>
+
+          <!-- Enlace elegante a bases científicas -->
+          <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.08); text-align: right;">
+            <a href="javascript:void(0)" onclick="window.openScienceModal()" style="font-size: 0.75rem; color: #38bdf8; text-decoration: none;">
+              📖 Ver fórmulas bioenergéticas y desglose médico completo →
+            </a>
           </div>
         </div>
 
@@ -525,12 +532,12 @@
           </div>
         </div>
 
-        <!-- WIDGET DE ACLARAMIENTO GLUT4 EN EXCESO DE CARBOHIDRATOS -->
+        <!-- WIDGET DE ACTIVIDAD Y COMPENSACIÓN DE CARBOHIDRATOS -->
         <div class="steps-garmin-section" id="cardStepsKeto" style="margin: 16px 0;">
           <div class="section-title">
             <div>
-              <h3>⚡ Aclaramiento Muscular GLUT4 (Postprandial)</h3>
-              <span class="sub-personal">Translocación no dependiente de insulina mediada por contracción muscular (AMPK)</span>
+              <h3>⚡ Actividad Post-Comida y Cetosis</h3>
+              <span class="sub-personal">Cómo tu movimiento ayuda a volver antes a quemar grasa</span>
             </div>
             <span class="badge" id="badgeStepStatus">Analizando...</span>
           </div>
@@ -541,7 +548,7 @@
                 <span class="step-big-val" id="valCurrentStepsKeto">0</span>
                 <span class="step-divider" id="stepDividerSlash">/</span>
                 <span class="step-target-val" id="valTargetStepsKeto">0</span>
-                <span class="step-unit" id="stepUnitText">pasos recomendados</span>
+                <span class="step-unit" id="stepUnitText">pasos</span>
               </div>
               <div class="step-percent-tag" id="valStepPercent">En Meta</div>
             </div>
@@ -551,13 +558,13 @@
             </div>
 
             <div class="steps-feedback-box" id="boxStepsFeedback">
-              <div class="feedback-title" id="txtStepFeedbackTitle">Calculando aclaramiento...</div>
+              <div class="feedback-title" id="txtStepFeedbackTitle">Calculando...</div>
               <div class="feedback-desc" id="txtStepFeedbackDesc">Conectando con tu reloj Garmin...</div>
             </div>
           </div>
 
           <div class="steps-science-footnote">
-            <span>🔬 Fisiología Muscular (Jensen / Brooks): La contracción muscular activa transportadores GLUT4 independientes de insulina vía AMPK/CaMKII, acelerando el aclaramiento glucídico y acortando las horas de inhibición de CPT-1.</span>
+            <span>🏃 Tu actividad física con Garmin estimula a tus músculos a absorber el exceso de glucosa, acelerando el retorno a cetosis.</span>
           </div>
         </div>
 
@@ -965,6 +972,9 @@
           <button id="btnCloseScienceModal" class="btn-close">&times;</button>
         </div>
         <div class="modal-body-scroll">
+          <!-- INFORME BIOENERGÉTICO Y MODELADO MATEMÁTICO INDIVIDUAL (v4.0) -->
+          <div id="personalizedScienceContainer"></div>
+
           <p class="intro-science">
             Los algoritmos de cálculo metabólico, progresión longitudinal de cetosis, gasto calórico y compensación por pasos de <strong>Barriketo</strong> están rigurosamente fundamentados en investigaciones clínicas y consensos de los organismos de salud y nutrición líderes mundiales:
           </p>
