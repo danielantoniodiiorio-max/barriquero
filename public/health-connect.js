@@ -474,15 +474,10 @@ class HealthConnectManager {
           this.lastDiagnostics.totalCaloriesValue = totalCaloriesHC;
 
           if (totalCaloriesHC > 0) {
+            // Si no se leyeron calorías activas directamente pero sí el total, deducir la fracción activa
             if (activeCalories === 0 && totalCaloriesHC > bmrSoFar) {
               activeCalories = Math.round(totalCaloriesHC - bmrSoFar);
               this.lastDiagnostics.caloriesValue = activeCalories;
-            } else if (activeCalories > 0 && totalCaloriesHC > activeCalories) {
-              const impliedActive = Math.round(totalCaloriesHC - bmrSoFar);
-              if (impliedActive > activeCalories) {
-                activeCalories = impliedActive;
-                this.lastDiagnostics.caloriesValue = activeCalories;
-              }
             }
           }
         }

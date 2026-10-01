@@ -2413,8 +2413,8 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5, arg6) {
   // Calorías estimadas por pasos (~0.03184 kcal/paso)
   const stepCalEstimated = Math.round((Number(steps) || 0) * 0.03184);
 
-  // Las calorías activas totales deben contemplar AMBOS: pasos + musculación/gimnasio
-  let totalActive = Math.max(Number(activeCalories) || 0, stepCalEstimated + exerciseCalSum);
+  // Las calorías activas de Garmin Connect son la fuente autoritativa
+  let totalActive = Number(activeCalories) || 0;
   if (totalActive === 0 && (Number(steps) > 0 || exerciseCalSum > 0)) {
     totalActive = stepCalEstimated + exerciseCalSum;
   }
@@ -2426,12 +2426,10 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5, arg6) {
 
   let restingElapsed = Math.round((dailyBmr / 24) * elapsedHours);
   
-  // Cálculo de gasto total del día acumulado a esta hora:
-  // Reposo transcurrido + Calorías Activas
-  let totalCaloriesVal = Math.round(restingElapsed + totalActive);
-  if (explicitTotal && Number(explicitTotal) > totalCaloriesVal) {
-    totalCaloriesVal = Math.round(Number(explicitTotal));
-  }
+  // Cálculo de gasto total del día: usar el total explícito de Garmin si está presente, o reposo + activas
+  let totalCaloriesVal = (explicitTotal && Number(explicitTotal) > 0)
+    ? Math.round(Number(explicitTotal))
+    : Math.round(restingElapsed + totalActive);
 
   // BMR Basal diario de 24h de Garmin Instinct
   const restingDayBmr = (explicitBmr && Number(explicitBmr) > 0)
