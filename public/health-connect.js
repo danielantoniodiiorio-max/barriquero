@@ -463,7 +463,7 @@ class HealthConnectManager {
       const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
       const dailyBmr = (typeof window.state !== 'undefined' && window.state.settings && window.state.settings.garmin_daily_bmr && window.state.settings.garmin_daily_bmr >= 1900) 
         ? Number(window.state.settings.garmin_daily_bmr) 
-        : 2196;
+        : 2188;
       const bmrSoFar = Math.round((dailyBmr / 24) * elapsedHours);
 
       try {
@@ -474,9 +474,15 @@ class HealthConnectManager {
           this.lastDiagnostics.totalCaloriesValue = totalCaloriesHC;
 
           if (totalCaloriesHC > 0) {
-            // Si no se leyeron calorías activas directamente pero sí el total, deducir la fracción activa
-            if (activeCalories === 0 && totalCaloriesHC > bmrSoFar) {
-              activeCalories = Math.round(totalCaloriesHC - bmrSoFar);
+            // Reconciliación con Garmin Connect:
+            // En Garmin Connect: Calorías Activas = Gasto Total - Calorías de Reposo (BMR transcurrido).
+            // Con frecuencia Health Connect solo recibe en 'calories' (ActiveCaloriesBurnedRecord)
+            // las sesiones de actividad registrada (ej. 272 kcal de una caminata matutina),
+            // mientras que el gasto activo total de Garmin (ej. 834 kcal = 1574 total - 740 reposo)
+            // está contenido en TotalCaloriesBurnedRecord.
+            const impliedActive = Math.round(totalCaloriesHC - bmrSoFar);
+            if (impliedActive > activeCalories) {
+              activeCalories = Math.max(0, impliedActive);
               this.lastDiagnostics.caloriesValue = activeCalories;
             }
           }
@@ -801,7 +807,7 @@ class HealthConnectManager {
       const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
       const dailyBmr = (typeof window.state !== 'undefined' && window.state.settings && window.state.settings.garmin_daily_bmr && window.state.settings.garmin_daily_bmr >= 1900) 
         ? Number(window.state.settings.garmin_daily_bmr) 
-        : 2196;
+        : 2188;
 
       for (const dKey of allPastKeys) {
         const dObj = new Date(dKey + 'T12:00:00');
@@ -812,6 +818,15 @@ class HealthConnectManager {
         let totalSteps = stepsDiag.value;
         let totalActiveCal = calDiag.value;
         let totalBurn = totDiag.value > 0 ? totDiag.value : (dailyBmr + totalActiveCal);
+
+        // Si Garmin registró el gasto total del día pero las muestras activas
+        // solo contenían una sesión puntual de entrenamiento, reconciliar la actividad real:
+        if (totDiag.value > dailyBmr) {
+          const impliedActivePast = Math.round(totDiag.value - dailyBmr);
+          if (impliedActivePast > totalActiveCal) {
+            totalActiveCal = impliedActivePast;
+          }
+        }
 
         // Sanity guards fisiológicos contra multiplicaciones de snapshots corruptos
         if (totalBurn > 4500 && totalActiveCal < 2000) {

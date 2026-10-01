@@ -259,7 +259,7 @@ function checkAndPerformDailyRollover() {
     const savedGarmin = JSON.parse(localStorage.getItem('ketotrack_garmin') || '{}');
     if (savedGarmin.date && savedGarmin.date !== todayKey) {
       const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
-      const dailyBmr = Number(state.settings?.garmin_daily_bmr) || 2185;
+      const dailyBmr = (Number(state.settings?.garmin_daily_bmr) >= 1900) ? Number(state.settings.garmin_daily_bmr) : 2188;
       const restingElapsed = Math.round((dailyBmr / 24) * elapsedHours);
       const freshGarmin = {
         date: todayKey,
@@ -2322,11 +2322,12 @@ function recalculateClientState() {
 
   // Validar fecha de Garmin: si los datos guardados son de ayer o previos, reiniciar métricas de hoy
   let garmin = state.status?.garmin || savedGarmin;
+  const now = new Date();
+  const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
+  const dailyBmr = (Number(state.settings?.garmin_daily_bmr) >= 1900) ? Number(state.settings.garmin_daily_bmr) : 2188;
+  const restingElapsed = Math.round((dailyBmr / 24) * elapsedHours);
+
   if (!garmin.date || garmin.date !== todayKey) {
-    const now = new Date();
-    const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
-    const dailyBmr = Number(state.settings?.garmin_daily_bmr) || 2185;
-    const restingElapsed = Math.round((dailyBmr / 24) * elapsedHours);
     garmin = {
       date: todayKey,
       active_calories: 0,
@@ -2343,6 +2344,14 @@ function recalculateClientState() {
       timestamp: now.toISOString()
     };
     localStorage.setItem('ketotrack_garmin', JSON.stringify(garmin));
+  } else if (garmin.total_calories && Number(garmin.total_calories) > restingElapsed) {
+    // Reconciliación inmediata con el gasto total confirmado de Garmin
+    const impliedActive = Math.round(Number(garmin.total_calories) - restingElapsed);
+    if (impliedActive > (Number(garmin.active_calories) || 0)) {
+      garmin.active_calories = impliedActive;
+      garmin.resting_elapsed = restingElapsed;
+      localStorage.setItem('ketotrack_garmin', JSON.stringify(garmin));
+    }
   }
 
   const macros = calculateDailyMacrosClient(state.meals, state.settings, todayKey);
@@ -2420,12 +2429,22 @@ window.applyGarminMetrics = function(arg1, arg2, arg3, arg4, arg5, arg6) {
   }
 
   const elapsedHours = Math.max(0.1, now.getHours() + (now.getMinutes() / 60));
-  let dailyBmr = (Number(state.settings?.garmin_daily_bmr) >= 2000) ? Number(state.settings.garmin_daily_bmr) : 2180;
+  let dailyBmr = (Number(state.settings?.garmin_daily_bmr) >= 1900) ? Number(state.settings.garmin_daily_bmr) : 2188;
   if (!state.settings) state.settings = {};
   state.settings.garmin_daily_bmr = dailyBmr;
 
   let restingElapsed = Math.round((dailyBmr / 24) * elapsedHours);
   
+  // Reconciliación con el gasto total de Garmin Connect:
+  // Si Garmin reportó el total diario (ej. 1574 kcal) y el reposo transcurrido a esta hora es 740 kcal,
+  // el gasto activo real de Garmin (834 kcal = 1574 - 740) tiene prioridad sobre fragmentos aislados de ejercicio.
+  if (explicitTotal && Number(explicitTotal) > restingElapsed) {
+    const impliedFromTotal = Math.round(Number(explicitTotal) - restingElapsed);
+    if (impliedFromTotal > totalActive) {
+      totalActive = impliedFromTotal;
+    }
+  }
+
   // Cálculo de gasto total del día: usar el total explícito de Garmin si está presente, o reposo + activas
   let totalCaloriesVal = (explicitTotal && Number(explicitTotal) > 0)
     ? Math.round(Number(explicitTotal))
@@ -4819,8 +4838,8 @@ function loadSettings() {
   const localSettings = JSON.parse(localStorage.getItem('ketotrack_settings') || '{}');
   state.settings = { ...state.settings, ...localSettings };
 
-  if (!state.settings.garmin_daily_bmr || state.settings.garmin_daily_bmr < 2000) {
-    state.settings.garmin_daily_bmr = 2180;
+  if (!state.settings.garmin_daily_bmr || state.settings.garmin_daily_bmr < 1900) {
+    state.settings.garmin_daily_bmr = 2188;
     localStorage.setItem('ketotrack_settings', JSON.stringify(state.settings));
   }
 
@@ -5097,7 +5116,7 @@ function syncTodayToDailyHistory() {
     : JSON.parse(localStorage.getItem('ketotrack_meals') || '[]');
 
   const daysOfWeek = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  const dailyBmr = Number(state.settings?.garmin_daily_bmr) || 2185;
+  const dailyBmr = Number(state.settings?.garmin_daily_bmr) || 2188;
 
   // 1. Reconciliar macros de todos los días pasados ya presentes en history y sanear valores anómalos
   for (const h of history) {
