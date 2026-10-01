@@ -2047,8 +2047,10 @@ function calculateKetosisStateClient(meals, garmin, settings) {
   const currentProtocolDay = Math.max(1, diffDays + 1);
   const totalProtocolHours = Math.max(0.1, (now.getTime() - startDate.getTime()) / (3600 * 1000));
 
-  // 2. CARBOHIDRATOS NETOS EN ÚLTIMAS 24H Y TIEMPO TRANSCURRIDO DESDE CARBOS
-  let lastCarbTimestamp = null;
+  // 2. CARBOHIDRATOS NETOS EN ÚLTIMAS 24H Y CONTROL DE COMIDAS
+  let lastHighCarbTimestamp = null;
+  let lastHighCarbNet = 0;
+  let lastMealTimestamp = null;
   let lastMealNetCarbs = 0;
   let totalNetCarbsLast24h = 0;
   const oneDayAgo = now.getTime() - (24 * 60 * 60 * 1000);
@@ -2060,67 +2062,99 @@ function calculateKetosisStateClient(meals, garmin, settings) {
     if (mealTime >= oneDayAgo) {
       totalNetCarbsLast24h += Math.max(0, mealNet);
     }
-    if (mealNet >= 5) {
-      lastCarbTimestamp = new Date(rawTime || meal.timestamp);
+    if (rawTime) {
+      lastMealTimestamp = new Date(rawTime);
       lastMealNetCarbs = mealNet;
+    }
+    // Una comida solo genera pico insulínico significativo si aporta >= 15g netos en una sola ingesta
+    if (mealNet >= 15.0) {
+      lastHighCarbTimestamp = new Date(rawTime || meal.timestamp);
+      lastHighCarbNet = mealNet;
     }
   }
 
-  let hoursSinceCarbs = 18;
-  if (lastCarbTimestamp) {
-    hoursSinceCarbs = Math.max(0, (now.getTime() - lastCarbTimestamp.getTime()) / (3600 * 1000));
-  } else {
-    hoursSinceCarbs = Math.min(totalProtocolHours, 168);
-  }
+  const excessCarbs = Math.max(0, totalNetCarbsLast24h - netCarbTarget);
 
   // 3. MODELO BICOMPARTIMENTAL DE GLUCÓGENO v4.1 (DESACOPLAMIENTO FISIOLÓGICO Y CONSERVACIÓN DE MASA)
-  // A. Depósito Hepático (G_H): Capacidad 90-110g.
-  //    Drenado primordialmente por el SNC y eritrocitos a 2.5 g/h neta (3.8 consumo basal - 1.3 gluconeogénesis).
-  //    En volúmenes altos de esfuerzo muscular (Garmin), el recambio sistémico (Ciclo de Cori de lactato
-  //    y ciclo glucosa-alanina) añade un modesto reciclaje hepático (+0.1 a +0.4 g/h).
+  // A. Depósito Hepático (G_H): Capacidad 90-110g. Drenaje autónomo SNC: 2.5 g/h neta.
   //    Estequiometría: 1g glucosa -> 0.90g glucógeno anhidro. Extracción hepática de primer paso: ~25%.
-  const hepaticIntake = totalNetCarbsLast24h * 0.25 * 0.90;
-  const hoursToDrain = Math.min(hoursSinceCarbs, totalProtocolHours);
-  const indirectHepaticTurnover = Math.min(0.4, (activeCalories / 1500) * 0.4);
-  const basalHepaticDrain = (2.5 + indirectHepaticTurnover) * hoursToDrain;
-  const initialHepatic = currentProtocolDay > 3 ? 30.0 : 105.0;
-  const excessCarbs = Math.max(0, totalNetCarbsLast24h - netCarbTarget);
-  
-  let glycogenHepatic = Math.max(0, Math.min(110.0, initialHepatic + hepaticIntake - basalHepaticDrain));
-  if (excessCarbs > 0) {
-    glycogenHepatic = Math.min(110.0, glycogenHepatic + (excessCarbs * 0.25 * 0.90));
+  //    El stock basal inicial (105g) se agota a las 42 horas (105 / 2.5 = 42h, Día 2).
+  //    A partir del Día 3+, el hígado está vacío de origen y solo retiene lo no drenado de ingestas recientes.
+  let glycogenHepatic = 0.5;
+  if (totalProtocolHours < 42.0) {
+    const initialRemaining = Math.max(0, 105.0 - (2.5 * totalProtocolHours));
+    const intakeHepatic = totalNetCarbsLast24h * 0.25 * 0.90;
+    glycogenHepatic = Math.max(0.5, Math.min(110.0, initialRemaining + intakeHepatic));
+  } else {
+    // Día 3 en adelante: el stock basal previo es 0.
+    // Carbohidratos en exceso aumentan el glucógeno hepático; si están dentro de la meta keto (<25g),
+    // el drenaje basal de 2.5 g/h (60g/día) supera holgadamente el influjo hepático (~1.9g a 5.6g),
+    // manteniendo el depósito hepático en niveles basales mínimos (0.5g - 2.0g).
+    let hoursSinceLastMeal = 4.0;
+    if (lastMealTimestamp) {
+      hoursSinceLastMeal = Math.max(0, (now.getTime() - lastMealTimestamp.getTime()) / (3600 * 1000));
+    }
+    const recentPulse = Math.max(0, (lastMealNetCarbs * 0.25 * 0.90) - (2.5 * hoursSinceLastMeal));
+    const excessContribution = excessCarbs * 0.25 * 0.90;
+    glycogenHepatic = Math.max(0.5, Math.min(110.0, 0.5 + recentPulse + excessContribution));
   }
 
   // B. Depósito Muscular (G_M): Capacidad 300-500g (media 380g).
   //    Drenado por la contracción muscular local según telemetría de Garmin (Brooks Crossover Concept).
   //    Captación periférica en músculo esquelético: ~75%. Estequiometría: 1g glucosa -> 0.90g glucógeno anhidro.
   const muscularIntake = totalNetCarbsLast24h * 0.75 * 0.90;
-  const initialMuscular = currentProtocolDay > 3 ? 280.0 : 380.0;
+  const initialMuscular = currentProtocolDay > 3 ? 240.0 : 380.0;
   const glycolyticFraction = activeCalories > 500 ? 0.45 : 0.35;
   const muscularLocomotorDrain = (activeCalories * glycolyticFraction) / 4.0;
   const glycogenMuscular = Math.max(0, Math.min(450.0, initialMuscular + muscularIntake - muscularLocomotorDrain));
 
   // 4. DESINHIBICIÓN SIGMOIDAL DE CPT-1 (Cinética de Hill n=3, K=20g)
+  // McGarry & Foster (1980): F_CPT1 = 1 / (1 + (G_H / 20)^3)
   const F_CPT1 = 1.0 / (1.0 + Math.pow(glycogenHepatic / 20.0, 3.0));
 
-  // Latencia insulínica por ingesta de carbohidratos
-  let suppressionHours = 0;
-  if (lastMealNetCarbs > 15.0) {
-    suppressionHours = 2.0 + ((lastMealNetCarbs - 15.0) / 15.0);
-  }
-  const isLipolysisSuppressed = hoursSinceCarbs < suppressionHours;
-  const effectiveFasting = Math.max(0, hoursSinceCarbs - suppressionHours);
-  const fastingModulator = 1.0 - Math.exp(-effectiveFasting / 6.0);
+  // 5. FARMACOCINÉTICA INSULÍNICA Y ACLARAMIENTO GLUT4 (Jensen 2011)
+  // Solo se activa supresión si hay exceso de carbohidratos (exceso sobre meta o comida masiva >= 15g)
+  let isLipolysisSuppressed = false;
+  let suppressionHoursRemaining = 0;
 
-  // Estimación Probabilística de BOHB con Intervalo de Confianza (95% CI)
-  const bohbCenter = 0.15 + (F_CPT1 * 2.2 * fastingModulator);
+  if (excessCarbs > 0 || lastHighCarbNet >= 15.0) {
+    const bolusExcess = Math.max(excessCarbs, lastHighCarbNet - 15.0);
+    const tBase = 2.0 + (bolusExcess / 15.0);
+    
+    // Aceleración por contracción muscular (GLUT4 independiente de insulina vía AMPK/CaMKII)
+    const stepsFactor = (steps / 5000.0) * 0.6;
+    const calFactor = (activeCalories / 300.0) * 0.4;
+    const fGlut4 = 1.0 + Math.min(1.5, stepsFactor + calFactor);
+    const tActive = Math.round((tBase / fGlut4) * 10) / 10;
+
+    let hoursSinceHighCarb = 24.0;
+    if (lastHighCarbTimestamp) {
+      hoursSinceHighCarb = Math.max(0, (now.getTime() - lastHighCarbTimestamp.getTime()) / (3600 * 1000));
+    }
+
+    if (hoursSinceHighCarb < tActive) {
+      isLipolysisSuppressed = true;
+      suppressionHoursRemaining = Math.round((tActive - hoursSinceHighCarb) * 10) / 10;
+    }
+  }
+
+  // 6. CETO-ADAPTACIÓN DEL PROTOCOLO Y ESTIMACIÓN DE BOHB (NIH Kevin Hall / Cahill)
+  // La síntesis enzimática mitocondrial de HMGCS2 y BDH1 escala con las horas totales de protocolo
+  const protocolAdaptation = 1.0 - Math.exp(-totalProtocolHours / 20.0);
+
+  // Concentración plasmática central de BOHB
+  let bohbCenter = 0.15 + (F_CPT1 * 2.2 * protocolAdaptation);
+  if (isLipolysisSuppressed) {
+    bohbCenter = Math.max(0.20, bohbCenter * 0.35);
+  }
+
   const bohbMargin = 0.25;
   const bohbMin = Math.max(0.10, Math.round((bohbCenter - bohbMargin) * 10) / 10);
   const bohbMax = Math.min(3.50, Math.round((bohbCenter + bohbMargin) * 10) / 10);
   const estimatedKetones = Math.round(bohbCenter * 10) / 10;
   const formattedRange = `${bohbMin.toFixed(1)} - ${bohbMax.toFixed(1)} mmol/L`;
 
-  // 5. DETERMINACIÓN DE FASES CIENTÍFICAS
+  // 7. DETERMINACIÓN DE FASES CIENTÍFICAS
   let phase = 1;
   let phaseName = 'Día ' + currentProtocolDay + ': Fase Basal (Glucolítica)';
   let phaseDesc = 'Glucógeno hepático > 30g. CPT-1 inhibida por Malonil-CoA. El cuerpo consume glucosa.';
@@ -2129,14 +2163,14 @@ function calculateKetosisStateClient(meals, garmin, settings) {
   let nextPhaseThreshold = 0.2;
   let timeToNextPhaseHours = 0;
 
-  if (excessCarbs >= 25 || isLipolysisSuppressed) {
+  if (isLipolysisSuppressed) {
     phase = 1;
     phaseName = 'Pausa Metabólica (Aclaramiento Insulínico)';
     phaseDesc = 'Insulina circulante activa por ingesta de carbohidratos. El ejercicio activa GLUT4 para acelerar el retorno a lipólisis.';
     statusColor = '#ef4444';
-    nextPhaseName = 'Fase 2: Inducción';
-    nextPhaseThreshold = 0.2;
-    timeToNextPhaseHours = Math.round(Math.max(0.5, suppressionHours - hoursSinceCarbs) * 10) / 10;
+    nextPhaseName = 'Retorno a Cetosis';
+    nextPhaseThreshold = 0.5;
+    timeToNextPhaseHours = suppressionHoursRemaining;
   } else if (glycogenHepatic > 30.0) {
     phase = 1;
     phaseName = 'Día ' + currentProtocolDay + ': Fase Basal (Vaciado Hepático)';
@@ -2145,14 +2179,14 @@ function calculateKetosisStateClient(meals, garmin, settings) {
     nextPhaseName = 'Fase 2: Inducción';
     nextPhaseThreshold = 0.2;
     timeToNextPhaseHours = Math.round(((glycogenHepatic - 30.0) / 2.5) * 10) / 10;
-  } else if (glycogenHepatic > 3.0) {
+  } else if (glycogenHepatic > 3.0 || estimatedKetones < 0.5) {
     phase = 2;
     phaseName = 'Día ' + currentProtocolDay + ': Cetosis Inicial (Inducción)';
     phaseDesc = 'Glucógeno hepático < 30g. CPT-1 desinhibida al ' + Math.round(F_CPT1 * 100) + '%. Beta-oxidación en aceleración.';
     statusColor = '#f59e0b';
     nextPhaseName = 'Fase 3: Cetosis Óptima';
     nextPhaseThreshold = 0.5;
-    timeToNextPhaseHours = Math.round((glycogenHepatic / 2.5) * 10) / 10;
+    timeToNextPhaseHours = Math.round((Math.max(glycogenHepatic, 1.0) / 2.5) * 10) / 10;
   } else if (estimatedKetones < 1.5) {
     phase = 3;
     phaseName = 'Día ' + currentProtocolDay + ': Cetosis Óptima (Quema Lipídica Plena)';
@@ -2171,7 +2205,7 @@ function calculateKetosisStateClient(meals, garmin, settings) {
     timeToNextPhaseHours = 0;
   }
 
-  // 6. CONTROL DEL RELOJ REGRESIVO
+  // 8. CONTROL DEL RELOJ REGRESIVO
   let targetNextPhaseDate = null;
   if (timeToNextPhaseHours > 0) {
     targetNextPhaseDate = new Date(now.getTime() + (timeToNextPhaseHours * 3600 * 1000));
@@ -2214,7 +2248,7 @@ function calculateKetosisStateClient(meals, garmin, settings) {
     glycogenMuscularGrams: Math.round(glycogenMuscular * 10) / 10,
     cpt1InductionFactor: Math.round(F_CPT1 * 1000) / 1000,
     depletionPercent,
-    hoursFastingOrKeto: Math.round(hoursSinceCarbs * 10) / 10,
+    hoursFastingOrKeto: Math.round(totalProtocolHours * 10) / 10,
     garminImpact: {
       steps,
       activeCalories,
