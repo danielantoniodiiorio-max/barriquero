@@ -214,13 +214,13 @@ body {
 .ketosis-gauge-wrap {
   display: flex;
   align-items: center;
-  gap: 18px;
-  margin: 8px 0;
+  gap: 16px;
+  margin: 10px 0;
 }
 
 .gauge-circle {
-  width: 106px;
-  height: 106px;
+  width: 118px;
+  height: 118px;
   border-radius: 50%;
   background: conic-gradient(var(--accent-green) 0deg 280deg, var(--card-border) 280deg 360deg);
   display: flex;
@@ -244,8 +244,8 @@ body {
 }
 
 .gauge-inner {
-  width: 84px;
-  height: 84px;
+  width: 94px;
+  height: 94px;
   border-radius: 50%;
   background: radial-gradient(circle at center, #1e293b 20%, #0b1120 100%);
   display: flex;
@@ -253,12 +253,12 @@ body {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 4px;
+  padding: 6px;
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.65);
 }
 
 .ketone-val {
-  font-size: 1.55rem;
+  font-size: 1.75rem;
   font-weight: 900;
   line-height: 1;
   color: #f8fafc;
@@ -269,19 +269,42 @@ body {
 }
 
 .ketone-unit {
-  font-size: 0.62rem;
+  font-size: 0.66rem;
   color: #94a3b8;
-  margin-top: 1px;
+  margin-top: 2px;
   text-align: center;
   font-weight: 700;
   letter-spacing: 0.4px;
   display: block;
 }
 
+.gauge-details {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .gauge-details h3 {
   font-size: 0.95rem;
   font-weight: 700;
   margin-bottom: 4px;
+}
+
+.gauge-range-badge {
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 6px;
+  padding: 3px 8px;
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
 }
 
 .text-muted {
@@ -718,12 +741,12 @@ body {
 
 /* Subtag y Chip en Gauge */
 .ketone-sublabel {
-  font-size: 0.52rem;
-  font-weight: 800;
-  color: #64748b;
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: #94a3b8;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-top: 2px;
+  margin-top: 3px;
   text-align: center;
   width: 100%;
   display: block;

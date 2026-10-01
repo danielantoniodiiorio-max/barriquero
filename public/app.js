@@ -2836,7 +2836,12 @@ function renderDashboard(data) {
 
   const elKetoneRange = document.getElementById('lblKetoneRange');
   if (elKetoneRange) {
-    elKetoneRange.textContent = ketosis.formattedRange ? `Rango estimado: ${ketosis.formattedRange}` : '';
+    if (ketosis.formattedRange) {
+      elKetoneRange.textContent = `🎯 Rango: ${ketosis.formattedRange}`;
+      elKetoneRange.style.display = 'inline-flex';
+    } else {
+      elKetoneRange.style.display = 'none';
+    }
   }
 
   const elPhaseTitle = document.getElementById('txtPhaseTitle');
