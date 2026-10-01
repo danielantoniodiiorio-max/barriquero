@@ -2073,14 +2073,16 @@ function calculateKetosisStateClient(meals, garmin, settings) {
     hoursSinceCarbs = Math.min(totalProtocolHours, 168);
   }
 
-  // 3. MODELO BICOMPARTIMENTAL DE GLUCÓGENO v4.1 (DESACOPLAMIENTO ESTRICTO Y CONSERVACIÓN DE MASA)
+  // 3. MODELO BICOMPARTIMENTAL DE GLUCÓGENO v4.1 (DESACOPLAMIENTO FISIOLÓGICO Y CONSERVACIÓN DE MASA)
   // A. Depósito Hepático (G_H): Capacidad 90-110g.
-  //    Drenado EXCLUSIVAMENTE por el SNC y eritrocitos a 2.5 g/h neta (3.8 consumo basal - 1.3 gluconeogénesis).
-  //    ¡Ningún paso ni ejercicio de Garmin drena este compartimento!
+  //    Drenado primordialmente por el SNC y eritrocitos a 2.5 g/h neta (3.8 consumo basal - 1.3 gluconeogénesis).
+  //    En volúmenes altos de esfuerzo muscular (Garmin), el recambio sistémico (Ciclo de Cori de lactato
+  //    y ciclo glucosa-alanina) añade un modesto reciclaje hepático (+0.1 a +0.4 g/h).
   //    Estequiometría: 1g glucosa -> 0.90g glucógeno anhidro. Extracción hepática de primer paso: ~25%.
   const hepaticIntake = totalNetCarbsLast24h * 0.25 * 0.90;
   const hoursToDrain = Math.min(hoursSinceCarbs, totalProtocolHours);
-  const basalHepaticDrain = 2.5 * hoursToDrain;
+  const indirectHepaticTurnover = Math.min(0.4, (activeCalories / 1500) * 0.4);
+  const basalHepaticDrain = (2.5 + indirectHepaticTurnover) * hoursToDrain;
   const initialHepatic = currentProtocolDay > 3 ? 30.0 : 105.0;
   const excessCarbs = Math.max(0, totalNetCarbsLast24h - netCarbTarget);
   
@@ -2781,18 +2783,21 @@ function renderPersonalizedScienceModal(data) {
         <div style="font-weight: 700; color: #10b981; margin-bottom: 4px;">
           2. Desacoplamiento Bicompartimental de Glucógeno (Jensen 2011 / Cahill 2006)
         </div>
-        • <strong>Glucógeno Hepático (G_H):</strong> <strong>~${remHepatic}g restantes</strong> (de 110g máx). Mantenimiento exclusivo de euglucemia SNC/eritrocitos a tasa neta de <strong>2.5 g/h</strong> (3.8 g/h basal - 1.3 g/h gluconeogénesis). Ningún paso ni caloría de Garmin vacía este depósito.<br>
-        • <strong>Glucógeno Muscular (G_M):</strong> <strong>~${remMuscular}g restantes</strong> (de 450g máx). Drenado exclusivamente por contracción muscular y actividad física de tu reloj Garmin.
+        • <strong>Glucógeno Hepático (G_H):</strong> <strong>~${remHepatic}g restantes</strong> (de 110g máx). Destinado prioritariamente a la euglucemia basal de SNC y eritrocitos (~2.5 g/h neta). El combustible locomotor directo de los pasos es el glucógeno muscular; ante volúmenes elevados de ejercicio, el recambio sistémico (Ciclo de Cori y alanina) añade una modesta demanda hepática de reciclaje.<br>
+        • <strong>Glucógeno Muscular (G_M):</strong> <strong>~${remMuscular}g restantes</strong> (de 450g máx). Combustible locomotor local drenado directamente por la contracción muscular y el esfuerzo medido por Garmin.
       </div>
 
       <!-- 3. CINÉTICA DE HILL CPT-1 Y BOHB -->
       <div style="background: rgba(255,255,255,0.03); border-radius: 8px; padding: 10px; margin-bottom: 10px; font-size: 0.8rem; line-height: 1.5; color: #cbd5e1;">
         <div style="font-weight: 700; color: #f59e0b; margin-bottom: 4px;">
-          3. Cinética Sigmoidal de Hill para CPT-1 e Intervalo BOHB (Hill n=3, K=20g)
+          3. Cinética Sigmoidal de Hill para CPT-1 y Rango Probable de BOHB
         </div>
         • Desinhibición CPT-1: <code>F_CPT1 = 1 / (1 + (G_H / 20)³) = ${cpt1Pct}%</code>.<br>
-        • Concentración Central de BOHB: <strong style="color: #f59e0b;">${bohbCenter} mmol/L</strong>.<br>
-        • Intervalo de Confianza del 95%: <strong>${bohbRange}</strong> (refleja la variabilidad analítica y biológica en sangre capilar).
+        • Nivel Central Estimado: <strong style="color: #f59e0b;">~${bohbCenter} mmol/L</strong>.<br>
+        • <strong>Rango Probable (IC 95%): ${bohbRange}</strong>.<br>
+        <span style="font-size: 0.72rem; color: #94a3b8; font-style: italic;">
+          *Nota biofísica: Es una estimación orientativa in silico. En sangre capilar real el valor puede fluctuar (ej. 1.8 a 2.6 mM) según hidratación, ritmo circadiano de cortisol y hora del test.
+        </span>
       </div>
 
       <!-- 4. BALANCE DE MASA GRASA Y AGUA OSMÓTICA -->
