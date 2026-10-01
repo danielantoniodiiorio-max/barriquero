@@ -119,6 +119,7 @@
               <span class="ketone-val" id="valEstimatedKetones">0.3</span>
               <span class="ketone-unit">mmol/L</span>
               <span class="ketone-sublabel">Cetonas en Sangre</span>
+              <span class="ketone-range" id="lblKetoneRange" style="font-size: 0.72rem; color: #94a3b8; display: block; margin-top: 2px;">IC 95%: 0.1 - 0.4 mM</span>
             </div>
           </div>
           <div class="gauge-details">
@@ -223,43 +224,43 @@
           </div>
         </div>
 
-        <!-- TARJETA CIENTÍFICA DE QUEMA DE GRASA CORPORAL (DÉFICIT + PLUS CETOGÉNICO) -->
+        <!-- TARJETA CIENTÍFICA DE QUEMA DE GRASA CORPORAL (MODELO NIH KEVIN HALL) -->
         <div class="fat-burn-card" id="cardFatBurnBreakdown">
           <div class="fat-burn-header">
             <div class="fat-burn-title-row">
-              <span class="fat-burn-icon">🔥</span>
+              <span class="fat-burn-icon">🔬</span>
               <div>
-                <h3 class="fat-burn-heading">Quema de Grasa Corporal</h3>
-                <span class="fat-burn-sub" id="txtFatBurnSub">Déficit calórico + Plus por cetogénesis</span>
+                <h3 class="fat-burn-heading">Oxidación de Grasa y Tejido Adiposo</h3>
+                <span class="fat-burn-sub" id="txtFatBurnSub">Modelo bioenergético NIH (Kevin Hall) • RER dinámico</span>
               </div>
             </div>
-            <span class="fat-burn-badge" id="badgeKetoStageBonus">⚡ +210 kcal ventaja</span>
+            <span class="fat-burn-badge" id="badgeKetoStageBonus">🔬 Consenso NIH</span>
           </div>
 
           <div class="fat-burn-grid">
-            <!-- Por Déficit Calórico -->
+            <!-- Grasa Pura (9.1 kcal/g) -->
             <div class="fat-burn-col deficit-col">
-              <span class="fat-burn-col-label">📉 Por Déficit</span>
+              <span class="fat-burn-col-label">📉 Grasa Pura (9.1 kcal/g)</span>
               <span class="fat-burn-col-value" id="valFatLossDeficit">-0 g</span>
-              <span class="fat-burn-col-sub" id="subFatLossDeficit">0 kcal de déficit Garmin</span>
+              <span class="fat-burn-col-sub" id="subFatLossDeficit">Triglicéridos anhidros</span>
             </div>
 
-            <!-- Símbolo + -->
-            <div class="fat-burn-plus-symbol">+</div>
+            <!-- Símbolo ~ -->
+            <div class="fat-burn-plus-symbol" style="font-size: 1.1rem; color: #94a3b8;">~</div>
 
-            <!-- Plus Cetogénico -->
+            <!-- Tejido Adiposo Humano (7.7 kcal/g) -->
             <div class="fat-burn-col keto-col">
-              <span class="fat-burn-col-label">⚡ Plus Cetogénico</span>
+              <span class="fat-burn-col-label">🧬 Tejido Adiposo (7.7 kcal/g)</span>
               <span class="fat-burn-col-value" id="valFatLossKeto">-0 g</span>
-              <span class="fat-burn-col-sub" id="subFatLossKeto">+0 kcal (BMJ / FASTER)</span>
+              <span class="fat-burn-col-sub" id="subFatLossKeto">Tejido bruto hidratado</span>
             </div>
           </div>
 
           <!-- Total de Quema Diaria -->
           <div class="fat-burn-total-row">
             <div class="fat-burn-total-label">
-              <span>🏆 Quema Total Estimada Hoy:</span>
-              <small id="subFatLossEffectiveBurn">Gasto total efectivo: 0 kcal</small>
+              <span>🏆 Quema Neta de Grasa Hoy:</span>
+              <small id="subFatLossEffectiveBurn">Déficit calórico real • Agua osmótica (3:1)</small>
             </div>
             <div class="fat-burn-total-val" id="valFatLossTotal">-0 g</div>
           </div>
@@ -524,12 +525,12 @@
           </div>
         </div>
 
-        <!-- WIDGET DE PASOS PARA MANTENER LA CETOSIS EN CASO DE EXCESO DE CARBOHIDRATOS -->
+        <!-- WIDGET DE ACLARAMIENTO GLUT4 EN EXCESO DE CARBOHIDRATOS -->
         <div class="steps-garmin-section" id="cardStepsKeto" style="margin: 16px 0;">
           <div class="section-title">
             <div>
-              <h3>🎯 Pasos para Mantener la Cetosis</h3>
-              <span class="sub-personal">Pasos necesarios en caso de exceder tu límite de carbohidratos</span>
+              <h3>⚡ Aclaramiento Muscular GLUT4 (Postprandial)</h3>
+              <span class="sub-personal">Translocación no dependiente de insulina mediada por contracción muscular (AMPK)</span>
             </div>
             <span class="badge" id="badgeStepStatus">Analizando...</span>
           </div>
@@ -540,7 +541,7 @@
                 <span class="step-big-val" id="valCurrentStepsKeto">0</span>
                 <span class="step-divider" id="stepDividerSlash">/</span>
                 <span class="step-target-val" id="valTargetStepsKeto">0</span>
-                <span class="step-unit" id="stepUnitText">pasos requeridos</span>
+                <span class="step-unit" id="stepUnitText">pasos recomendados</span>
               </div>
               <div class="step-percent-tag" id="valStepPercent">En Meta</div>
             </div>
@@ -550,13 +551,13 @@
             </div>
 
             <div class="steps-feedback-box" id="boxStepsFeedback">
-              <div class="feedback-title" id="txtStepFeedbackTitle">Calculando requerimiento...</div>
+              <div class="feedback-title" id="txtStepFeedbackTitle">Calculando aclaramiento...</div>
               <div class="feedback-desc" id="txtStepFeedbackDesc">Conectando con tu reloj Garmin...</div>
             </div>
           </div>
 
           <div class="steps-science-footnote">
-            <span>📐 Modelo ACSM: ~292 pasos por cada gramo neto de carbohidrato excedente para neutralizarlo antes de rellenar el glucógeno.</span>
+            <span>🔬 Fisiología Muscular (Jensen / Brooks): La contracción muscular activa transportadores GLUT4 independientes de insulina vía AMPK/CaMKII, acelerando el aclaramiento glucídico y acortando las horas de inhibición de CPT-1.</span>
           </div>
         </div>
 
