@@ -46,9 +46,70 @@
       </div>
     </header>
 
-    <!-- PESTAÑA 1: ESTADO (DASHBOARD REDISEÑADO CON FUEGO, CUENTA REGRESIVA Y PASOS DE CETOSIS) -->
+    <!-- PESTAÑA 1: ESTADO (DASHBOARD PERSONALIZABLE SEGÚN DIETA Y OBJETIVO) -->
     <main id="tab-dashboard" class="tab-pane active">
-      <!-- Tarjeta Dinámica de Cetosis (Limpia, Elegante y Enfocada) -->
+      <!-- BANNER SUPERIOR DE PROGRAMA Y DIETA ACTIVA -->
+      <div class="active-program-banner" id="bannerActiveProgram" role="button" tabindex="0" title="Toca para cambiar de dieta u objetivo">
+        <div class="program-banner-left">
+          <span class="program-banner-icon" id="bannerProgramIcon">🥑</span>
+          <div class="program-banner-info">
+            <div class="program-banner-title">
+              <span id="bannerProgramGoal">Pérdida de Grasa</span>
+              <span class="program-banner-diet-tag" id="bannerProgramDiet">Keto Estándar</span>
+            </div>
+            <span class="program-banner-sub" id="bannerProgramMacros">Meta: 1.800 kcal • 140g P • 25g C • 130g G</span>
+          </div>
+        </div>
+        <span class="program-banner-action">⚙️ Cambiar</span>
+      </div>
+
+      <!-- TARJETA HERO DE RENDIMIENTO FITNESS Y METABOLISMO (DIETAS NO-KETO) -->
+      <section class="card fitness-hero-card" id="cardFitnessPerformance" style="display: none;">
+        <div class="fitness-hero-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.4rem;" id="fitnessHeroIcon">🏋️</span>
+            <div>
+              <h3 style="margin: 0; font-size: 1.05rem; color: #f8fafc;" id="fitnessHeroTitle">Modo Fitness &amp; Hipertrofia</h3>
+              <span style="font-size: 0.72rem; color: #94a3b8;" id="fitnessHeroSubtitle">Ruta Anabólica mTORC1 y Glucólisis Activa</span>
+            </div>
+          </div>
+          <span class="fitness-hero-badge" id="fitnessHeroBadge">MPS Activo</span>
+        </div>
+
+        <!-- 3 Métricas Clave de Fitness -->
+        <div class="fitness-metrics-grid">
+          <div class="fitness-metric-box">
+            <span class="fitness-metric-lbl">🥩 Síntesis Proteica</span>
+            <div class="fitness-metric-val" id="valFitnessProteinGPerKg" style="color: #38bdf8;">0.0 <small style="font-size: 0.7rem;">g/kg</small></div>
+            <span class="fitness-metric-lbl" id="lblFitnessProteinTarget">Meta: 2.2 g/kg</span>
+          </div>
+
+          <div class="fitness-metric-box">
+            <span class="fitness-metric-lbl">🌾 Glucógeno Muscular</span>
+            <div class="fitness-metric-val" id="valFitnessCarbsStatus" style="color: #f59e0b;">0 <small style="font-size: 0.7rem;">g</small></div>
+            <span class="fitness-metric-lbl" id="lblFitnessCarbsTarget">Meta: 210g peri-entreno</span>
+          </div>
+
+          <div class="fitness-metric-box">
+            <span class="fitness-metric-lbl">⚡ Balance Energético</span>
+            <div class="fitness-metric-val" id="valFitnessEnergyBalance" style="color: #34d399;">+0 <small style="font-size: 0.7rem;">kcal</small></div>
+            <span class="fitness-metric-lbl" id="lblFitnessEnergyTarget">Superávit / Déficit</span>
+          </div>
+        </div>
+
+        <!-- Barra de Progreso de Síntesis Proteica Muscular (MPS) -->
+        <div style="margin-top: 14px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 4px;">
+            <span style="color: #cbd5e1;">Proteína Ingerida Hoy (MPS &amp; Masa Magra): <strong id="lblFitnessProtSummary">0g / 180g</strong></span>
+            <span style="color: #38bdf8; font-weight: 700;" id="lblFitnessProtPercent">0%</span>
+          </div>
+          <div style="height: 7px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
+            <div id="barFitnessProtFill" style="height: 100%; width: 0%; background: linear-gradient(90deg, #38bdf8, #0284c7); border-radius: 4px; transition: width 0.3s ease;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tarjeta Dinámica de Cetosis (Limpia, Elegante y Enfocada para Dietas Keto) -->
       <section class="card ketosis-card" id="cardKetosisStatus">
         <div class="card-header" style="justify-content: flex-start;">
           <span class="badge" id="badgePhase">Día 1: En Proceso</span>
@@ -975,6 +1036,114 @@
           <!-- INFORME BIOENERGÉTICO Y MODELADO MATEMÁTICO INDIVIDUAL (v4.0) -->
           <div id="personalizedScienceContainer"></div>
 
+          <!-- GUÍA MÉDICA: MANIPULACIÓN DE MACRONUTRIENTES, RUTAS METABÓLICAS Y MODELOS DIETÉTICOS -->
+          <div class="science-source-box" style="border-color: rgba(56, 189, 248, 0.45); background: rgba(15, 23, 42, 0.9); margin-bottom: 24px;">
+            <div class="source-header">
+              <span class="source-badge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8;">Guía Médica y Nutricional</span>
+              <h3>Manipulación de Macronutrientes, Rutas Metabólicas y Modelos Dietéticos</h3>
+            </div>
+            <p style="font-size: 0.85rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 12px;">
+              La manipulación de los macronutrientes modifica las rutas metabólicas, la señalización hormonal y la partición de nutrientes según el balance energético total. A continuación, se detallan las configuraciones según el objetivo físico y los modelos dietéticos estructurados por su composición de macros:
+            </p>
+
+            <!-- 1. Distribución de macros según el objetivo físico -->
+            <h4 style="color: #38bdf8; font-size: 0.92rem; margin: 14px 0 8px 0; border-bottom: 1px solid rgba(56, 189, 248, 0.25); padding-bottom: 4px;">
+              1. Distribución de macros según el objetivo físico (en g/kg de peso corporal)
+            </h4>
+            <ul style="font-size: 0.82rem; color: #cbd5e1; line-height: 1.55; margin-left: 18px;">
+              <li style="margin-bottom: 8px;">
+                <strong>Pérdida de grasa preservando masa muscular (Déficit / Definición):</strong>
+                <br>• <em>Proteína (1,8 a 2,5 g/kg — aprox. 30-40% de las calorías):</em> Al haber restricción calórica, el cuerpo incrementa la degradación proteica; una ingesta elevada maximiza la síntesis de proteína muscular (MPS), previene la sarcopenia por déficit y aprovecha el efecto térmico de los alimentos (TEF, donde el cuerpo gasta el 20-30% de la energía de la proteína solo en digerirla).
+                <br>• <em>Carbohidratos (2,0 a 3,5 g/kg — aprox. 30-40%):</em> Se concentran en torno al entrenamiento (peri-entreno) para reponer glucógeno muscular básico y permitir sostener la intensidad en ejercicios de fuerza (el principal estímulo de retención muscular).
+                <br>• <em>Grasas (0,6 a 0,9 g/kg — aprox. 20-25%):</em> Nivel funcional indispensable para la síntesis de hormonas esteroideas (testosterona, estrógenos) y absorción de vitaminas liposolubles (A, D, E, K).
+                <br>• <em>Efecto generado:</em> Lipólisis neta acelerada con movilización de triglicéridos adiposos, mínima pérdida de tejido magro y alto control del apetito mediante la elevación de péptidos de saciedad (GLP-1, PYY).
+              </li>
+              <li style="margin-bottom: 8px;">
+                <strong>Aumento de peso y masa muscular (Superávit / Hipertrofia):</strong>
+                <br>• <em>Proteína (1,6 a 2,2 g/kg — aprox. 20-25%):</em> El superávit energético es de por sí anticatabólico, por lo que niveles superiores a 2,2 g/kg no muestran mayor síntesis muscular.
+                <br>• <em>Carbohidratos (4,0 a 7,0 g/kg — aprox. 45-55%):</em> Es el macro prioritario. Eleva los depósitos de glucógeno, reduce la fatiga del sistema nervioso central y genera picos fisiológicos de insulina que facilitan el entorno anabólico y la recuperación de fibras musculares.
+                <br>• <em>Grasas (1,0 a 1,5 g/kg — aprox. 25-30%):</em> Aportan densidad calórica (9 kcal/g) para alcanzar el superávit sin saturar el volumen gastrointestinal.
+                <br>• <em>Efecto generado:</em> Estado anabólico continuo, máxima tasa de reposición de glucógeno, balance nitrogenado positivo y progresiva ganancia de masa magra con una acumulación controlada de tejido adiposo.
+              </li>
+              <li style="margin-bottom: 8px;">
+                <strong>Recomposición corporal (Ganar músculo y perder grasa a la vez):</strong>
+                <br>• <em>Distribución:</em> Calorías en mantenimiento o déficit ligero (-5% a -10%), con proteína muy alta (<strong>2,2 a 2,6 g/kg</strong>) y ciclado de carbohidratos (moderados/altos los días de entrenamiento de fuerza, bajos los días de descanso compensando con grasas saludables).
+                <br>• <em>Efecto generado:</em> La grasa corporal se oxida como sustrato energético endógeno para cubrir el gasto celular, mientras que el alto flujo de aminoácidos y el estímulo mecánico de fuerza sostienen la hipertrofia.
+              </li>
+            </ul>
+
+            <!-- 2. Tabla comparativa de dietas nutricionales -->
+            <h4 style="color: #10b981; font-size: 0.92rem; margin: 16px 0 8px 0; border-bottom: 1px solid rgba(16, 185, 129, 0.25); padding-bottom: 4px;">
+              2. Dietas nutricionales según su composición de macros
+            </h4>
+            <div style="overflow-x: auto; margin: 10px 0;">
+              <table style="width: 100%; border-collapse: collapse; font-size: 0.76rem; color: #cbd5e1; min-width: 550px;">
+                <thead>
+                  <tr style="background: rgba(30, 41, 59, 0.8); border-bottom: 1.5px solid rgba(56, 189, 248, 0.3);">
+                    <th style="padding: 7px 6px; text-align: left; color: #38bdf8;">Dieta</th>
+                    <th style="padding: 7px 6px; text-align: left; color: #38bdf8;">Distribución (% P / C / G)</th>
+                    <th style="padding: 7px 6px; text-align: left; color: #38bdf8;">Mecanismo metabólico</th>
+                    <th style="padding: 7px 6px; text-align: left; color: #38bdf8;">Efecto fisiológico y corporal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                    <td style="padding: 8px 6px; font-weight: 700; color: #34d399;">Cetogénica (Keto estándar)</td>
+                    <td style="padding: 8px 6px;"><strong>20-25% P / 5% C / 70-75% G</strong> (&lt;30-50g carbohidratos netos)</td>
+                    <td style="padding: 8px 6px;">Depleción de glucógeno hepático; cambio de sustrato hacia cuerpos cetónicos (BOHB y acetoacetato).</td>
+                    <td style="padding: 8px 6px;">Supresión notable del apetito, estabilidad glucémica; puede mermar esfuerzos anaeróbicos glucolíticos máximos.</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+                    <td style="padding: 8px 6px; font-weight: 700; color: #34d399;">Keto alta en proteínas</td>
+                    <td style="padding: 8px 6px;"><strong>30-35% P / 5% C / 60-65% G</strong></td>
+                    <td style="padding: 8px 6px;">Cetosis moderada con aporte suficiente de aminoácidos para síntesis estructural.</td>
+                    <td style="padding: 8px 6px;">Mejor preservación muscular que la keto estándar durante la pérdida de grasa; saciedad extrema.</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                    <td style="padding: 8px 6px; font-weight: 700; color: #38bdf8;">Low Carb (Baja en carbos)</td>
+                    <td style="padding: 8px 6px;"><strong>25-35% P / 15-25% C / 45-50% G</strong> (50-130g carbohidratos)</td>
+                    <td style="padding: 8px 6px;">Reducción de la demanda de insulina sin inducir necesariamente cetosis metabólica continua.</td>
+                    <td style="padding: 8px 6px;">Flexibilidad metabólica, reducción de retención hídrica inicial, alta adherencia.</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+                    <td style="padding: 8px 6px; font-weight: 700; color: #f59e0b;">Alta en Proteínas / Fitness (Culturismo)</td>
+                    <td style="padding: 8px 6px;"><strong>30-40% P / 40-50% C / 15-25% G</strong></td>
+                    <td style="padding: 8px 6px;">Cobertura simultánea de síntesis proteica máxima y repleción de glucógeno para contracciones intensas.</td>
+                    <td style="padding: 8px 6px;">Estándar de oro para recomposición, ganancia de masa magra o definición deportiva con entrenamiento de cargas.</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+                    <td style="padding: 8px 6px; font-weight: 700; color: #c084fc;">Dieta de la Zona (40-30-30)</td>
+                    <td style="padding: 8px 6px;"><strong>30% P / 40% C / 30% G</strong></td>
+                    <td style="padding: 8px 6px;">Modulación hormonal de la relación insulina/glucagón y eicosanoides celulares en cada ingesta.</td>
+                    <td style="padding: 8px 6px;">Niveles de energía constantes, reducción de marcadores inflamatorios y buen balance para deportes funcionales.</td>
+                  </tr>
+                  <tr style="border-bottom: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.02);">
+                    <td style="padding: 8px 6px; font-weight: 700; color: #38bdf8;">Alta en Carbos / Baja en Grasas (HCLF)</td>
+                    <td style="padding: 8px 6px;"><strong>15-20% P / 55-65% C / 15-20% G</strong></td>
+                    <td style="padding: 8px 6px;">Priorización de glucólisis aeróbica y fosforilación oxidativa a partir de carbohidratos.</td>
+                    <td style="padding: 8px 6px;">Máximo rendimiento y volumen en deportes de resistencia prolongada (ciclismo, maratón).</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 6px; font-weight: 700; color: #34d399;">Equilibrada Estándar (Mediterránea / IIFYM)</td>
+                    <td style="padding: 8px 6px;"><strong>15-25% P / 45-55% C / 25-35% G</strong></td>
+                    <td style="padding: 8px 6px;">Balance equilibrado de sustratos energéticos sin restricciones severas de grupos de alimentos.</td>
+                    <td style="padding: 8px 6px;">Sostenibilidad a largo plazo, salud cardiovascular y flexibilidad psicosocial.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- 3. Rol metabólico específico de cada macronutriente -->
+            <h4 style="color: #f59e0b; font-size: 0.92rem; margin: 16px 0 8px 0; border-bottom: 1px solid rgba(245, 158, 11, 0.25); padding-bottom: 4px;">
+              3. Rol metabólico específico de cada macronutriente
+            </h4>
+            <ul style="font-size: 0.82rem; color: #cbd5e1; line-height: 1.55; margin-left: 18px;">
+              <li><strong>Proteínas:</strong> No se utilizan principalmente como fuente energética sino estructural. Aportan aminoácidos esenciales (como la leucina) para activar la vía mTORC1 responsable del crecimiento muscular. Tienen la menor eficiencia calórica neta debido a su alto costo de procesamiento digestivo (TEF 20-30%).</li>
+              <li><strong>Carbohidratos:</strong> Son el combustible más eficiente para esfuerzos de media y alta intensidad (vía anaeróbica láctica y glucólisis rápida). Además de reponer el glucógeno celular (que retiene aproximadamente 3 g de agua por gramo de glucógeno en el músculo), previenen que el organismo utilice los aminoácidos del músculo para gluconeogénesis.</li>
+              <li><strong>Grasas:</strong> Regulan la absorción de nutrientes y la fluidez de las membranas celulares, aportando ácidos grasos esenciales (Omega-3 y Omega-6). Retrasan el vaciado gástrico, prolongando la sensación de saciedad entre comidas.</li>
+            </ul>
+          </div>
+
           <p class="intro-science">
             Los algoritmos de cálculo metabólico, progresión longitudinal de cetosis, gasto calórico y compensación por pasos de <strong>Barriketo</strong> están rigurosamente fundamentados en investigaciones clínicas y consensos de los organismos de salud y nutrición líderes mundiales:
           </p>
@@ -1103,97 +1272,305 @@
       </div>
     </div>
 
-    <!-- MODAL DE CONFIGURACIÓN Y PERFIL PERSONALIZADO -->
+    <!-- MODAL DE CONFIGURACIÓN Y PERFIL PERSONALIZADO MULTI-DIETA -->
     <div id="settingsModal" class="modal-backdrop">
-      <div class="modal-card">
+      <div class="modal-card" style="max-width: 580px;">
         <div class="modal-header">
-          <h2>Perfil y Objetivos Keto</h2>
+          <div>
+            <h2>⚙️ Perfil y Programa Nutricional</h2>
+            <span class="subtext">Biometría, Objetivos Físicos y Modelos Dietéticos</span>
+          </div>
           <button id="btnCloseSettingsModal" class="btn-close">&times;</button>
         </div>
         <form id="formSettings">
-          <h3>Protocolo Cetogénico y Fechas</h3>
-          <p class="small text-muted">Establece el inicio de tu protocolo para calcular el Día 1, 2, 3... y la entrada a cetosis.</p>
+
+          <!-- 1. MEDIDAS BIOLÓGICAS INDIVIDUALES -->
+          <h3>1. Medidas Biológicas Corporales</h3>
+          <p class="small text-muted">Tu gasto energético basal (Mifflin-St Jeor) se calcula con estos parámetros exactos.</p>
           
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label for="setProfileWeight">Peso Actual (kg)</label>
+              <input type="number" step="0.1" id="setProfileWeight" placeholder="Ej. 80" required>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 8px;">
+              <label for="setGoalWeight">Peso Meta / Deseado (kg)</label>
+              <input type="number" step="0.1" id="setGoalWeight" placeholder="Ej. 75.0" value="75.0" required>
+            </div>
+          </div>
+          <div style="margin-bottom: 10px;">
+            <small class="text-muted" id="txtGoalWeightFeedback" style="font-weight: 700;">Meta: Disminuir 5.0 kg</small>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+            <div class="form-group">
+              <label for="setProfileAge">Edad (años)</label>
+              <input type="number" id="setProfileAge" placeholder="Ej. 35" required>
+            </div>
+
+            <div class="form-group">
+              <label for="setProfileHeight">Altura (cm)</label>
+              <input type="number" id="setProfileHeight" placeholder="Ej. 175" value="175">
+            </div>
+
+            <div class="form-group">
+              <label for="setProfileGender">Sexo</label>
+              <select id="setProfileGender">
+                <option value="male">Hombre</option>
+                <option value="female">Mujer</option>
+              </select>
+            </div>
+          </div>
+
+          <hr class="divider">
+
+          <!-- 2. OBJETIVO FÍSICO -->
+          <h3>2. Objetivo Físico y Muscular</h3>
+          <p class="small text-muted">Determina el balance calórico y la prioridad de aminoácidos para síntesis proteica.</p>
+          <input type="hidden" id="setFitnessGoal" value="fat_loss">
+
+          <div class="goal-cards-grid">
+            <!-- Pérdida de Grasa -->
+            <button type="button" class="goal-card-btn active" data-goal="fat_loss">
+              <div class="goal-card-header">
+                <span class="goal-card-icon">📉</span>
+                <span class="goal-card-title">Pérdida de Grasa</span>
+              </div>
+              <span class="goal-card-desc">Déficit calórico protegiendo masa magra y maximizando lipólisis.</span>
+              <span class="goal-card-tag tag-deficit">Déficit • 1.8 - 2.5 g/kg P</span>
+            </button>
+
+            <!-- Aumento Muscular / Hipertrofia -->
+            <button type="button" class="goal-card-btn" data-goal="hypertrophy">
+              <div class="goal-card-header">
+                <span class="goal-card-icon">💪</span>
+                <span class="goal-card-title">Aumento Muscular</span>
+              </div>
+              <span class="goal-card-desc">Superávit anabólico para síntesis de miofibrillas y fuerza.</span>
+              <span class="goal-card-tag tag-surplus">Superávit • Glucógeno</span>
+            </button>
+
+            <!-- Recomposición Corporal -->
+            <button type="button" class="goal-card-btn" data-goal="recomp">
+              <div class="goal-card-header">
+                <span class="goal-card-icon">⚡</span>
+                <span class="goal-card-title">Recomposición</span>
+              </div>
+              <span class="goal-card-desc">Ganar músculo y oxidar grasa corporal al mismo tiempo.</span>
+              <span class="goal-card-tag tag-recomp">Mantenimiento • 2.2+ g/kg P</span>
+            </button>
+
+            <!-- Mantenimiento y Salud -->
+            <button type="button" class="goal-card-btn" data-goal="maintenance">
+              <div class="goal-card-header">
+                <span class="goal-card-icon">⚖️</span>
+                <span class="goal-card-title">Mantenimiento</span>
+              </div>
+              <span class="goal-card-desc">Equilibrio normocalórico sostenible para salud y rendimiento.</span>
+              <span class="goal-card-tag tag-neutral">Normocalórica • Balance</span>
+            </button>
+          </div>
+
+          <!-- 3. RITMO / VELOCIDAD DE CAMBIO -->
+          <div class="pace-selector-wrap">
+            <label style="font-size: 0.82rem; font-weight: 700; color: #cbd5e1;">Velocidad de Reducción o Ganancia</label>
+            <input type="hidden" id="setPaceRate" value="moderate">
+            <div class="pace-chips-row">
+              <button type="button" class="pace-chip-btn" data-pace="slow">
+                <span class="pace-chip-label">🐢 Conservador</span>
+                <span class="pace-chip-sub">±10% • ~0.25 kg/sem</span>
+              </button>
+              <button type="button" class="pace-chip-btn active" data-pace="moderate">
+                <span class="pace-chip-label">🎯 Moderado</span>
+                <span class="pace-chip-sub">±18% • ~0.50 kg/sem</span>
+              </button>
+              <button type="button" class="pace-chip-btn" data-pace="aggressive">
+                <span class="pace-chip-label">🚀 Agresivo</span>
+                <span class="pace-chip-sub">±25% • ~0.8-1 kg/sem</span>
+              </button>
+            </div>
+          </div>
+
+          <hr class="divider">
+
+          <!-- 4. MODELO NUTRICIONAL / DIETA -->
+          <h3>3. Modelo Nutricional / Dieta</h3>
+          <p class="small text-muted">Elige el enfoque dietético que mejor se adapte a tu estilo de vida y entrenamiento:</p>
+          <input type="hidden" id="setDietType" value="keto_standard">
+
+          <div class="diet-models-grid">
+            <!-- 1. Keto Estándar -->
+            <button type="button" class="diet-card-btn active" data-diet="keto_standard">
+              <div class="diet-card-top">
+                <span class="diet-card-icon">🥑</span>
+                <span class="diet-card-name">Keto Estándar</span>
+              </div>
+              <div class="diet-card-ratios-pill">22% P • 5% C • 73% G</div>
+              <span class="diet-card-desc">Cetosis clásica (&lt;30g netos), vaciado de glucógeno y producción de BOHB.</span>
+            </button>
+
+            <!-- 2. Keto Alta en Proteínas -->
+            <button type="button" class="diet-card-btn" data-diet="keto_high_protein">
+              <div class="diet-card-top">
+                <span class="diet-card-icon">🥩</span>
+                <span class="diet-card-name">Keto Proteica</span>
+              </div>
+              <div class="diet-card-ratios-pill">32% P • 5% C • 63% G</div>
+              <span class="diet-card-desc">Cetosis con máxima preservación muscular, extrema saciedad y alto TEF.</span>
+            </button>
+
+            <!-- 3. Low Carb -->
+            <button type="button" class="diet-card-btn" data-diet="low_carb">
+              <div class="diet-card-top">
+                <span class="diet-card-icon">🥗</span>
+                <span class="diet-card-name">Low Carb</span>
+              </div>
+              <div class="diet-card-ratios-pill">30% P • 20% C • 50% G</div>
+              <span class="diet-card-desc">50-130g de carbohidratos. Flexibilidad metabólica sin cetosis estricta.</span>
+            </button>
+
+            <!-- 4. Fitness Culturismo -->
+            <button type="button" class="diet-card-btn" data-diet="fitness_bodybuilding">
+              <div class="diet-card-top">
+                <span class="diet-card-icon">🏋️</span>
+                <span class="diet-card-name">Fitness Culturismo</span>
+              </div>
+              <div class="diet-card-ratios-pill">35% P • 45% C • 20% G</div>
+              <span class="diet-card-desc">Estándar de oro: síntesis proteica máxima (MPS) y glucógeno peri-entreno.</span>
+            </button>
+
+            <!-- 5. Dieta de la Zona -->
+            <button type="button" class="diet-card-btn" data-diet="zone">
+              <div class="diet-card-top">
+                <span class="diet-card-icon">⏱️</span>
+                <span class="diet-card-name">Dieta de la Zona</span>
+              </div>
+              <div class="diet-card-ratios-pill">30% P • 40% C • 30% G</div>
+              <span class="diet-card-desc">Balance hormonal insulina/glucagón y eicosanoides celulares en cada comida.</span>
+            </button>
+
+            <!-- 6. Alta en Carbos (HCLF) -->
+            <button type="button" class="diet-card-btn" data-diet="hclf">
+              <div class="diet-card-top">
+                <span class="diet-card-icon">🏃</span>
+                <span class="diet-card-name">Alta en Carbos (HCLF)</span>
+              </div>
+              <div class="diet-card-ratios-pill">18% P • 62% C • 20% G</div>
+              <span class="diet-card-desc">Para deportes de resistencia prolongada y máxima glucólisis aeróbica.</span>
+            </button>
+
+            <!-- 7. Equilibrada Mediterránea -->
+            <button type="button" class="diet-card-btn" data-diet="balanced">
+              <div class="diet-card-top">
+                <span class="diet-card-icon">🍎</span>
+                <span class="diet-card-name">Equilibrada / IIFYM</span>
+              </div>
+              <div class="diet-card-ratios-pill">20% P • 50% C • 30% G</div>
+              <span class="diet-card-desc">Sostenibilidad a largo plazo, balance flexible y salud cardiovascular.</span>
+            </button>
+
+            <!-- 8. Personalizada -->
+            <button type="button" class="diet-card-btn" data-diet="custom">
+              <div class="diet-card-top">
+                <span class="diet-card-icon">⚙️</span>
+                <span class="diet-card-name">Personalizada</span>
+              </div>
+              <div class="diet-card-ratios-pill">Ajuste Libre</div>
+              <span class="diet-card-desc">Configuración manual de gramos según pautas de tu preparador o nutricionista.</span>
+            </button>
+          </div>
+
+          <!-- 5. VISTA PREVIA EN VIVO DE METAS (LIVE PREVIEW) -->
+          <div class="macro-live-preview-box" id="boxMacroLivePreview">
+            <div class="macro-preview-header">
+              <span class="macro-preview-title">
+                <span>🎯</span> Metas Diarias Calculadas en Tiempo Real
+              </span>
+              <div class="macro-preview-energy">
+                <div class="macro-preview-calories" id="lblPreviewCalories">1,800 <small style="font-size:0.75rem; font-weight:600;">kcal</small></div>
+                <div class="macro-preview-energy-sub" id="lblPreviewEnergySub">TDEE: 2,250 kcal • Déficit: -450 kcal</div>
+              </div>
+            </div>
+
+            <div class="macro-preview-grid">
+              <div class="macro-preview-col preview-col-prot">
+                <div class="preview-col-lbl">Proteínas</div>
+                <div class="preview-col-val" id="lblPreviewProtein">144g</div>
+                <div class="preview-col-sub" id="lblPreviewProteinPerKg">1.8 g/kg • 32%</div>
+              </div>
+
+              <div class="macro-preview-col preview-col-carb">
+                <div class="preview-col-lbl">Carbos Netos</div>
+                <div class="preview-col-val" id="lblPreviewCarbs">25g</div>
+                <div class="preview-col-sub" id="lblPreviewCarbsPct">5% • Cetogénico</div>
+              </div>
+
+              <div class="macro-preview-col preview-col-fat">
+                <div class="preview-col-lbl">Grasas</div>
+                <div class="preview-col-val" id="lblPreviewFat">126g</div>
+                <div class="preview-col-sub" id="lblPreviewFatPct">63%</div>
+              </div>
+            </div>
+          </div>
+
+          <button type="button" id="btnAutoCalculateMacros" class="btn btn-outline full-width" style="margin: 8px 0 14px 0; border-color: #38bdf8; color: #38bdf8; font-weight: 700;">
+            ⚡ Aplicar Sugerencia Automática a los Campos Manuales
+          </button>
+
+          <!-- 6. CAMPOS MANUALES DE METAS NUTRICIONALES DIARIAS -->
+          <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 12px; margin-bottom: 14px;">
+            <span style="font-size: 0.8rem; font-weight: 700; color: #cbd5e1; display: block; margin-bottom: 8px;">
+              Edición Fina de Metas Diarias (Valores Activos de la App)
+            </span>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <div class="form-group" style="margin-bottom: 6px;">
+                <label for="setCalories">Objetivo Calórico (kcal)</label>
+                <input type="number" id="setCalories" required value="1800">
+              </div>
+              <div class="form-group" style="margin-bottom: 6px;">
+                <label for="setNetCarbs">Carbos Netos (g)</label>
+                <input type="number" id="setNetCarbs" required value="25">
+              </div>
+              <div class="form-group" style="margin-bottom: 6px;">
+                <label for="setProtein">Proteína (g)</label>
+                <input type="number" id="setProtein" required value="140">
+              </div>
+              <div class="form-group" style="margin-bottom: 6px;">
+                <label for="setFat">Grasas (g)</label>
+                <input type="number" id="setFat" required value="130">
+              </div>
+            </div>
+          </div>
+
+          <!-- 7. PROTOCOLO Y FECHAS -->
+          <hr class="divider">
+          <h3>4. Protocolo y Fecha de Inicio</h3>
           <div class="form-group">
             <label for="setKetoStartDate">Fecha y Hora de Inicio del Protocolo</label>
             <input type="datetime-local" id="setKetoStartDate">
-            <small class="text-muted">Calcula automáticamente los días y el vaciado de glucógeno.</small>
+            <small class="text-muted">Calcula automáticamente el Día 1, Día 2... y los ciclos de adaptación.</small>
           </div>
 
-          <button type="button" class="btn btn-outline full-width" id="btnOpenStartProcessModal" style="margin-bottom: 14px; border-color: #38bdf8; color: #38bdf8; font-weight: 700; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-            <span>🚀</span> Iniciar / Reiniciar Protocolo Cetogénico (Día 1)
+          <button type="button" class="btn btn-outline full-width" id="btnOpenStartProcessModal" style="margin-bottom: 14px; border-color: #38bdf8; color: #38bdf8; font-weight: 700; padding: 11px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <span>🚀</span> Iniciar / Reiniciar Protocolo (Día 1)
           </button>
 
+          <!-- 8. INTELIGENCIA ARTIFICIAL Y COPIAS DE SEGURIDAD -->
           <hr class="divider">
-          <h3>Datos Corporales (Ajuste Automático de Macros)</h3>
-          <p class="small text-muted">Ajusta tus metas de carbohidratos, proteínas y grasas exactamente a tu cuerpo.</p>
-          
-          <div class="form-group">
-            <label for="setProfileWeight">Peso Corporal Actual (kg)</label>
-            <input type="number" step="0.1" id="setProfileWeight" placeholder="Ej. 80" required>
-          </div>
-
-          <div class="form-group">
-            <label for="setGoalWeight">Peso Meta / Deseado (kg)</label>
-            <input type="number" step="0.1" id="setGoalWeight" placeholder="Ej. 75.0" value="75.0" required>
-            <small class="text-muted" id="txtGoalWeightFeedback">Meta: Disminuir 5.0 kg</small>
-          </div>
-
-          <div class="form-group">
-            <label for="setProfileAge">Edad (años)</label>
-            <input type="number" id="setProfileAge" placeholder="Ej. 35" required>
-          </div>
-
-          <div class="form-group">
-            <label for="setProfileHeight">Altura (cm)</label>
-            <input type="number" id="setProfileHeight" placeholder="Ej. 175" value="175">
-          </div>
-
-          <div class="form-group">
-            <label for="setProfileGender">Sexo Biológico</label>
-            <select id="setProfileGender">
-              <option value="male">Hombre</option>
-              <option value="female">Mujer</option>
-            </select>
-          </div>
-
-          <button type="button" id="btnAutoCalculateMacros" class="btn btn-outline full-width" style="margin: 10px 0 14px 0;">
-            ⚡ Recalcular Calorías y Macros para mi Meta de Peso
-          </button>
-
-          <hr class="divider">
-          <h3>Metas Nutricionales Diarias</h3>
-
-          <div class="form-group">
-            <label for="setCalories">Objetivo Calórico (kcal para tu meta)</label>
-            <input type="number" id="setCalories" required value="1800">
-            <small class="text-muted">Calculado automáticamente con déficit saludable (OMS/ACSM).</small>
-          </div>
-          <div class="form-group">
-            <label for="setNetCarbs">Límite Diario de Carbos Netos (g)</label>
-            <input type="number" id="setNetCarbs" required value="25">
-          </div>
-          <div class="form-group">
-            <label for="setProtein">Objetivo de Proteína (g)</label>
-            <input type="number" id="setProtein" required value="140">
-            <small class="text-muted">1.8g por kg para proteger tu musculatura en cetosis.</small>
-          </div>
-          <div class="form-group">
-            <label for="setFat">Objetivo de Grasas (g)</label>
-            <input type="number" id="setFat" required value="130">
-          </div>
-
-          <div class="form-group" style="margin-top: 14px; background: rgba(56, 189, 248, 0.06); padding: 12px; border-radius: 8px; border: 1px dashed rgba(56, 189, 248, 0.3);">
+          <div class="form-group" style="margin-top: 10px; background: rgba(56, 189, 248, 0.06); padding: 12px; border-radius: 8px; border: 1px dashed rgba(56, 189, 248, 0.3);">
             <label for="setGeminiApiKey">✨ Clave API de Google Gemini (Opcional)</label>
             <input type="password" id="setGeminiApiKey" placeholder="Pega tu clave AIzaSy... (Opcional)">
-            <small class="text-muted">Opcional. Permite consultar directamente a la IA de Google Gemini para recetas complejas o platos de restaurante. Si la dejas vacía, Barriketo utiliza el motor local exacto sin internet ni consumo de saldo.</small>
+            <small class="text-muted">Permite consultar platos complejos al modelo Gemini de Google. Si la dejas vacía, la app opera con su base de datos local rápida sin internet.</small>
           </div>
 
-          <button type="submit" class="btn btn-primary full-width btn-save-settings">💾 Guardar Ajustes y Recalcular Metas</button>
+          <button type="submit" class="btn btn-primary full-width btn-save-settings" style="padding: 13px; font-weight: 800; font-size: 0.95rem;">
+            💾 Guardar Ajustes y Activar Programa
+          </button>
 
           <hr class="divider" style="margin: 20px 0 14px 0;">
           <h3>Copia de Seguridad y Datos</h3>
-          <p class="small text-muted">Exporta o restaura tus comidas, historial y ajustes en un archivo de respaldo seguro.</p>
+          <p class="small text-muted">Exporta o restaura tus comidas, historial y ajustes en un archivo seguro.</p>
           <div style="display: flex; gap: 10px; margin-top: 10px;">
             <button type="button" id="btnExportData" class="btn btn-outline" style="flex: 1; padding: 10px 8px; font-size: 0.85rem;">📥 Exportar Copia</button>
             <button type="button" id="btnImportData" class="btn btn-outline" style="flex: 1; padding: 10px 8px; font-size: 0.85rem;">📤 Restaurar Copia</button>

@@ -288,7 +288,7 @@ function checkAndPerformDailyRollover() {
 }
 
 // ==========================================================================
-// 1. CÁLCULO DE MACRONUTRIENTES PERSONALIZADOS SEGÚN PESO Y EDAD (v4.0 NIH / HALL)
+// 1. CÁLCULO DE MACRONUTRIENTES PERSONALIZADOS SEGÚN OBJETIVO Y DIETA (v4.2 NIH / ACSM)
 // ==========================================================================
 function calculatePersonalizedTargets(profile) {
   const weightKg = Number(profile?.weight || 80);
@@ -296,10 +296,12 @@ function calculatePersonalizedTargets(profile) {
   const age = Number(profile?.age || 35);
   const heightCm = Number(profile?.height || 175);
   const gender = profile?.gender || 'male';
-  const netCarbTarget = Number(profile?.net_carbs_target || 25);
   const bodyFatPct = profile?.body_fat_pct != null ? Number(profile.body_fat_pct) : null;
+  const fitnessGoal = profile?.fitness_goal || 'fat_loss';
+  const paceRate = profile?.pace_rate || 'moderate';
+  const dietType = profile?.diet_type || 'keto_standard';
 
-  // BMR: Katch-McArdle si existe masa libre de grasa, o Mifflin-St Jeor (1990)
+  // 1. BMR: Katch-McArdle si existe masa libre de grasa, o Mifflin-St Jeor (1990)
   let bmr = 0;
   if (bodyFatPct && bodyFatPct > 3 && bodyFatPct < 60) {
     const ffmKg = weightKg * (1 - (bodyFatPct / 100));
@@ -309,54 +311,129 @@ function calculatePersonalizedTargets(profile) {
     bmr += (gender === 'female' ? -161 : 5);
   }
 
-  // Gasto Energético Total Diario (TDEE base en reposo / actividad leve)
+  // 2. Gasto Energético Total Diario (TDEE base en reposo / actividad física ligera)
   const tdeeBase = Math.round(bmr * 1.25);
 
-  // Cálculo de déficit según el peso a disminuir (OMS / ACSM)
-  const weightToLose = Math.max(0, Math.round((weightKg - goalWeight) * 10) / 10);
-  let deficitRatio = 0;
-  if (weightToLose >= 10) {
-    deficitRatio = 0.20; // 20% déficit para pérdida sostenida (aprox 450-500 kcal)
-  } else if (weightToLose > 0) {
-    deficitRatio = 0.15; // 15% déficit para pérdida moderada (aprox 300-380 kcal)
+  // 3. Modulación Calórica según Objetivo Físico y Ritmo de Cambio
+  let deltaRatio = 0;
+  let deltaLabel = 'Mantenimiento';
+  if (fitnessGoal === 'fat_loss') {
+    if (paceRate === 'slow') deltaRatio = -0.10;
+    else if (paceRate === 'aggressive') deltaRatio = -0.25;
+    else deltaRatio = -0.18; // moderate
+    deltaLabel = `Déficit: -${Math.round(tdeeBase * Math.abs(deltaRatio))} kcal`;
+  } else if (fitnessGoal === 'hypertrophy') {
+    if (paceRate === 'slow') deltaRatio = 0.08;
+    else if (paceRate === 'aggressive') deltaRatio = 0.22;
+    else deltaRatio = 0.15; // moderate
+    deltaLabel = `Superávit: +${Math.round(tdeeBase * deltaRatio)} kcal`;
+  } else if (fitnessGoal === 'recomp') {
+    if (paceRate === 'slow') deltaRatio = -0.05;
+    else if (paceRate === 'aggressive') deltaRatio = -0.12;
+    else deltaRatio = -0.08; // moderate
+    deltaLabel = `Déficit leve: -${Math.round(tdeeBase * Math.abs(deltaRatio))} kcal`;
+  } else {
+    deltaRatio = 0; // maintenance
+    deltaLabel = 'Equilibrio normocalórico';
   }
 
   // Pisos de seguridad clínica internacional (OMS / ACSM)
   const minSafeCalories = gender === 'female' ? 1200 : 1450;
-  let targetCalories = Math.round(tdeeBase * (1 - deficitRatio));
-  targetCalories = Math.max(minSafeCalories, targetCalories);
-  const dailyDeficit = Math.max(0, tdeeBase - targetCalories);
+  let targetCalories = Math.max(minSafeCalories, Math.round(tdeeBase * (1 + deltaRatio)));
 
-  // Macronutrientes cetogénicos v4.0
-  // Proteína: 1.8g / kg para preservar musculatura en déficit calórico (Morton & Phillips, BJSM 2018)
-  const proteinGrams = Math.round(weightKg * 1.8);
-  const proteinCalories = proteinGrams * 4;
-  const carbCalories = netCarbTarget * 4;
-  const fatCalories = Math.max(0, targetCalories - proteinCalories - carbCalories);
-  const fatGrams = Math.round(fatCalories / 9);
+  // 4. Distribución de Macronutrientes según Modelo Dietético Elegido
+  let proteinGrams = 0;
+  let carbGrams = 0;
+  let fatGrams = 0;
+  let dietCarbNote = '';
 
-  // TEF Dinámico del plan objetivo (Proteína 25%, Carbos 8%, Grasas 2%)
-  const targetTef = Math.round((proteinGrams * 4 * 0.25) + (netCarbTarget * 4 * 0.08) + (fatGrams * 9 * 0.02));
+  if (dietType === 'keto_standard') {
+    // 20-25% P / 5% C / 70-75% G (<30g netos)
+    carbGrams = 25;
+    proteinGrams = Math.round(weightKg * 1.8);
+    const remCal = Math.max(0, targetCalories - (carbGrams * 4) - (proteinGrams * 4));
+    fatGrams = Math.max(25, Math.round(remCal / 9));
+    dietCarbNote = '<30g Cetogénico';
+  } else if (dietType === 'keto_high_protein') {
+    // 30-35% P / 5% C / 60-65% G
+    carbGrams = 25;
+    proteinGrams = Math.round(weightKg * 2.2);
+    const remCal = Math.max(0, targetCalories - (carbGrams * 4) - (proteinGrams * 4));
+    fatGrams = Math.max(25, Math.round(remCal / 9));
+    dietCarbNote = '<30g Cetosis Máx Proteína';
+  } else if (dietType === 'low_carb') {
+    // 25-35% P / 15-25% C / 45-50% G (50-130g carbos)
+    proteinGrams = Math.round(weightKg * 2.0);
+    carbGrams = Math.min(130, Math.max(50, Math.round((targetCalories * 0.20) / 4)));
+    const remCal = Math.max(0, targetCalories - (carbGrams * 4) - (proteinGrams * 4));
+    fatGrams = Math.max(25, Math.round(remCal / 9));
+    dietCarbNote = '50-130g Low Carb';
+  } else if (dietType === 'fitness_bodybuilding') {
+    // 30-40% P / 40-50% C / 15-25% G (Culturismo)
+    const pMultiplier = fitnessGoal === 'fat_loss' ? 2.3 : (fitnessGoal === 'recomp' ? 2.4 : 2.0);
+    proteinGrams = Math.round(weightKg * pMultiplier);
+    fatGrams = Math.max(30, Math.round(weightKg * 0.8));
+    const remCal = Math.max(0, targetCalories - (proteinGrams * 4) - (fatGrams * 9));
+    carbGrams = Math.max(40, Math.round(remCal / 4));
+    dietCarbNote = 'Glucógeno & Rendimiento';
+  } else if (dietType === 'zone') {
+    // Dieta de la Zona (30% P / 40% C / 30% G)
+    proteinGrams = Math.round((targetCalories * 0.30) / 4);
+    carbGrams = Math.round((targetCalories * 0.40) / 4);
+    fatGrams = Math.round((targetCalories * 0.30) / 9);
+    dietCarbNote = 'Balance 40-30-30';
+  } else if (dietType === 'hclf') {
+    // Alta en Carbos (18% P / 62% C / 20% G)
+    proteinGrams = Math.round((targetCalories * 0.18) / 4);
+    carbGrams = Math.round((targetCalories * 0.62) / 4);
+    fatGrams = Math.round((targetCalories * 0.20) / 9);
+    dietCarbNote = 'Alta Glucólisis';
+  } else if (dietType === 'balanced') {
+    // Equilibrada Estándar (20% P / 50% C / 30% G)
+    proteinGrams = Math.round((targetCalories * 0.20) / 4);
+    carbGrams = Math.round((targetCalories * 0.50) / 4);
+    fatGrams = Math.round((targetCalories * 0.30) / 9);
+    dietCarbNote = 'Flexible / Mediterránea';
+  } else {
+    // Custom / Personalizada
+    proteinGrams = Number(profile?.protein_target || Math.round(weightKg * 1.8));
+    carbGrams = Number(profile?.net_carbs_target || 25);
+    fatGrams = Number(profile?.fat_target || Math.max(25, Math.round((targetCalories - (proteinGrams * 4) - (carbGrams * 4)) / 9)));
+    dietCarbNote = 'Personalizado';
+  }
 
-  // Recalibrar calorías finales exactas con los gramos redondeados
-  const finalCalories = Math.round((fatGrams * 9) + proteinCalories + carbCalories);
+  // Recalibración final de calorías y proporciones reales
+  const finalCalories = (proteinGrams * 4) + (carbGrams * 4) + (fatGrams * 9);
+  const proteinPerKg = Math.round((proteinGrams / weightKg) * 10) / 10;
+  const ratioP = Math.round(((proteinGrams * 4) / finalCalories) * 100);
+  const ratioC = Math.round(((carbGrams * 4) / finalCalories) * 100);
+  const ratioF = Math.max(0, 100 - ratioP - ratioC);
+
+  // TEF Dinámico del plan objetivo
+  const targetTef = Math.round((proteinGrams * 4 * 0.25) + (carbGrams * 4 * 0.08) + (fatGrams * 9 * 0.02));
 
   return {
     weight: weightKg,
     goalWeight,
-    weightToLose,
+    weightDiff: Math.round((weightKg - goalWeight) * 10) / 10,
     age,
     height: heightCm,
     gender,
+    fitnessGoal,
+    paceRate,
+    dietType,
     bmr: Math.round(bmr),
     tdee: tdeeBase,
     tef: targetTef,
-    deficit: dailyDeficit,
-    deficitRatio: Math.round(deficitRatio * 100),
-    netCarbs: netCarbTarget,
+    deltaRatio: Math.round(deltaRatio * 100),
+    deltaLabel,
+    calories: finalCalories,
     protein: proteinGrams,
+    proteinPerKg,
+    netCarbs: carbGrams,
     fat: fatGrams,
-    calories: finalCalories
+    ratios: { protein: ratioP, carbs: ratioC, fat: ratioF },
+    dietCarbNote
   };
 }
 
@@ -2874,10 +2951,117 @@ function renderPersonalizedScienceModal(data) {
 }
 
 // ==========================================================================
-// 4. RENDER DASHBOARD (CON FUEGO O CUENTA REGRESIVA)
+// 4. RENDER DASHBOARD (PERSONALIZADO POR DIETA Y OBJETIVO)
 // ==========================================================================
 function renderDashboard(data) {
   const { ketosis, macros, garmin } = data;
+
+  const currentDiet = state.settings?.diet_type || 'keto_standard';
+  const currentGoal = state.settings?.fitness_goal || 'fat_loss';
+  const isKetoDiet = (currentDiet === 'keto_standard' || currentDiet === 'keto_high_protein');
+
+  const DIET_NAMES = {
+    'keto_standard': { name: 'Keto Estándar', icon: '🥑' },
+    'keto_high_protein': { name: 'Keto Proteica', icon: '🥩' },
+    'low_carb': { name: 'Low Carb', icon: '🥗' },
+    'fitness_bodybuilding': { name: 'Fitness Culturismo', icon: '🏋️' },
+    'zone': { name: 'Dieta de la Zona', icon: '⏱️' },
+    'hclf': { name: 'Alta en Carbos (HCLF)', icon: '🏃' },
+    'balanced': { name: 'Equilibrada / IIFYM', icon: '🍎' },
+    'custom': { name: 'Personalizada', icon: '⚙️' }
+  };
+
+  const GOAL_NAMES = {
+    'fat_loss': 'Pérdida de Grasa',
+    'hypertrophy': 'Aumento Muscular',
+    'recomp': 'Recomposición',
+    'maintenance': 'Mantenimiento'
+  };
+
+  // 0. ACTUALIZAR BANNER SUPERIOR DE PROGRAMA ACTIVO
+  const elBannerIcon = document.getElementById('bannerProgramIcon');
+  const elBannerGoal = document.getElementById('bannerProgramGoal');
+  const elBannerDiet = document.getElementById('bannerProgramDiet');
+  const elBannerMacros = document.getElementById('bannerProgramMacros');
+
+  if (elBannerIcon) elBannerIcon.textContent = DIET_NAMES[currentDiet]?.icon || '🥑';
+  if (elBannerGoal) elBannerGoal.textContent = GOAL_NAMES[currentGoal] || 'Pérdida de Grasa';
+  if (elBannerDiet) elBannerDiet.textContent = DIET_NAMES[currentDiet]?.name || 'Keto Estándar';
+  if (elBannerMacros) {
+    const tCal = Number(macros.targets.calories || 2000).toLocaleString();
+    const tProt = macros.targets.protein || 140;
+    const tCarbs = macros.targets.netCarbs || 25;
+    const tFat = macros.targets.fat || 130;
+    elBannerMacros.textContent = `Meta: ${tCal} kcal • ${tProt}g P • ${tCarbs}g C • ${tFat}g G`;
+  }
+
+  // TARJETA DE RENDIMIENTO FITNESS (DIETAS NO-KETO)
+  const cardFitness = document.getElementById('cardFitnessPerformance');
+  if (cardFitness) {
+    cardFitness.style.display = isKetoDiet ? 'none' : 'block';
+    if (!isKetoDiet) {
+      const elFitIcon = document.getElementById('fitnessHeroIcon');
+      const elFitTitle = document.getElementById('fitnessHeroTitle');
+      const elFitSub = document.getElementById('fitnessHeroSubtitle');
+      const elFitBadge = document.getElementById('fitnessHeroBadge');
+      const elFitProtVal = document.getElementById('valFitnessProteinGPerKg');
+      const elFitProtTarget = document.getElementById('lblFitnessProteinTarget');
+      const elFitCarbVal = document.getElementById('valFitnessCarbsStatus');
+      const elFitCarbTarget = document.getElementById('lblFitnessCarbsTarget');
+      const elFitEnergy = document.getElementById('valFitnessEnergyBalance');
+      const elFitEnergyTarget = document.getElementById('lblFitnessEnergyTarget');
+      const elFitProtSummary = document.getElementById('lblFitnessProtSummary');
+      const elFitProtPct = document.getElementById('lblFitnessProtPercent');
+      const elBarFitProt = document.getElementById('barFitnessProtFill');
+
+      const curWeight = Number(state.settings?.weight || 80);
+      const pConsumed = Math.round(Number(macros.totals.protein || 0) * 10) / 10;
+      const pTarget = Math.round(Number(macros.targets.protein || 140));
+      const pPerKg = Math.round((pConsumed / curWeight) * 10) / 10;
+      const pTargetPerKg = Math.round((pTarget / curWeight) * 10) / 10;
+      const cConsumed = Math.round(Number(macros.totals.netCarbs || 0));
+      const cTarget = Math.round(Number(macros.targets.netCarbs || 200));
+      const totalBurn = Math.round(garmin.total_calories || ((garmin.bmr_calories || 2188) + Number(garmin.active_calories || 0)));
+      const calIn = Math.round(Number(macros.totals.calories || 0));
+      const calBalance = totalBurn - calIn;
+
+      if (elFitIcon) elFitIcon.textContent = DIET_NAMES[currentDiet]?.icon || '🏋️';
+      if (elFitTitle) elFitTitle.textContent = `Modo ${DIET_NAMES[currentDiet]?.name || 'Fitness'} (${GOAL_NAMES[currentGoal]})`;
+      if (elFitSub) {
+        if (currentDiet === 'fitness_bodybuilding') elFitSub.textContent = 'Síntesis Proteica Muscular (MPS) & Reposición Glucogénica';
+        else if (currentDiet === 'low_carb') elFitSub.textContent = 'Flexibilidad Metabólica & Estabilidad Glucémica';
+        else if (currentDiet === 'zone') elFitSub.textContent = 'Control Hormonal Insulina / Glucagón (40-30-30)';
+        else if (currentDiet === 'hclf') elFitSub.textContent = 'Glucólisis Aeróbica y Alto Rendimiento Deportivo';
+        else if (currentDiet === 'balanced') elFitSub.textContent = 'Nutrición Equilibrada y Sostenible (IIFYM)';
+        else elFitSub.textContent = 'Ruta Metabólica Optimizada según Perfil';
+      }
+      if (elFitBadge) {
+        elFitBadge.textContent = pPerKg >= 1.6 ? '✅ MPS Óptimo' : '⚡ En Reposición';
+        elFitBadge.style.color = pPerKg >= 1.6 ? '#34d399' : '#38bdf8';
+      }
+
+      if (elFitProtVal) elFitProtVal.innerHTML = `${pPerKg} <small style="font-size:0.7rem;">g/kg</small>`;
+      if (elFitProtTarget) elFitProtTarget.textContent = `Meta: ${pTargetPerKg} g/kg (${pTarget}g)`;
+
+      if (elFitCarbVal) elFitCarbVal.innerHTML = `${cConsumed} <small style="font-size:0.7rem;">/ ${cTarget}g</small>`;
+      if (elFitCarbTarget) {
+        elFitCarbTarget.textContent = cConsumed <= cTarget ? `${cTarget - cConsumed}g restantes` : 'Meta de glucógeno cubierta';
+      }
+
+      if (elFitEnergy) {
+        elFitEnergy.innerHTML = `${calBalance >= 0 ? '-' : '+'}${Math.abs(calBalance).toLocaleString()} <small style="font-size:0.7rem;">kcal</small>`;
+        elFitEnergy.style.color = (currentGoal === 'hypertrophy' ? (calBalance < 0 ? '#34d399' : '#f59e0b') : (calBalance >= 0 ? '#38bdf8' : '#f87171'));
+      }
+      if (elFitEnergyTarget) {
+        elFitEnergyTarget.textContent = calBalance >= 0 ? 'Déficit calórico hoy' : 'Superávit calórico hoy';
+      }
+
+      const pPct = Math.min(100, Math.round((pConsumed / Math.max(1, pTarget)) * 100));
+      if (elFitProtSummary) elFitProtSummary.textContent = `${pConsumed}g / ${pTarget}g`;
+      if (elFitProtPct) elFitProtPct.textContent = `${pPct}%`;
+      if (elBarFitProt) elBarFitProt.style.width = `${pPct}%`;
+    }
+  }
 
   const cardKetosis = document.getElementById('cardKetosisStatus');
   const flameBox = document.getElementById('ketosisFlameBox');
@@ -2886,8 +3070,13 @@ function renderDashboard(data) {
   // 1. BADGE DE FASE Y PROTOCOLO
   const badgePhase = document.getElementById('badgePhase');
   if (badgePhase) {
-    badgePhase.textContent = 'Día ' + ketosis.protocolDay + (ketosis.phase >= 3 ? ' • En Cetosis 🔥' : ' • En Proceso');
-    badgePhase.style.backgroundColor = ketosis.statusColor;
+    if (isKetoDiet) {
+      badgePhase.textContent = 'Día ' + ketosis.protocolDay + (ketosis.phase >= 3 ? ' • En Cetosis 🔥' : ' • En Proceso');
+      badgePhase.style.backgroundColor = ketosis.statusColor;
+    } else {
+      badgePhase.textContent = `${DIET_NAMES[currentDiet]?.name || 'Dieta'} • ${GOAL_NAMES[currentGoal] || 'Fitness'}`;
+      badgePhase.style.backgroundColor = '#0284c7';
+    }
   }
 
   const elKetones = document.getElementById('valEstimatedKetones');
@@ -2905,16 +3094,24 @@ function renderDashboard(data) {
 
   const elPhaseTitle = document.getElementById('txtPhaseTitle');
   if (elPhaseTitle) {
-    elPhaseTitle.textContent = ketosis.phase >= 3 
-      ? '¡Cetosis Nutricional Activa!' 
-      : (ketosis.phase === 2 ? 'Cetosis Inicial (Inducción)' : 'En Proceso de Inducción');
+    if (isKetoDiet) {
+      elPhaseTitle.textContent = ketosis.phase >= 3 
+        ? '¡Cetosis Nutricional Activa!' 
+        : (ketosis.phase === 2 ? 'Cetosis Inicial (Inducción)' : 'En Proceso de Inducción');
+    } else {
+      elPhaseTitle.textContent = 'Sensor Metabólico BOHB';
+    }
   }
 
   const elPhaseDesc = document.getElementById('txtPhaseDesc');
   if (elPhaseDesc) {
-    elPhaseDesc.textContent = ketosis.phase >= 3
-      ? 'Tu cuerpo y cerebro queman cetonas de alta pureza a pleno rendimiento.'
-      : 'Vaciando depósitos para cruzar al umbral de quema de grasa.';
+    if (isKetoDiet) {
+      elPhaseDesc.textContent = ketosis.phase >= 3
+        ? 'Tu cuerpo y cerebro queman cetonas de alta pureza a pleno rendimiento.'
+        : 'Vaciando depósitos para cruzar al umbral de quema de grasa.';
+    } else {
+      elPhaseDesc.textContent = 'Concentración basal de cuerpos cetónicos según ingesta de carbohidratos.';
+    }
   }
 
   // Velocímetro metabólico circular con degradee tricolor dinámico
@@ -2954,9 +3151,9 @@ function renderDashboard(data) {
   }
 
   // Reloj de cuenta regresiva para guiar hacia la siguiente fase
-  // Si ya se alcanzó la cetosis profunda (Fase 4, última etapa), el contador no debe estar
+  // Si no es dieta keto o ya se alcanzó la cetosis profunda (Fase 4), el contador se oculta
   if (forecastBox) {
-    if (ketosis.phase >= 4) {
+    if (!isKetoDiet || ketosis.phase >= 4) {
       forecastBox.style.display = 'none';
     } else {
       forecastBox.style.display = 'block';
@@ -2964,6 +3161,7 @@ function renderDashboard(data) {
   }
 
   if (cardKetosis) {
+    cardKetosis.style.display = isKetoDiet ? 'block' : 'none';
     if (ketosis.isKetosisActive) {
       cardKetosis.style.border = '1px solid rgba(16, 185, 129, 0.6)';
       cardKetosis.style.boxShadow = '0 0 20px rgba(16, 185, 129, 0.2)';
@@ -3348,14 +3546,28 @@ function renderDashboard(data) {
   
   const badgeCarb = document.getElementById('badgeCarbStatus');
   if (badgeCarb) {
-    if (macros.status.carbLimitExceeded) {
-      badgeCarb.textContent = '¡Límite Superado!';
-      badgeCarb.style.color = 'var(--accent-red)';
-      if (barNetCarbs) barNetCarbs.style.background = 'var(--accent-red)';
+    if (isKetoDiet) {
+      if (macros.status.carbLimitExceeded) {
+        badgeCarb.textContent = '¡Límite Cetogénico Superado!';
+        badgeCarb.style.color = 'var(--accent-red)';
+        if (barNetCarbs) barNetCarbs.style.background = 'var(--accent-red)';
+      } else {
+        badgeCarb.textContent = macros.status.carbRemaining + 'g restantes';
+        badgeCarb.style.color = 'var(--accent-green)';
+        if (barNetCarbs) barNetCarbs.style.background = 'var(--accent-amber)';
+      }
     } else {
-      badgeCarb.textContent = macros.status.carbRemaining + 'g restantes';
-      badgeCarb.style.color = 'var(--accent-green)';
-      if (barNetCarbs) barNetCarbs.style.background = 'var(--accent-amber)';
+      const cConsumed = Math.round(Number(macros.totals.netCarbs || 0));
+      const cTarget = Math.round(Number(macros.targets.netCarbs || 200));
+      if (cConsumed > cTarget) {
+        badgeCarb.textContent = '+' + (cConsumed - cTarget) + 'g sobre meta';
+        badgeCarb.style.color = '#f59e0b';
+        if (barNetCarbs) barNetCarbs.style.background = '#f59e0b';
+      } else {
+        badgeCarb.textContent = (cTarget - cConsumed) + 'g restantes';
+        badgeCarb.style.color = 'var(--accent-green)';
+        if (barNetCarbs) barNetCarbs.style.background = '#38bdf8';
+      }
     }
   }
 
@@ -4913,17 +5125,41 @@ function loadSettings() {
   if (inGoal) inGoal.value = s.goal_weight || 75.0;
   updateGoalWeightFeedback();
 
+  // 1. Objetivo Físico
+  const fitnessGoal = s.fitness_goal || 'fat_loss';
+  const inGoalInput = document.getElementById('setFitnessGoal');
+  if (inGoalInput) inGoalInput.value = fitnessGoal;
+  document.querySelectorAll('.goal-card-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.goal === fitnessGoal);
+  });
+
+  // 2. Ritmo / Velocidad
+  const paceRate = s.pace_rate || 'moderate';
+  const inPaceInput = document.getElementById('setPaceRate');
+  if (inPaceInput) inPaceInput.value = paceRate;
+  document.querySelectorAll('.pace-chip-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.pace === paceRate);
+  });
+
+  // 3. Modelo Dietético
+  const dietType = s.diet_type || 'keto_standard';
+  const inDietInput = document.getElementById('setDietType');
+  if (inDietInput) inDietInput.value = dietType;
+  document.querySelectorAll('.diet-card-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.diet === dietType);
+  });
+
   const inCarbs = document.getElementById('setNetCarbs');
-  if (inCarbs) inCarbs.value = s.net_carbs_target || 25;
+  if (inCarbs) inCarbs.value = s.net_carbs_target != null ? s.net_carbs_target : 25;
 
   const inProt = document.getElementById('setProtein');
-  if (inProt) inProt.value = s.protein_target || 140;
+  if (inProt) inProt.value = s.protein_target != null ? s.protein_target : 140;
 
   const inFat = document.getElementById('setFat');
-  if (inFat) inFat.value = s.fat_target || 150;
+  if (inFat) inFat.value = s.fat_target != null ? s.fat_target : 150;
 
   const inCal = document.getElementById('setCalories');
-  if (inCal) inCal.value = s.calories_target || 2000;
+  if (inCal) inCal.value = s.calories_target != null ? s.calories_target : 2000;
 
   const inStartDate = document.getElementById('setKetoStartDate');
   if (inStartDate) {
@@ -4937,6 +5173,8 @@ function loadSettings() {
   if (inGeminiKey) {
     inGeminiKey.value = s.gemini_api_key || '';
   }
+
+  updateSettingsLivePreview(false);
 }
 
 function updateGoalWeightFeedback() {
@@ -4949,7 +5187,7 @@ function updateGoalWeightFeedback() {
       fb.textContent = '🎯 Meta: Disminuir ' + diff + ' kg de peso corporal';
       fb.style.color = '#38bdf8';
     } else if (diff < 0) {
-      fb.textContent = '🎯 Meta: Ganar ' + Math.abs(diff) + ' kg de peso';
+      fb.textContent = '🎯 Meta: Ganar ' + Math.abs(diff) + ' kg de peso corporal';
       fb.style.color = '#f59e0b';
     } else {
       fb.textContent = '🎯 Meta: Mantenimiento de peso actual';
@@ -4958,16 +5196,15 @@ function updateGoalWeightFeedback() {
   }
 }
 
-document.getElementById('setProfileWeight')?.addEventListener('input', updateGoalWeightFeedback);
-document.getElementById('setGoalWeight')?.addEventListener('input', updateGoalWeightFeedback);
-
-document.getElementById('btnAutoCalculateMacros')?.addEventListener('click', () => {
+function updateSettingsLivePreview(applyToInputs = false) {
   const weight = parseFloat(document.getElementById('setProfileWeight')?.value) || 80;
   const goalWeight = parseFloat(document.getElementById('setGoalWeight')?.value) || 75;
   const age = parseFloat(document.getElementById('setProfileAge')?.value) || 35;
   const height = parseFloat(document.getElementById('setProfileHeight')?.value) || 175;
   const gender = document.getElementById('setProfileGender')?.value || 'male';
-  const carbs = parseFloat(document.getElementById('setNetCarbs')?.value) || 25;
+  const fitnessGoal = document.getElementById('setFitnessGoal')?.value || 'fat_loss';
+  const paceRate = document.getElementById('setPaceRate')?.value || 'moderate';
+  const dietType = document.getElementById('setDietType')?.value || 'keto_standard';
 
   const calculated = calculatePersonalizedTargets({
     weight,
@@ -4975,27 +5212,117 @@ document.getElementById('btnAutoCalculateMacros')?.addEventListener('click', () 
     age,
     height,
     gender,
-    net_carbs_target: carbs
+    fitness_goal: fitnessGoal,
+    pace_rate: paceRate,
+    diet_type: dietType
   });
 
-  document.getElementById('setProtein').value = calculated.protein;
-  document.getElementById('setFat').value = calculated.fat;
-  document.getElementById('setCalories').value = calculated.calories;
-  updateGoalWeightFeedback();
+  const lblPreviewCalories = document.getElementById('lblPreviewCalories');
+  const lblPreviewEnergySub = document.getElementById('lblPreviewEnergySub');
+  const lblPreviewProtein = document.getElementById('lblPreviewProtein');
+  const lblPreviewProteinPerKg = document.getElementById('lblPreviewProteinPerKg');
+  const lblPreviewCarbs = document.getElementById('lblPreviewCarbs');
+  const lblPreviewCarbsPct = document.getElementById('lblPreviewCarbsPct');
+  const lblPreviewFat = document.getElementById('lblPreviewFat');
+  const lblPreviewFatPct = document.getElementById('lblPreviewFatPct');
 
-  let msg = '¡Metas recalculadas automáticamente!\n' +
-    '• Peso actual: ' + weight + ' kg | Meta: ' + goalWeight + ' kg\n';
-  if (calculated.weightToLose > 0) {
-    msg += '• Objetivo: Bajar ' + calculated.weightToLose + ' kg (Déficit saludable: -' + calculated.deficit + ' kcal / día)\n';
-  } else {
-    msg += '• Objetivo: Mantenimiento de peso\n';
+  if (lblPreviewCalories) {
+    lblPreviewCalories.innerHTML = calculated.calories.toLocaleString() + ' <small style="font-size:0.75rem; font-weight:600;">kcal</small>';
   }
-  msg += '• Calorías necesarias calculadas: ' + calculated.calories + ' kcal\n' +
-    '• Proteínas: ' + calculated.protein + 'g (1.8g/kg para proteger músculo)\n' +
-    '• Grasas: ' + calculated.fat + 'g\n' +
-    '• Carbos: ' + calculated.netCarbs + 'g';
+  if (lblPreviewEnergySub) {
+    lblPreviewEnergySub.textContent = `TDEE: ${calculated.tdee.toLocaleString()} kcal • ${calculated.deltaLabel}`;
+  }
+  if (lblPreviewProtein) {
+    lblPreviewProtein.textContent = calculated.protein + 'g';
+  }
+  if (lblPreviewProteinPerKg) {
+    lblPreviewProteinPerKg.textContent = `${calculated.proteinPerKg} g/kg • ${calculated.ratios.protein}%`;
+  }
+  if (lblPreviewCarbs) {
+    lblPreviewCarbs.textContent = calculated.netCarbs + 'g';
+  }
+  if (lblPreviewCarbsPct) {
+    lblPreviewCarbsPct.textContent = `${calculated.ratios.carbs}% • ${calculated.dietCarbNote}`;
+  }
+  if (lblPreviewFat) {
+    lblPreviewFat.textContent = calculated.fat + 'g';
+  }
+  if (lblPreviewFatPct) {
+    lblPreviewFatPct.textContent = `${calculated.ratios.fat}%`;
+  }
 
-  alert(msg);
+  if (applyToInputs) {
+    const inCal = document.getElementById('setCalories');
+    const inCarbs = document.getElementById('setNetCarbs');
+    const inProt = document.getElementById('setProtein');
+    const inFat = document.getElementById('setFat');
+    if (inCal) inCal.value = calculated.calories;
+    if (inCarbs) inCarbs.value = calculated.netCarbs;
+    if (inProt) inProt.value = calculated.protein;
+    if (inFat) inFat.value = calculated.fat;
+  }
+
+  updateGoalWeightFeedback();
+}
+
+// Eventos interactivos en tiempo real para el modal de ajustes
+['setProfileWeight', 'setGoalWeight', 'setProfileAge', 'setProfileHeight', 'setProfileGender'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) {
+    el.addEventListener('input', () => updateSettingsLivePreview(true));
+    el.addEventListener('change', () => updateSettingsLivePreview(true));
+  }
+});
+
+// Selección de Objetivo Físico
+document.querySelectorAll('.goal-card-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.goal-card-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const goal = btn.dataset.goal;
+    const inGoalInput = document.getElementById('setFitnessGoal');
+    if (inGoalInput) inGoalInput.value = goal;
+    updateSettingsLivePreview(true);
+  });
+});
+
+// Selección de Ritmo / Velocidad
+document.querySelectorAll('.pace-chip-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.pace-chip-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const pace = btn.dataset.pace;
+    const inPaceInput = document.getElementById('setPaceRate');
+    if (inPaceInput) inPaceInput.value = pace;
+    updateSettingsLivePreview(true);
+  });
+});
+
+// Selección de Dieta Nutricional
+document.querySelectorAll('.diet-card-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.diet-card-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const diet = btn.dataset.diet;
+    const inDietInput = document.getElementById('setDietType');
+    if (inDietInput) inDietInput.value = diet;
+    updateSettingsLivePreview(true);
+  });
+});
+
+// Botón Recalcular / Aplicar en vivo
+document.getElementById('btnAutoCalculateMacros')?.addEventListener('click', () => {
+  updateSettingsLivePreview(true);
+});
+
+// Banner del Dashboard para abrir Ajustes rápidamente
+document.getElementById('bannerActiveProgram')?.addEventListener('click', () => {
+  const modal = document.getElementById('settingsModal');
+  if (modal) {
+    loadSettings();
+    modal.classList.add('show');
+    document.body.classList.add('modal-open');
+  }
 });
 
 document.getElementById('formSettings')?.addEventListener('submit', (e) => {
@@ -5010,6 +5337,9 @@ document.getElementById('formSettings')?.addEventListener('submit', (e) => {
     height: parseFloat(document.getElementById('setProfileHeight')?.value) || 175,
     gender: document.getElementById('setProfileGender')?.value || 'male',
     goal_weight: parseFloat(document.getElementById('setGoalWeight')?.value) || 75.0,
+    fitness_goal: document.getElementById('setFitnessGoal')?.value || 'fat_loss',
+    pace_rate: document.getElementById('setPaceRate')?.value || 'moderate',
+    diet_type: document.getElementById('setDietType')?.value || 'keto_standard',
     net_carbs_target: parseFloat(document.getElementById('setNetCarbs')?.value) || 25,
     protein_target: parseFloat(document.getElementById('setProtein')?.value) || 140,
     fat_target: parseFloat(document.getElementById('setFat')?.value) || 150,
