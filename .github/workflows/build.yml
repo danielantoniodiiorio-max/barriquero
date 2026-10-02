@@ -90,7 +90,7 @@ jobs:
                 <application
                     android:allowBackup=\"true\"
                     android:icon=\"@mipmap/ic_launcher\"
-                    android:label=\"Barriketo\"
+                    android:label=\"Barriketo Multi\"
                     android:roundIcon=\"@mipmap/ic_launcher_round\"
                     android:supportsRtl=\"true\"
                     android:theme=\"@android:style/Theme.DeviceDefault.NoActionBar\">
@@ -98,7 +98,7 @@ jobs:
                     <activity
                         android:configChanges=\"orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode\"
                         android:name=\".MainActivity\"
-                        android:label=\"Barriketo\"
+                        android:label=\"Barriketo Multi\"
                         android:theme=\"@android:style/Theme.DeviceDefault.NoActionBar\"
                         android:launchMode=\"singleTask\"
                         android:exported=\"true\">
@@ -140,11 +140,16 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace
 
+      - name: Preparar Artefactos de la App Independiente
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/barriketo-multidiet.apk
+          ls -la android/app/build/outputs/apk/debug/
+
       - name: Guardar APK como Artefacto Descargable
         uses: actions/upload-artifact@v4
         with:
-          name: KetoTrack-Android-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: Barriketo-Multi-APK
+          path: android/app/build/outputs/apk/debug/barriketo-multidiet.apk
           retention-days: 14
 
       - name: Publicar APK Directo en Releases (Sin ZIP)
@@ -152,8 +157,10 @@ jobs:
         continue-on-error: true
         with:
           tag_name: latest
-          name: "Barriketo APK (Última Versión)"
-          body: "Descarga directa del APK de Barriketo para tu celular Android con Health Connect, Garmin y reconocimiento IA de comidas."
-          files: android/app/build/outputs/apk/debug/app-debug.apk
+          name: "Barriketo Multi APK (App Independiente)"
+          body: "Descarga de Barriketo Multi (app independiente con identificador com.barriketo.multidiet para instalar en paralelo en tu celular sin tocar ni interferir con tu Barriketo original)."
+          files: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/debug/barriketo-multidiet.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -3,6 +3,19 @@ const path = require('path');
 
 console.log('--- Configurando Android Gradle con Firma Permanente ---');
 
+// Leer capacitor.config.json para obtener appId y appName
+const capConfigPath = path.join(__dirname, '..', 'capacitor.config.json');
+let appId = 'com.barriketo.multidiet';
+let appName = 'Barriketo Multi';
+if (fs.existsSync(capConfigPath)) {
+  try {
+    const capConfig = JSON.parse(fs.readFileSync(capConfigPath, 'utf8'));
+    if (capConfig.appId) appId = capConfig.appId;
+    if (capConfig.appName) appName = capConfig.appName;
+  } catch (e) {}
+}
+console.log(`Configurando aplicación para: appId=${appId}, appName=${appName}`);
+
 const buildGradlePath = path.join(__dirname, '..', 'android', 'app', 'build.gradle');
 if (!fs.existsSync(buildGradlePath)) {
   console.error('No se encontró android/app/build.gradle');
@@ -11,9 +24,9 @@ if (!fs.existsSync(buildGradlePath)) {
 
 let content = fs.readFileSync(buildGradlePath, 'utf8');
 
-// 1. Incrementar versionCode a 29 y versionName a 1.28.0
-content = content.replace(/versionCode\s+\d+/, 'versionCode 29');
-content = content.replace(/versionName\s+["'][^"']*["']/, 'versionName "1.28.0"');
+// 1. Incrementar versionCode y versionName
+content = content.replace(/versionCode\s+\d+/, 'versionCode 30');
+content = content.replace(/versionName\s+["'][^"']*["']/, 'versionName "1.30.0"');
 
 // 2. Inyectar bloque signingConfigs permanente
 const signingConfigsBlock = `
@@ -70,10 +83,26 @@ if (!content.includes('desugar_jdk_libs')) {
 fs.writeFileSync(buildGradlePath, content, 'utf8');
 console.log('android/app/build.gradle actualizado correctamente con firma permanente ketotrack.keystore');
 
-// 5. Configurar MainActivity.java con soporte de botón Atrás seguro
-const mainActivityPath = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'java', 'com', 'ketotrack', 'garmin', 'MainActivity.java');
-if (fs.existsSync(path.dirname(mainActivityPath))) {
-  const mainActivityCode = `package com.ketotrack.garmin;
+// 5. Configurar MainActivity.java dinámicamente con soporte de botón Atrás seguro
+function findMainActivity(dir) {
+  if (!fs.existsSync(dir)) return null;
+  const files = fs.readdirSync(dir);
+  for (const file of files) {
+    const fullPath = path.join(dir, file);
+    if (fs.statSync(fullPath).isDirectory()) {
+      const found = findMainActivity(fullPath);
+      if (found) return found;
+    } else if (file === 'MainActivity.java') {
+      return fullPath;
+    }
+  }
+  return null;
+}
+
+const javaSrcDir = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'java');
+const mainActivityPath = findMainActivity(javaSrcDir);
+if (mainActivityPath) {
+  const mainActivityCode = `package ${appId};
 
 import android.os.Bundle;
 import android.webkit.WebView;
@@ -96,15 +125,15 @@ public class MainActivity extends BridgeActivity {
 }
 `;
   fs.writeFileSync(mainActivityPath, mainActivityCode, 'utf8');
-  console.log('MainActivity.java configurado correctamente con navegación y botón Atrás seguro');
+  console.log(`MainActivity.java configurado correctamente en ${mainActivityPath} con package ${appId}`);
 }
 
-// 6. Configurar strings.xml con el nombre oficial Barriketo
+// 6. Configurar strings.xml con el nombre oficial
 const stringsPath = path.join(__dirname, '..', 'android', 'app', 'src', 'main', 'res', 'values', 'strings.xml');
 if (fs.existsSync(stringsPath)) {
   let stringsXml = fs.readFileSync(stringsPath, 'utf8');
-  stringsXml = stringsXml.replace(/<string name="app_name">.*?<\/string>/, '<string name="app_name">Barriketo</string>');
-  stringsXml = stringsXml.replace(/<string name="title_activity_main">.*?<\/string>/, '<string name="title_activity_main">Barriketo</string>');
+  stringsXml = stringsXml.replace(/<string name="app_name">.*?<\/string>/, `<string name="app_name">${appName}</string>`);
+  stringsXml = stringsXml.replace(/<string name="title_activity_main">.*?<\/string>/, `<string name="title_activity_main">${appName}</string>`);
   fs.writeFileSync(stringsPath, stringsXml, 'utf8');
-  console.log('strings.xml actualizado con nombre Barriketo');
+  console.log(`strings.xml actualizado con nombre ${appName}`);
 }

@@ -1,6 +1,6 @@
 {
-  "appId": "com.ketotrack.garmin",
-  "appName": "Barriketo",
+  "appId": "com.barriketo.multidiet",
+  "appName": "Barriketo Multi",
   "webDir": "public",
   "bundledWebRuntime": false,
   "server": {
